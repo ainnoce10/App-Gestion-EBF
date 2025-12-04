@@ -24,9 +24,10 @@ export interface StatData {
 export interface Technician {
   id: string;
   name: string;
-  specialty: string;
-  status: 'Available' | 'Busy' | 'Leave';
+  specialty: string; // Mapped from 'role'
+  status: 'Available' | 'Busy' | 'Leave'; // Mocked or added to DB later
   site: Site;
+  email?: string;
 }
 
 export interface StockItem {
@@ -42,10 +43,11 @@ export interface Intervention {
   id: string;
   site: Site;
   client: string;
-  clientPhone?: string; // Added field
+  clientPhone?: string;
   location: string; 
   description: string;
   technicianId: string;
+  technicianName?: string;
   date: string;
   status: 'Pending' | 'In Progress' | 'Completed';
 }
@@ -67,6 +69,16 @@ export interface DailyReport {
   clientName?: string;
   clientPhone?: string;
   audioUrl?: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'Recette' | 'Dépense';
+  amount: number;
+  label: string;
+  category: string;
+  date: string;
+  site: Site;
 }
 
 export interface TickerMessage {

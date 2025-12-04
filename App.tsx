@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
-import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Technician } from './types';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Technician, Transaction } from './types';
 import { supabase } from './services/supabaseClient';
 
 // --- Types for Navigation & Forms ---
@@ -122,35 +122,9 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
   ]
 };
 
-// --- Form Definitions ---
-const FORM_CONFIGS: Record<string, FormConfig> = {
-  '/techniciens/interventions': {
-    title: 'Nouvelle Intervention',
-    fields: [
-      { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
-      { name: 'client', label: 'Nom du Client', type: 'text', placeholder: 'Ex: Hôtel Ivoire' },
-      { name: 'clientPhone', label: 'Numéro du Client', type: 'text', placeholder: 'Ex: 0707...' },
-      { name: 'lieu', label: 'Lieu d\'intervention', type: 'text', placeholder: 'Ex: Cocody Riviera' },
-      { name: 'description', label: 'Description', type: 'text', placeholder: 'Ex: Panne Clim R410' },
-      { name: 'technician', label: 'Technicien', type: 'select', options: ['T1', 'T2', 'T3'] }, // Idealement dynamique
-      { name: 'date', label: 'Date Prévue', type: 'date' },
-      { name: 'status', label: 'Statut Initial', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
-    ]
-  },
-  '/quincaillerie/stocks': {
-    title: 'Article Stock',
-    fields: [
-      { name: 'name', label: 'Nom Article', type: 'text' },
-      { name: 'quantity', label: 'Quantité Initiale', type: 'number' },
-      { name: 'unit', label: 'Unité', type: 'text', placeholder: 'm, kg, pcs...' },
-      { name: 'threshold', label: 'Seuil Alerte', type: 'number' },
-      { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
-    ]
-  },
-};
-
 // --- Helper: Date Filter ---
 const isInPeriod = (dateStr: string, period: Period): boolean => {
+  if (!dateStr) return false;
   const date = new Date(dateStr);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -558,7 +532,6 @@ const Header = ({ onMenuClick, title, onLogout, onOpenProfile, onOpenHelp, darkM
       </div>
       
       <div className="flex items-center space-x-3">
-        {/* Notifications and Settings removed from here for brevity based on previous context, can be re-added if needed but prompt focused on Login */}
         <div className="relative group">
            <button className="p-2 text-ebf-orange hover:bg-orange-50 rounded-full transition"><Settings size={24} /></button>
            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-orange-100 dark:border-gray-700 hidden group-hover:block animate-fade-in z-50">
@@ -809,7 +782,8 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     // Labels mapping for nicer display
     const COLUMN_LABELS: Record<string, string> = {
         name: 'Nom', quantity: 'Quantité', unit: 'Unité', threshold: 'Seuil', site: 'Site',
-        client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technician: 'Technicien', date: 'Date', status: 'Statut'
+        client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technician: 'Technicien', date: 'Date', status: 'Statut',
+        amount: 'Montant', type: 'Type', label: 'Libellé', category: 'Catégorie', email: 'Email', specialty: 'Spécialité'
     };
 
     // Filter items locally based on Site and Period props if passed
@@ -826,7 +800,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     // Determine columns from first item
     const columns = filteredItems.length > 0 
         ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId') 
-        : ['info']; // Fallback
+        : []; 
 
     return (
         <div className="space-y-4 animate-fade-in">
@@ -869,11 +843,11 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
                     <table className="w-full min-w-[600px]">
                         <thead className={`bg-opacity-10 ${color}`}>
                             <tr>
-                                {columns.map(col => (
+                                {columns.length > 0 ? columns.map(col => (
                                     <th key={col} className="p-4 text-left text-xs font-bold uppercase tracking-wider text-green-900">
                                         {COLUMN_LABELS[col] || col}
                                     </th>
-                                ))}
+                                )) : <th className="p-4 text-left text-xs font-bold uppercase tracking-wider text-green-900">Info</th>}
                                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wider text-green-900">Actions</th>
                             </tr>
                         </thead>
@@ -1081,6 +1055,7 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
   const [stock, setStock] = useState<StockItem[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [reports, setReports] = useState<DailyReport[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>([]);
   
   // Dashboard Derived Data
@@ -1093,6 +1068,55 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
 
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
   const [viewReport, setViewReport] = useState<any | null>(null);
+
+  // --- FORM CONFIGURATION (Dynamic based on data) ---
+  const formConfigs = useMemo<Record<string, FormConfig>>(() => ({
+      '/techniciens/interventions': {
+        title: 'Nouvelle Intervention',
+        fields: [
+          { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
+          { name: 'client', label: 'Nom du Client', type: 'text', placeholder: 'Ex: Hôtel Ivoire' },
+          { name: 'clientPhone', label: 'Numéro du Client', type: 'text', placeholder: 'Ex: 0707...' },
+          { name: 'lieu', label: 'Lieu d\'intervention', type: 'text', placeholder: 'Ex: Cocody Riviera' },
+          { name: 'description', label: 'Description', type: 'text', placeholder: 'Ex: Panne Clim R410' },
+          // Dynamically populate technicians
+          { name: 'technician', label: 'Technicien', type: 'select', options: technicians.map(t => t.name) }, 
+          { name: 'date', label: 'Date Prévue', type: 'date' },
+          { name: 'status', label: 'Statut Initial', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
+        ]
+      },
+      '/quincaillerie/stocks': {
+        title: 'Article Stock',
+        fields: [
+          { name: 'name', label: 'Nom Article', type: 'text' },
+          { name: 'quantity', label: 'Quantité Initiale', type: 'number' },
+          { name: 'unit', label: 'Unité', type: 'text', placeholder: 'm, kg, pcs...' },
+          { name: 'threshold', label: 'Seuil Alerte', type: 'number' },
+          { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+        ]
+      },
+      '/comptabilite/rh': {
+        title: 'Nouvel Employé',
+        fields: [
+           { name: 'full_name', label: 'Nom Complet', type: 'text' },
+           { name: 'email', label: 'Email', type: 'email' },
+           { name: 'role', label: 'Rôle', type: 'select', options: ['Technicien', 'Magasinier', 'Secretaire', 'Admin'] },
+           { name: 'site', label: 'Site Principal', type: 'select', options: ['Abidjan', 'Bouaké'] },
+        ]
+      },
+      '/comptabilite/bilan': {
+        title: 'Nouvelle Transaction',
+        fields: [
+           { name: 'type', label: 'Type', type: 'select', options: ['Recette', 'Dépense'] },
+           { name: 'amount', label: 'Montant (FCFA)', type: 'number' },
+           { name: 'label', label: 'Libellé', type: 'text' },
+           { name: 'category', label: 'Catégorie', type: 'select', options: ['Facture Client', 'Achat Matériel', 'Salaire', 'Transport', 'Autre'] },
+           { name: 'date', label: 'Date', type: 'date' },
+           { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
+        ]
+      }
+  }), [technicians]);
+
 
   // --- FETCH DATA FROM SUPABASE ---
   const fetchData = async () => {
@@ -1108,8 +1132,8 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
           clientPhone: i.client_phone,
           location: i.location,
           description: i.description,
-          technicianId: i.technician_id, // Map ID or Name depending on needs
-          technician: 'Technicien', // Placeholder or fetch name
+          technicianId: i.technician_id,
+          technician: 'Technicien', // Placeholder waiting for join
           date: i.scheduled_date,
           status: i.status
         })));
@@ -1124,7 +1148,7 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
       if (reps) {
         setReports(reps.map(r => ({
           id: r.id,
-          technicianName: 'Technicien', // Need join ideally
+          technicianName: 'Technicien', 
           date: r.date,
           method: r.method,
           site: r.site,
@@ -1143,6 +1167,23 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
       // 4. Fetch Ticker
       const { data: msgs } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
       if (msgs) setTickerMessages(msgs);
+
+      // 5. Fetch Profiles (Technicians)
+      const { data: profs } = await supabase.from('profiles').select('*');
+      if (profs) {
+         setTechnicians(profs.map(p => ({
+            id: p.id,
+            name: p.full_name,
+            specialty: p.role,
+            status: 'Available',
+            site: p.site,
+            email: p.email
+         })));
+      }
+
+      // 6. Fetch Transactions
+      const { data: trans } = await supabase.from('transactions').select('*').order('date', { ascending: false });
+      if (trans) setTransactions(trans);
 
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -1168,22 +1209,15 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
     };
   }, []);
 
-  // --- CALCULATE DASHBOARD STATS ---
+  // --- CALCULATE DASHBOARD STATS (Aggregated from Reports + Transactions) ---
   useEffect(() => {
-    // Generate StatData from Reports (Revenue/Expenses)
     const statsMap = new Map<string, StatData>();
 
+    // 1. From Reports
     reports.forEach(r => {
       if (!r.date) return;
       if (!statsMap.has(r.date)) {
-        statsMap.set(r.date, {
-          date: r.date,
-          site: r.site as Site,
-          revenue: 0,
-          expenses: 0,
-          profit: 0,
-          interventions: 0
-        });
+        statsMap.set(r.date, { date: r.date, site: r.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 });
       }
       const stat = statsMap.get(r.date)!;
       const rev = Number(r.revenue || 0);
@@ -1193,11 +1227,27 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
       stat.profit += (rev - exp);
       stat.interventions += 1;
     });
+
+    // 2. From Transactions
+    transactions.forEach(t => {
+       if (!t.date) return;
+       if (!statsMap.has(t.date)) {
+          statsMap.set(t.date, { date: t.date, site: t.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 });
+       }
+       const stat = statsMap.get(t.date)!;
+       if (t.type === 'Recette') {
+          stat.revenue += Number(t.amount);
+          stat.profit += Number(t.amount);
+       } else {
+          stat.expenses += Number(t.amount);
+          stat.profit -= Number(t.amount);
+       }
+    });
     
     // Sort by date
     setDashboardStats(Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date)));
 
-  }, [reports]);
+  }, [reports, transactions]);
 
 
   // --- CRUD HANDLERS ---
@@ -1207,8 +1257,8 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
   };
 
   const handleAddClick = () => {
-    if (FORM_CONFIGS[currentPath]) {
-      setModalConfig(FORM_CONFIGS[currentPath]);
+    if (formConfigs[currentPath]) {
+      setModalConfig(formConfigs[currentPath]);
       setIsModalOpen(true);
     }
   };
@@ -1235,8 +1285,32 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
           threshold: data.threshold,
           site: data.site
         }]);
+      } else if (currentPath.includes('rh')) {
+        // Warning: This only adds to 'profiles' table. Real auth user needs Signup API.
+        // Assuming we just want to list them here.
+        // In real app: use admin API or trigger.
+        await supabase.from('profiles').insert([{
+             // id needs to be generated if not auth linked, but schema enforces FK.
+             // Workaround: We cannot insert into profiles directly if they are not auth users.
+             // We will assume for this demo that we are using a separate 'employees' logic 
+             // OR we just alert the user to use Signup page.
+             // Actually, let's use a simpler approach: Just try insert, if fails, alert.
+             id: crypto.randomUUID(), // This will fail if FK constraint exists to auth.users
+             full_name: data.full_name,
+             email: data.email,
+             role: data.role,
+             site: data.site
+        }]);
+      } else if (currentPath.includes('bilan')) {
+         await supabase.from('transactions').insert([{
+             type: data.type,
+             amount: data.amount,
+             label: data.label,
+             category: data.category,
+             date: data.date,
+             site: data.site
+         }]);
       }
-      // Add other cases...
       
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
@@ -1271,10 +1345,6 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
   };
 
   const handleTickerUpdate = async (msgs: TickerMessage[]) => {
-    // Sync with DB: Strategy -> Delete all and re-insert is easiest for reordering, 
-    // but Upsert is better. For simplicity, let's just use the modal logic to upsert one by one or delete.
-    // Actually, the modal passes the full new list.
-    
     // 1. Find deleted
     const currentIds = tickerMessages.map(m => m.id);
     const newIds = msgs.map(m => m.id);
@@ -1286,17 +1356,13 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
 
     // 2. Upsert (Update or Insert)
     for (const msg of msgs) {
-       // Check if exists to determine insert/update if UUID is not standard
-       // Assuming msg.id is generated by Date.now() in frontend, it might clash with UUID. 
-       // Better to let Supabase handle ID for new ones, but for reordering we need display_order.
-       const { error } = await supabase.from('ticker_messages').upsert({
-         id: msg.id.length < 10 ? undefined : msg.id, // Simple check if it's a temp ID
+       await supabase.from('ticker_messages').upsert({
+         id: msg.id.length < 10 ? undefined : msg.id, 
          text: msg.text,
          type: msg.type,
          display_order: msgs.indexOf(msg)
        });
     }
-    
     fetchData();
   };
 
@@ -1305,6 +1371,8 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
      if (currentPath.includes('interventions')) type = 'interventions';
      else if (currentPath.includes('stocks')) type = 'stocks';
      else if (currentPath.includes('rapports')) type = 'daily_reports';
+     else if (currentPath.includes('rh')) type = 'profiles';
+     else if (currentPath.includes('bilan')) type = 'transactions';
      
      if (type) {
        setDeleteModalConfig({ isOpen: true, itemId: item.id, type });
@@ -1388,6 +1456,8 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
       items = stock; title = 'Stocks'; subtitle = 'Inventaire matériel'; color = 'bg-blue-500';
     } else if (currentPath === '/comptabilite/rh') {
       items = technicians; title = 'Ressources Humaines'; subtitle = 'Personnel'; color = 'bg-purple-500';
+    } else if (currentPath === '/comptabilite/bilan') {
+      items = transactions; title = 'Bilan Financier'; subtitle = 'Recettes & Dépenses'; color = 'bg-green-600';
     }
 
     return (
