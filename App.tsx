@@ -783,9 +783,6 @@ const HeaderWithNotif = ({
                  )}
               </div>
 
-              {/* Flash Info Button */}
-              <button onClick={onOpenFlashInfo} className="p-2 hover:bg-orange-50 rounded-full transition"><Megaphone className="text-ebf-orange"/></button>
-
               {/* Settings Dropdown */}
               <div className="relative" ref={settingsRef}>
                  <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition">
@@ -796,6 +793,9 @@ const HeaderWithNotif = ({
                       <div className="p-2 space-y-1">
                          <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <User size={16} className="text-ebf-green"/> Mon Profil
+                         </button>
+                         <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
+                            <Megaphone size={16} className="text-ebf-orange"/> Configurer Flash Info
                          </button>
                          <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <div className="flex items-center gap-3"><Moon size={16} className="text-indigo-500"/> Mode Sombre</div>
