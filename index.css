@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.animate-ticker {
+  display: flex;
+  width: max-content;
+}
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.submenu-enter { max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s ease-in-out; }
+.submenu-enter-active { max-height: 500px; opacity: 1; }
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #FF8C00; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #228B22; }
+
+/* CRITICAL FIX: Force Inputs to be White with Green Text */
+input, select, textarea {
+  background-color: #ffffff !important;
+  color: #14532d !important; /* green-900 */
+  border-color: #fed7aa; /* orange-200 default */
+}
+::placeholder { color: #166534 !important; opacity: 0.5; }
+input:focus, select:focus, textarea:focus {
+  border-color: #FF8C00 !important;
+  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.2) !important;
+  outline: none !important;
+}
