@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -472,7 +471,6 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
 const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
   return (
     <div className="space-y-8 animate-fade-in">
-       {/* Boutons (Masqués si readOnly pour les visiteurs, mais affichés pour techniciens) */}
        {!readOnly && (
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition text-left relative overflow-hidden group">
@@ -641,6 +639,94 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
   );
 };
 
+// --- Header Component (Extracted) ---
+const HeaderWithNotif = ({ 
+  title, 
+  onMenuClick, 
+  onLogout, 
+  onOpenFlashInfo, 
+  notifications, 
+  userProfile, 
+  userRole, 
+  markNotificationAsRead 
+}: any) => {
+    const [showDropdown, setShowDropdown] = useState(false);
+    const unreadCount = notifications.filter((n: Notification) => !n.read).length;
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: any) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+           <div className="flex items-center gap-4">
+              <button onClick={onMenuClick} className="lg:hidden p-2"><Menu/></button>
+              <h2 className="text-xl font-bold text-green-900 hidden md:block">{title}</h2>
+           </div>
+           
+           <div className="flex items-center gap-3">
+               <div className="flex items-center gap-3 border-l pl-4 ml-2 border-orange-200">
+                  <div className="hidden md:block text-right">
+                     <p className="text-sm font-bold text-green-900">{userProfile?.full_name || 'Utilisateur'}</p>
+                     <p className="text-xs text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-ebf-green to-emerald-700 text-white flex items-center justify-center font-bold text-lg shadow-md border-2 border-white">
+                      {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
+                  </div>
+               </div>
+
+              <div className="relative ml-2" ref={dropdownRef}>
+                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-orange-50 rounded-full transition">
+                     <Bell className="text-ebf-green"/>
+                     {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}
+                 </button>
+                 
+                 {showDropdown && (
+                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-orange-100 overflow-hidden animate-fade-in z-50">
+                         <div className="p-3 border-b border-orange-50 bg-gray-50 flex justify-between items-center">
+                             <h3 className="font-bold text-green-900 text-sm">Notifications</h3>
+                             <span className="text-xs text-gray-500">{unreadCount} non lues</span>
+                         </div>
+                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                             {notifications.length === 0 ? (
+                                 <div className="p-4 text-center text-gray-400 text-sm">Aucune notification</div>
+                             ) : (
+                                 notifications.map((notif: Notification) => (
+                                     <div 
+                                         key={notif.id} 
+                                         onClick={() => { markNotificationAsRead(notif); setShowDropdown(false); }}
+                                         className={`p-3 border-b border-gray-50 hover:bg-orange-50 cursor-pointer transition ${!notif.read ? 'bg-orange-50/30' : ''}`}
+                                     >
+                                         <div className="flex items-start gap-3">
+                                             <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'alert' ? 'bg-red-500' : notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                                             <div>
+                                                 <p className={`text-sm ${!notif.read ? 'font-bold text-green-900' : 'text-gray-600'}`}>{notif.title}</p>
+                                                 <p className="text-xs text-gray-500 line-clamp-2">{notif.message}</p>
+                                                 <p className="text-[10px] text-gray-400 mt-1">{new Date(notif.created_at).toLocaleDateString()}</p>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 ))
+                             )}
+                         </div>
+                     </div>
+                 )}
+              </div>
+
+              <button onClick={onOpenFlashInfo} className="p-2 hover:bg-orange-50 rounded-full transition"><Megaphone className="text-ebf-orange"/></button>
+              <button onClick={onLogout} className="p-2 hover:bg-red-50 rounded-full transition"><LogOut className="text-red-500"/></button>
+           </div>
+        </header>
+    )
+};
+
 // --- App Content with Role Management ---
 const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any, onLogout: () => void, userRole: Role, userProfile: Profile | null }) => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -729,13 +815,25 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
     } catch (err) { console.error(err); } 
     finally { setLoadingData(false); }
   };
+  
   useEffect(() => { fetchData(); const channels = supabase.channel('public:db-changes').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe(); return () => { supabase.removeChannel(channels); }; }, []);
+  
   useEffect(() => {
     const statsMap = new Map<string, StatData>();
     reports.forEach(r => { if (!r.date) return; if (!statsMap.has(r.date)) statsMap.set(r.date, { date: r.date, site: r.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(r.date)!; const rev = Number(r.revenue || 0); const exp = Number(r.expenses || 0); s.revenue += rev; s.expenses += exp; s.profit += (rev - exp); s.interventions += 1; });
     transactions.forEach(t => { if (!t.date) return; if (!statsMap.has(t.date)) statsMap.set(t.date, { date: t.date, site: t.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(t.date)!; if (t.type === 'Recette') { s.revenue += Number(t.amount); s.profit += Number(t.amount); } else { s.expenses += Number(t.amount); s.profit -= Number(t.amount); } });
     setDashboardStats(Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date)));
   }, [reports, transactions]);
+
+  // --- NOTIFICATION HELPERS ---
+  const createNotification = async (title: string, message: string, type: 'info' | 'success' | 'alert', path: string) => {
+      await supabase.from('notifications').insert([{ title, message, type, path, read: false }]);
+  };
+
+  const markNotificationAsRead = async (notif: Notification) => {
+      await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
+      if (notif.path) navigate(notif.path);
+  };
 
   // --- HANDLERS ---
   const handleTickerUpdate = async (msgs: TickerMessage[]) => {
@@ -744,45 +842,21 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
     for (let i = 0; i < msgs.length; i++) { const msg = msgs[i]; const payload: any = { text: msg.text, type: msg.type, display_order: i }; if (msg.id.length > 15) payload.id = msg.id; await supabase.from('ticker_messages').upsert(payload); }
     fetchData();
   };
+
   const navigate = (path: string) => { setCurrentPath(path); setReportMode('select'); };
+  
   const handleFormSubmit = async (data: any) => {
     setIsModalOpen(false);
     try {
-      if (currentPath.includes('interventions')) { const techProfile = profiles.find(p => p.full_name === data.technician); await supabase.from('interventions').insert([{ site: data.site, client_name: data.client, client_phone: data.clientPhone, location: data.lieu, description: data.description, scheduled_date: data.date, status: data.status, technician_id: techProfile?.id }]); } 
+      if (currentPath.includes('interventions')) { 
+          const techProfile = profiles.find(p => p.full_name === data.technician); 
+          await supabase.from('interventions').insert([{ site: data.site, client_name: data.client, client_phone: data.clientPhone, location: data.lieu, description: data.description, scheduled_date: data.date, status: data.status, technician_id: techProfile?.id }]); 
+          // TRIGGER NOTIFICATION
+          await createNotification('Nouvelle Intervention', `Nouvelle intervention créée pour ${data.client} à ${data.lieu}`, 'info', '/techniciens/interventions');
+      } 
       // Add other module inserts here
       setShowToast(true); setTimeout(() => setShowToast(false), 3000); fetchData();
     } catch (e) { console.error("Insert error", e); }
-  };
-
-  const HeaderWithNotif = (props: any) => {
-      const unreadCount = notifications.filter(n => !n.read).length;
-      return (
-          <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
-             <div className="flex items-center gap-4">
-                <button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button>
-                <h2 className="text-xl font-bold text-green-900 hidden md:block">{props.title}</h2>
-             </div>
-             
-             <div className="flex items-center gap-3">
-                 {/* PROFILE SECTION */}
-                 <div className="flex items-center gap-3 border-l pl-4 ml-2 border-orange-200">
-                    <div className="hidden md:block text-right">
-                       <p className="text-sm font-bold text-green-900">{userProfile?.full_name || 'Utilisateur'}</p>
-                       <p className="text-xs text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-ebf-green to-emerald-700 text-white flex items-center justify-center font-bold text-lg shadow-md border-2 border-white">
-                        {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
-                    </div>
-                 </div>
-
-                <div className="relative group ml-2">
-                   <button className="p-2 relative hover:bg-orange-50 rounded-full transition"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button>
-                </div>
-                <button onClick={props.onOpenFlashInfo} className="p-2 hover:bg-orange-50 rounded-full transition"><Megaphone className="text-ebf-orange"/></button>
-                <button onClick={props.onLogout} className="p-2 hover:bg-red-50 rounded-full transition"><LogOut className="text-red-500"/></button>
-             </div>
-          </header>
-      )
   };
 
   const renderContent = () => {
@@ -806,7 +880,16 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
      <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-orange-50 via-white to-green-50'}`}>
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setSidebarOpen} currentPath={currentPath} onNavigate={navigate} />
         <div className="lg:ml-72 min-h-screen flex flex-col transition-all duration-300">
-           <HeaderWithNotif onMenuClick={() => setSidebarOpen(true)} title="EBF Manager" onLogout={onLogout} onOpenFlashInfo={() => setIsFlashInfoOpen(true)} />
+           <HeaderWithNotif 
+              title="EBF Manager" 
+              onMenuClick={() => setSidebarOpen(true)} 
+              onLogout={onLogout} 
+              onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
+              notifications={notifications}
+              userProfile={userProfile}
+              userRole={userRole}
+              markNotificationAsRead={markNotificationAsRead}
+           />
            <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
         </div>
         <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
