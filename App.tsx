@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, UserCog, Sun
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, UserCog, Sun, Image as ImageIcon
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -232,6 +232,7 @@ const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
 const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -240,6 +241,7 @@ const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
     if (profile) {
       setFullName(profile.full_name || '');
       setPhone(profile.phone || '');
+      setAvatarUrl(profile.avatar_url || '');
     }
     setPassword('');
     setConfirmPassword('');
@@ -255,6 +257,7 @@ const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
         id: session.user.id,
         full_name: fullName,
         phone: phone,
+        avatar_url: avatarUrl,
         updated_at: new Date(),
       };
 
@@ -295,6 +298,18 @@ const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
         </div>
         
         <div className="p-6 space-y-4 overflow-y-auto">
+          {/* Avatar Preview */}
+          <div className="flex flex-col items-center justify-center mb-4">
+            <div className="w-24 h-24 rounded-full border-4 border-orange-100 overflow-hidden mb-2 relative bg-gray-100">
+               {avatarUrl ? (
+                 <img src={avatarUrl} alt="Profil" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150')} />
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={40} /></div>
+               )}
+            </div>
+            <label className="text-xs font-bold text-ebf-green uppercase tracking-wide">Photo de profil</label>
+          </div>
+
           <div>
             <label className="block text-sm font-bold text-green-900 mb-1">Nom Complet</label>
             <div className="relative">
@@ -303,6 +318,20 @@ const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
                 type="text" 
                 value={fullName} 
                 onChange={e => setFullName(e.target.value)} 
+                className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-green-900 mb-1">URL Photo (Lien)</label>
+            <div className="relative">
+              <ImageIcon className="absolute left-3 top-3 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                value={avatarUrl} 
+                onChange={e => setAvatarUrl(e.target.value)} 
+                placeholder="https://exemple.com/photo.jpg"
                 className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
               />
             </div>
@@ -406,6 +435,17 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
     if (visited) setHasLoggedInBefore(true);
   }, []);
 
+  const handleBiometricLogin = async () => {
+    // Simulation of WebAuthn / Biometric check
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      // In a real app, this would use navigator.credentials.get() and verify with Supabase
+      // Here we simulate a successful login trigger if the user exists in session
+      alert("Authentification Biométrique réussie (Simulation). Veuillez entrer votre mot de passe pour confirmer.");
+    }, 1500);
+  };
+
   const handleAuth = async () => {
     setLoading(true); setError(''); setSuccessMsg('');
 
@@ -446,7 +486,6 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         // --- SUCCÈS INSCRIPTION -> BASCULE VERS CONNEXION ---
         setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
         setIsSignUp(false); // Basculer automatiquement vers l'écran de connexion
-        // On garde identifier et password remplis pour faciliter la connexion
 
       } else {
         // --- CONNEXION ---
@@ -471,6 +510,26 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
           
           {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm mb-4 text-left">{error}</div>}
           {successMsg && <div className="bg-green-50 text-green-600 p-3 rounded text-sm mb-4 text-left font-bold">{successMsg}</div>}
+
+          {!isResetMode && !isSignUp && hasLoggedInBefore && (
+             <div className="mb-6 bg-orange-50 p-4 rounded-xl border border-orange-100">
+                <p className="text-xs font-bold text-ebf-orange uppercase mb-3">Connexion Rapide</p>
+                <div className="flex justify-center gap-6">
+                   <button onClick={handleBiometricLogin} className="flex flex-col items-center gap-1 group">
+                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:scale-110 transition border border-orange-200">
+                        <Fingerprint size={24} className="text-ebf-green" />
+                      </div>
+                      <span className="text-xs font-bold text-green-800">Touch ID</span>
+                   </button>
+                   <button onClick={handleBiometricLogin} className="flex flex-col items-center gap-1 group">
+                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:scale-110 transition border border-orange-200">
+                        <ScanFace size={24} className="text-ebf-green" />
+                      </div>
+                      <span className="text-xs font-bold text-green-800">Face ID</span>
+                   </button>
+                </div>
+             </div>
+          )}
 
           {!isResetMode && (
             <div className="flex p-1 bg-gray-100 rounded-lg mb-6">
@@ -554,7 +613,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     }, [items, currentSite, currentPeriod]);
 
     const columns = filteredItems.length > 0 
-        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url') 
+        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url' && k !== 'phone') 
         : []; 
 
     const renderCell = (col: string, value: any) => {
@@ -674,12 +733,7 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
   );
 };
 
-// ... TeamGrid, Sidebar, ModuleMenu, DynamicModal, FlashInfoModal remain unchanged ...
-// RE-USE existing implementations for these components. 
-// I am including them in the full file output below for completeness if needed, 
-// but focused on the requested changes.
-
-// (Re-declaring necessary components to make the file valid)
+// --- TeamGrid Component ---
 const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void }) => {
    const team = members.filter(m => m.role !== 'Visiteur');
    return (
@@ -688,16 +742,26 @@ const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void 
              <div><h2 className="text-2xl font-bold text-indigo-700">Notre Équipe</h2><p className="text-sm text-gray-500">Membres actifs ({team.length})</p></div>
              <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 font-bold">Retour</button>
          </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {team.map(member => (
-               <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
-                  <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-4 font-bold text-2xl">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
-                  <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
-                  <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
-                  <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
-               </div>
-            ))}
-         </div>
+         {team.length === 0 ? (
+           <div className="text-center p-12 text-gray-400 bg-white rounded-xl">Aucun membre trouvé (vérifiez votre connexion ou la DB).</div>
+         ) : (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {team.map(member => (
+                 <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
+                    <div className="w-20 h-20 rounded-full border-2 border-indigo-100 mb-4 overflow-hidden">
+                       {member.avatar_url ? (
+                         <img src={member.avatar_url} alt={member.full_name} className="w-full h-full object-cover"/>
+                       ) : (
+                         <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-2xl">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
+                       )}
+                    </div>
+                    <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
+                    <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
+                    <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
+                 </div>
+              ))}
+           </div>
+         )}
       </div>
    );
 };
@@ -797,25 +861,35 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
 const HeaderWithNotif = (props: any) => {
     const unreadCount = (props.notifications || []).filter((n:any) => !n.read).length;
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    
+    // Determine profile image or default
+    const profileImage = props.userProfile?.avatar_url;
 
     return (
         <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
            <div className="flex items-center gap-4"><button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button><h2 className="text-xl font-bold text-green-900">{props.title} <span className="text-xs ml-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full uppercase">{props.userRole}</span></h2></div>
            <div className="flex items-center gap-3">
               <div className="relative group"><button className="p-2 relative"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button></div>
-              <button onClick={props.onOpenFlashInfo} title="Flash Info"><Megaphone className="text-ebf-orange"/></button>
               
               {/* Settings Dropdown */}
               <div className="relative">
-                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 hover:bg-orange-50 rounded-full transition relative"><Settings className="text-gray-600 hover:text-ebf-green"/></button>
+                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 hover:bg-orange-50 rounded-full transition relative">
+                  {/* Show Avatar if exists, else Settings Icon */}
+                  {profileImage ? (
+                    <img src={profileImage} alt="Profile" className="w-8 h-8 rounded-full object-cover border border-orange-200" />
+                  ) : (
+                    <Settings className="text-gray-600 hover:text-ebf-green"/>
+                  )}
+                </button>
                 {isSettingsOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)}></div>
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-orange-100 z-50 py-2 animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-orange-100 z-50 py-2 animate-fade-in">
                        <div className="px-4 py-3 border-b border-gray-100 mb-1">
                           <p className="text-sm font-bold text-green-900">Paramètres</p>
                        </div>
                        <button onClick={() => { setIsSettingsOpen(false); props.onOpenProfile(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><User size={16}/> Mon Profil</button>
+                       <button onClick={() => { setIsSettingsOpen(false); props.onOpenFlashInfo(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><Megaphone size={16}/> Gestion Flash Info</button>
                        <button onClick={() => { props.onToggleTheme(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2">{props.darkMode ? <Sun size={16}/> : <Moon size={16}/>} Apparence</button>
                        <button onClick={() => { setIsSettingsOpen(false); props.onOpenHelp(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><HelpCircle size={16}/> Aide & Support</button>
                        <div className="border-t border-gray-100 mt-1 pt-1">
@@ -934,6 +1008,11 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
     transactions.forEach(t => { if (!t.date) return; if (!statsMap.has(t.date)) statsMap.set(t.date, { date: t.date, site: t.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(t.date)!; if (t.type === 'Recette') { s.revenue += Number(t.amount); s.profit += Number(t.amount); } else { s.expenses += Number(t.amount); s.profit -= Number(t.amount); } });
     setDashboardStats(Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date)));
   }, [reports, transactions]);
+  
+  // Refresh Team data explicitly when navigating to team page
+  useEffect(() => {
+      if (currentPath === '/equipe') fetchData();
+  }, [currentPath]);
 
   // --- HANDLERS ---
   const handleTickerUpdate = async (msgs: TickerMessage[]) => {
@@ -977,6 +1056,7 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
               onMenuClick={() => setSidebarOpen(true)} 
               title="EBF Manager" 
               userRole={userRole}
+              userProfile={currentUserProfile}
               onLogout={onLogout} 
               onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
               onOpenProfile={() => setIsProfileOpen(true)} 
@@ -1001,42 +1081,60 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
   );
 };
 
-// --- App Wrapper ---
-function App() {
+const App = () => {
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<Role>('Visiteur');
-  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        if (session) fetchUserRole(session.user.id);
+      setSession(session);
+      if (session) {
+          fetchUserRole(session.user.id);
+      } else {
+          setLoading(false);
+      }
     });
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-            setIsPasswordResetOpen(true);
-        }
-        setSession(session);
-        if (session) fetchUserRole(session.user.id);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+         fetchUserRole(session.user.id);
+      } else {
+         setUserRole('Visiteur');
+         setLoading(false);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchUserRole = async (userId: string) => {
-      const { data, error } = await supabase.from('profiles').select('role').eq('id', userId).single();
-      if (data) setUserRole(data.role);
-      else console.error("Role fetch error", error);
+    try {
+       // Check if profile exists
+       const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+       
+       if (data) {
+           setUserRole(data.role as Role);
+       }
+    } catch (e) {
+        console.error("Role fetch error", e);
+    } finally {
+        setLoading(false);
+    }
   };
 
-  if (!session) return <LoginScreen onLogin={() => {}} />;
+  if (loading) {
+     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-ebf-green" size={48}/></div>;
+  }
 
-  return (
-    <>
-      <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userRole} />
-      <PasswordUpdateModal isOpen={isPasswordResetOpen} onClose={() => setIsPasswordResetOpen(false)} />
-    </>
-  );
-}
+  return !session ? <LoginScreen onLogin={() => {}} /> : <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userRole} />;
+};
 
 export default App;
