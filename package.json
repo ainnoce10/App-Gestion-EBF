@@ -14,7 +14,7 @@
     "lucide-react": "^0.344.0",
     "recharts": "^2.12.2",
     "@supabase/supabase-js": "^2.39.7",
-    "@google/genai": "^0.1.0"
+    "@google/genai": "^0.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
