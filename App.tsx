@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -243,11 +243,14 @@ const EbfLogo = () => (
 
 // --- Login & Register Screen (Supabase Auth) ---
 const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
-  const [email, setEmail] = useState('');
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
+  const [identifier, setIdentifier] = useState(''); // Email or Phone
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
   const [hasLoggedInBefore, setHasLoggedInBefore] = useState(false);
 
   useEffect(() => {
@@ -261,32 +264,68 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const handleAuth = async () => {
     setLoading(true);
     setError('');
+    setSuccessMsg('');
 
     try {
-      if (isSignUp) {
-        // Mode Inscription
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
+      if (isResetMode) {
+        // Logique de réinitialisation de mot de passe (Email uniquement)
+        if (authMethod !== 'email') {
+          throw new Error("La réinitialisation n'est disponible que par Email pour le moment.");
+        }
+        const { error } = await supabase.auth.resetPasswordForEmail(identifier, {
+          redirectTo: window.location.origin,
         });
         if (error) throw error;
+        setSuccessMsg("Lien de réinitialisation envoyé ! Vérifiez votre boîte mail.");
+        setLoading(false);
+        return;
+      }
+
+      if (isSignUp) {
+        // Mode Inscription
+        let error;
+        if (authMethod === 'email') {
+          const { error: err } = await supabase.auth.signUp({
+            email: identifier,
+            password,
+          });
+          error = err;
+        } else {
+          // Inscription Téléphone
+          const { error: err } = await supabase.auth.signUp({
+            phone: identifier,
+            password,
+          });
+          error = err;
+        }
+
+        if (error) throw error;
         
-        // Enregistrement réussi, on marque le passage
         localStorage.setItem('ebf_has_logged_in', 'true');
-        // Supabase connecte souvent automatiquement, sinon message
         alert("Inscription réussie ! Vous êtes connecté.");
       } else {
         // Mode Connexion
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        let error;
+        if (authMethod === 'email') {
+          const { error: err } = await supabase.auth.signInWithPassword({
+            email: identifier,
+            password,
+          });
+          error = err;
+        } else {
+          // Connexion Téléphone
+          const { error: err } = await supabase.auth.signInWithPassword({
+            phone: identifier,
+            password,
+          });
+          error = err;
+        }
+
         if (error) throw error;
-        
         localStorage.setItem('ebf_has_logged_in', 'true');
       }
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue");
+      setError(err.message || "Une erreur est survenue. Vérifiez vos identifiants.");
     } finally {
       setLoading(false);
     }
@@ -294,7 +333,9 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
 
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
+    setIsResetMode(false);
     setError('');
+    setSuccessMsg('');
   };
 
   return (
@@ -303,44 +344,86 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
           <div className="flex justify-center mb-6 transform scale-125">
              <EbfLogo />
           </div>
+          
           <h2 className="text-2xl font-bold text-green-900 mb-2">
-            {isSignUp ? "Créer un compte" : "Bon retour"}
+            {isResetMode ? "Réinitialisation" : (isSignUp ? "Créer un compte" : "Bon retour")}
           </h2>
-          <p className="text-green-700 mb-8 text-sm">
-            {isSignUp 
-              ? "Enregistrez-vous pour accéder à EBF Manager" 
-              : "Connectez-vous pour accéder à votre espace."}
+          <p className="text-green-700 mb-6 text-sm">
+            {isResetMode 
+               ? "Entrez votre email pour recevoir un lien de récupération."
+               : (isSignUp 
+                  ? "Enregistrez-vous pour accéder à EBF Manager" 
+                  : "Connectez-vous pour accéder à votre espace.")}
           </p>
           
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-bold flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-bold flex items-center gap-2 text-left"><AlertCircle size={16}/> {error}</div>}
+          {successMsg && <div className="bg-green-50 text-green-600 p-3 rounded-lg mb-4 text-sm font-bold flex items-center gap-2 text-left"><CheckCircle size={16}/> {successMsg}</div>}
+
+          {/* Onglets de méthode d'auth */}
+          {!isResetMode && (
+            <div className="flex p-1 bg-gray-100 rounded-lg mb-6">
+               <button 
+                 onClick={() => { setAuthMethod('email'); setError(''); }}
+                 className={`flex-1 flex items-center justify-center py-2 rounded-md text-sm font-bold transition ${authMethod === 'email' ? 'bg-white text-ebf-green shadow' : 'text-gray-500'}`}
+               >
+                 <Mail size={16} className="mr-2"/> Email
+               </button>
+               <button 
+                 onClick={() => { setAuthMethod('phone'); setError(''); }}
+                 className={`flex-1 flex items-center justify-center py-2 rounded-md text-sm font-bold transition ${authMethod === 'phone' ? 'bg-white text-ebf-orange shadow' : 'text-gray-500'}`}
+               >
+                 <Phone size={16} className="mr-2"/> Téléphone
+               </button>
+            </div>
+          )}
 
           <div className="space-y-4 text-left">
              <div>
-                <label className="block text-sm font-bold text-green-900 mb-1">Email</label>
+                <label className="block text-sm font-bold text-green-900 mb-1">
+                  {authMethod === 'email' ? 'Email' : 'Numéro de téléphone'}
+                </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 text-green-700" size={18} />
+                  {authMethod === 'email' ? (
+                    <Mail className="absolute left-3 top-3 text-green-700" size={18} />
+                  ) : (
+                    <Phone className="absolute left-3 top-3 text-ebf-orange" size={18} />
+                  )}
                   <input 
-                    type="email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="exemple@ebf.ci" 
+                    type={authMethod === 'email' ? 'email' : 'tel'}
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder={authMethod === 'email' ? "exemple@ebf.ci" : "+225 07..."}
                     className="w-full border border-orange-200 p-3 pl-10 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
                   />
                 </div>
              </div>
-             <div>
-                <label className="block text-sm font-bold text-green-900 mb-1">Mot de passe</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 text-green-700" size={18} />
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••" 
-                    className="w-full border border-orange-200 p-3 pl-10 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
-                  />
-                </div>
-             </div>
+             
+             {!isResetMode && (
+               <div>
+                  <label className="block text-sm font-bold text-green-900 mb-1">Mot de passe</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 text-green-700" size={18} />
+                    <input 
+                      type="password" 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••" 
+                      className="w-full border border-orange-200 p-3 pl-10 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
+                    />
+                  </div>
+                  {/* Lien Mot de passe oublié */}
+                  {!isSignUp && (
+                    <div className="text-right mt-1">
+                      <button 
+                        onClick={() => { setIsResetMode(true); setAuthMethod('email'); setError(''); }}
+                        className="text-xs text-orange-600 hover:text-orange-800 font-semibold"
+                      >
+                        Mot de passe oublié ?
+                      </button>
+                    </div>
+                  )}
+               </div>
+             )}
              
              <button 
                 onClick={handleAuth} 
@@ -348,24 +431,35 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                 className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3 rounded-lg hover:shadow-lg transition transform hover:scale-105 disabled:opacity-50 flex justify-center items-center gap-2 mt-4"
              >
                 {loading ? <Loader2 className="animate-spin" /> : (
-                  isSignUp ? <><UserPlus size={18} /> S'inscrire</> : "Se Connecter"
+                  isResetMode 
+                    ? "Envoyer le lien" 
+                    : (isSignUp ? <><UserPlus size={18} /> S'inscrire</> : "Se Connecter")
                 )}
              </button>
           </div>
 
           <div className="mt-6 pt-4 border-t border-gray-100">
-            <button 
-              onClick={toggleMode}
-              className="text-sm font-bold text-ebf-green hover:underline focus:outline-none"
-            >
-              {isSignUp 
-                ? "Déjà un compte ? Se connecter" 
-                : "Pas encore de compte ? S'inscrire"}
-            </button>
+            {isResetMode ? (
+              <button 
+                onClick={() => setIsResetMode(false)}
+                className="text-sm font-bold text-gray-500 hover:text-gray-800"
+              >
+                Retour à la connexion
+              </button>
+            ) : (
+              <button 
+                onClick={toggleMode}
+                className="text-sm font-bold text-ebf-green hover:underline focus:outline-none"
+              >
+                {isSignUp 
+                  ? "Déjà un compte ? Se connecter" 
+                  : "Pas encore de compte ? S'inscrire"}
+              </button>
+            )}
           </div>
 
-          {/* Affichage des autres méthodes UNIQUEMENT si l'utilisateur s'est déjà connecté auparavant */}
-          {!isSignUp && hasLoggedInBefore && (
+          {/* Affichage des autres méthodes UNIQUEMENT si l'utilisateur s'est déjà connecté auparavant et n'est pas en mode reset */}
+          {!isSignUp && hasLoggedInBefore && !isResetMode && (
             <div className="mt-6 animate-fade-in">
               <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-gray-200"></div>
@@ -390,7 +484,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
             </div>
           )}
 
-          <p className="mt-8 text-xs text-gray-400">© 2024 EBF Manager v2.1 (Secured)</p>
+          <p className="mt-8 text-xs text-gray-400">© 2024 EBF Manager v2.2 (Secured)</p>
        </div>
     </div>
   );
