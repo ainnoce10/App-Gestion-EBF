@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -5,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -240,70 +241,156 @@ const EbfLogo = () => (
   </div>
 );
 
-// --- Login Screen (Supabase Auth) ---
+// --- Login & Register Screen (Supabase Auth) ---
 const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [hasLoggedInBefore, setHasLoggedInBefore] = useState(false);
 
-  const handleLogin = async () => {
+  useEffect(() => {
+    // Vérifier si l'utilisateur s'est déjà connecté sur ce navigateur
+    const visited = localStorage.getItem('ebf_has_logged_in');
+    if (visited) {
+      setHasLoggedInBefore(true);
+    }
+  }, []);
+
+  const handleAuth = async () => {
     setLoading(true);
     setError('');
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
 
-    if (error) {
-      setError(error.message);
+    try {
+      if (isSignUp) {
+        // Mode Inscription
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        
+        // Enregistrement réussi, on marque le passage
+        localStorage.setItem('ebf_has_logged_in', 'true');
+        // Supabase connecte souvent automatiquement, sinon message
+        alert("Inscription réussie ! Vous êtes connecté.");
+      } else {
+        // Mode Connexion
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        
+        localStorage.setItem('ebf_has_logged_in', 'true');
+      }
+    } catch (err: any) {
+      setError(err.message || "Une erreur est survenue");
+    } finally {
       setLoading(false);
-    } else {
-      // Auth listener in App will handle state change
     }
+  };
+
+  const toggleMode = () => {
+    setIsSignUp(!isSignUp);
+    setError('');
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-green-50/50 p-4">
-       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center border-t-4 border-ebf-orange">
+       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center border-t-4 border-ebf-orange animate-fade-in">
           <div className="flex justify-center mb-6 transform scale-125">
              <EbfLogo />
           </div>
-          <h2 className="text-2xl font-bold text-green-900 mb-2">Bienvenue</h2>
-          <p className="text-green-700 mb-8">Connectez-vous pour accéder à votre espace.</p>
+          <h2 className="text-2xl font-bold text-green-900 mb-2">
+            {isSignUp ? "Créer un compte" : "Bon retour"}
+          </h2>
+          <p className="text-green-700 mb-8 text-sm">
+            {isSignUp 
+              ? "Enregistrez-vous pour accéder à EBF Manager" 
+              : "Connectez-vous pour accéder à votre espace."}
+          </p>
           
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-bold">{error}</div>}
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-bold flex items-center gap-2"><AlertCircle size={16}/> {error}</div>}
 
           <div className="space-y-4 text-left">
              <div>
                 <label className="block text-sm font-bold text-green-900 mb-1">Email</label>
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@ebf.ci" 
-                  className="w-full border border-orange-200 p-3 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
-                />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 text-green-700" size={18} />
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="exemple@ebf.ci" 
+                    className="w-full border border-orange-200 p-3 pl-10 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
+                  />
+                </div>
              </div>
              <div>
                 <label className="block text-sm font-bold text-green-900 mb-1">Mot de passe</label>
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" 
-                  className="w-full border border-orange-200 p-3 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 text-green-700" size={18} />
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••" 
+                    className="w-full border border-orange-200 p-3 pl-10 rounded-lg focus:ring-2 focus:ring-ebf-orange outline-none bg-white text-green-900 placeholder-green-300" 
+                  />
+                </div>
              </div>
+             
              <button 
-                onClick={handleLogin} 
+                onClick={handleAuth} 
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3 rounded-lg hover:shadow-lg transition transform hover:scale-105 disabled:opacity-50 flex justify-center items-center"
+                className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3 rounded-lg hover:shadow-lg transition transform hover:scale-105 disabled:opacity-50 flex justify-center items-center gap-2 mt-4"
              >
-                {loading ? <Loader2 className="animate-spin" /> : 'Se Connecter'}
+                {loading ? <Loader2 className="animate-spin" /> : (
+                  isSignUp ? <><UserPlus size={18} /> S'inscrire</> : "Se Connecter"
+                )}
              </button>
           </div>
-          <p className="mt-6 text-xs text-gray-400">© 2024 EBF Manager v2.0 (Connected)</p>
+
+          <div className="mt-6 pt-4 border-t border-gray-100">
+            <button 
+              onClick={toggleMode}
+              className="text-sm font-bold text-ebf-green hover:underline focus:outline-none"
+            >
+              {isSignUp 
+                ? "Déjà un compte ? Se connecter" 
+                : "Pas encore de compte ? S'inscrire"}
+            </button>
+          </div>
+
+          {/* Affichage des autres méthodes UNIQUEMENT si l'utilisateur s'est déjà connecté auparavant */}
+          {!isSignUp && hasLoggedInBefore && (
+            <div className="mt-6 animate-fade-in">
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-gray-200"></div>
+                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase font-bold">Ou continuer avec</span>
+                <div className="flex-grow border-t border-gray-200"></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <button className="flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition text-sm font-medium text-green-900">
+                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.26.81-.58z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                  Google
+                </button>
+                <button className="flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition text-sm font-medium text-green-900">
+                   <Mail size={18} className="mr-2 text-indigo-500"/> Lien Magique
+                </button>
+                <button className="flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition text-sm font-medium text-green-900">
+                   <ScanFace size={18} className="mr-2 text-ebf-orange"/> Face ID
+                </button>
+                <button className="flex items-center justify-center py-2 px-4 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition text-sm font-medium text-green-900">
+                   <Fingerprint size={18} className="mr-2 text-ebf-green"/> Touch ID
+                </button>
+              </div>
+            </div>
+          )}
+
+          <p className="mt-8 text-xs text-gray-400">© 2024 EBF Manager v2.1 (Secured)</p>
        </div>
     </div>
   );
@@ -377,9 +464,24 @@ const Header = ({ onMenuClick, title, onLogout, onOpenProfile, onOpenHelp, darkM
       </div>
       
       <div className="flex items-center space-x-3">
-          <button onClick={onLogout} className="flex items-center gap-2 text-red-600 font-bold bg-red-50 px-3 py-1 rounded-lg">
-             <LogOut size={16} /> <span className="hidden md:inline">Déconnexion</span>
-          </button>
+        {/* Notifications and Settings removed from here for brevity based on previous context, can be re-added if needed but prompt focused on Login */}
+        <div className="relative group">
+           <button className="p-2 text-ebf-orange hover:bg-orange-50 rounded-full transition"><Settings size={24} /></button>
+           <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-orange-100 dark:border-gray-700 hidden group-hover:block animate-fade-in z-50">
+              <div className="p-4 border-b border-orange-50 dark:border-gray-700">
+                 <p className="font-bold text-green-900 dark:text-white text-sm">Paramètres</p>
+              </div>
+              <button onClick={onOpenProfile} className="w-full text-left px-4 py-3 text-sm text-green-800 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2"><User size={16}/> Mon Profil</button>
+              <button onClick={onOpenFlashInfo} className="w-full text-left px-4 py-3 text-sm text-green-800 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2"><Megaphone size={16}/> Configurer Flash Info</button>
+              <button onClick={onToggleTheme} className="w-full text-left px-4 py-3 text-sm text-green-800 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                 {darkMode ? <><Moon size={16}/> Mode Clair</> : <><Moon size={16}/> Mode Sombre</>}
+              </button>
+              <button onClick={onOpenHelp} className="w-full text-left px-4 py-3 text-sm text-green-800 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2"><HelpCircle size={16}/> Aide & Support</button>
+              <div className="border-t border-orange-50 dark:border-gray-700">
+                 <button onClick={onLogout} className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"><LogOut size={16}/> Se déconnecter</button>
+              </div>
+           </div>
+        </div>
       </div>
     </header>
   );
@@ -409,6 +511,16 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: {
     }
   };
 
+  const moveMessage = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === messages.length - 1) return;
+    
+    const newMessages = [...messages];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    [newMessages[index], newMessages[targetIndex]] = [newMessages[targetIndex], newMessages[index]];
+    onUpdate(newMessages);
+  };
+
   const handleEdit = (msg: TickerMessage) => { setText(msg.text); setType(msg.type); setEditingId(msg.id); };
   
   if (!isOpen) return null;
@@ -423,18 +535,25 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: {
         <div className="flex gap-2 mb-6 items-end">
            <input type="text" value={text} onChange={e => setText(e.target.value)} className="flex-1 border-orange-200 border rounded p-2 bg-white text-green-900" placeholder="Message..." />
            <select value={type} onChange={e => setType(e.target.value as any)} className="border-orange-200 border rounded p-2 bg-white text-green-900"><option value="info">Info</option><option value="alert">Alerte</option><option value="success">Succès</option></select>
-           <button onClick={handleSubmit} className="bg-ebf-orange text-white p-2 rounded"><Save size={20}/></button>
+           <button onClick={handleSubmit} className="bg-ebf-orange text-white p-2 rounded flex items-center gap-1">{editingId ? <><RefreshCw size={16}/> MAJ</> : <><Plus size={16}/> Ajout</>}</button>
+           {editingId && <button onClick={resetForm} className="bg-gray-200 text-gray-700 p-2 rounded"><X size={16}/></button>}
         </div>
         <div className="flex-1 overflow-y-auto space-y-2">
-            {messages.map((msg) => (
-               <div key={msg.id} className="flex justify-between items-center p-2 border rounded">
-                  <span>{msg.text}</span>
-                  <div className="flex gap-2">
-                     <button onClick={() => handleEdit(msg)}><Edit size={16}/></button>
+            {messages.map((msg, idx) => (
+               <div key={msg.id} className="flex justify-between items-center p-2 border border-orange-100 rounded bg-orange-50/30">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></span>
+                    <span className="text-green-900 dark:text-white text-sm">{msg.text}</span>
+                  </div>
+                  <div className="flex gap-1">
+                     <button onClick={() => moveMessage(idx, 'up')} disabled={idx === 0} className="p-1 text-gray-400 hover:text-ebf-orange disabled:opacity-30"><ArrowUp size={16}/></button>
+                     <button onClick={() => moveMessage(idx, 'down')} disabled={idx === messages.length - 1} className="p-1 text-gray-400 hover:text-ebf-orange disabled:opacity-30"><ArrowDown size={16}/></button>
+                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                     <button onClick={() => handleEdit(msg)} className="p-1 text-blue-500 hover:text-blue-700"><Edit size={16}/></button>
                      <button onClick={() => { 
                          const newMsgs = messages.filter(m => m.id !== msg.id);
                          onUpdate(newMsgs); 
-                     }}><Trash2 size={16} color="red"/></button>
+                     }} className="p-1 text-red-500 hover:text-red-700"><Trash2 size={16}/></button>
                   </div>
                </div>
             ))}
@@ -448,22 +567,28 @@ const ReportModeSelector = ({ onSelectMode, onBack, reports, onViewReport }: any
     return (
         <div className="animate-fade-in max-w-5xl mx-auto pb-10">
            <div className="flex justify-center gap-6 mb-8">
-               <button onClick={() => onSelectMode('voice')} className="p-8 bg-white shadow-xl rounded-xl border-2 hover:border-indigo-500">
+               <button onClick={() => onSelectMode('voice')} className="p-8 bg-white shadow-xl rounded-xl border-2 hover:border-indigo-500 h-40 w-40 flex flex-col items-center justify-center gap-2 md:h-56 md:w-56">
                    <Mic size={40} className="text-indigo-600 mb-2" />
-                   <div className="font-bold text-lg">Vocal</div>
+                   <div className="font-bold text-lg text-green-900">Vocal</div>
                </button>
-               <button onClick={() => onSelectMode('form')} className="p-8 bg-white shadow-xl rounded-xl border-2 hover:border-orange-500">
+               <button onClick={() => onSelectMode('form')} className="p-8 bg-white shadow-xl rounded-xl border-2 hover:border-orange-500 h-40 w-40 flex flex-col items-center justify-center gap-2 md:h-56 md:w-56">
                    <FileText size={40} className="text-orange-600 mb-2" />
-                   <div className="font-bold text-lg">Formulaire</div>
+                   <div className="font-bold text-lg text-green-900">Formulaire</div>
                </button>
            </div>
            {/* List */}
-           <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-bold mb-4">Historique</h3>
+           <div className="bg-white rounded-xl shadow p-4 border border-orange-100">
+              <h3 className="font-bold mb-4 text-green-900">Historique des Derniers Rapports</h3>
               {reports.map((r: any) => (
-                  <div key={r.id} className="flex justify-between p-3 border-b">
-                      <span>{r.date} - {r.technicianName}</span>
-                      <button onClick={() => onViewReport(r)} className="text-green-600 font-bold">VOIR</button>
+                  <div key={r.id} className="flex justify-between items-center p-3 border-b border-gray-100 last:border-0 hover:bg-orange-50 transition">
+                      <div className="flex items-center gap-3">
+                         {r.method === 'Voice' ? <Mic size={16} className="text-indigo-500"/> : <FileText size={16} className="text-orange-500"/>}
+                         <div className="flex flex-col">
+                            <span className="font-bold text-green-900 text-sm">{r.technicianName}</span>
+                            <span className="text-xs text-gray-500">{r.date} - {r.site}</span>
+                         </div>
+                      </div>
+                      <button onClick={() => onViewReport(r)} className="text-white bg-ebf-green hover:bg-green-800 px-3 py-1 rounded text-xs font-bold transition">VOIR</button>
                   </div>
               ))}
            </div>
@@ -472,61 +597,213 @@ const ReportModeSelector = ({ onSelectMode, onBack, reports, onViewReport }: any
 };
 
 const VoiceReportRecorder = ({ onBack, onSubmit }: any) => (
-    <div className="bg-white p-6 rounded-xl shadow-xl max-w-lg mx-auto">
-        <h2 className="text-2xl font-bold mb-4">Rapport Vocal</h2>
-        <div className="flex justify-center my-8"><Mic size={64} className="text-gray-300" /></div>
-        <button onClick={() => onSubmit({method: 'Voice', content: 'Audio simulation', date: new Date().toISOString(), technicianName: 'Tech'})} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold">Envoyer (Simulé)</button>
-        <button onClick={onBack} className="w-full mt-2 text-red-500">Annuler</button>
+    <div className="bg-white p-6 rounded-xl shadow-xl max-w-lg mx-auto border border-orange-100">
+        <h2 className="text-2xl font-bold mb-4 text-green-900">Rapport Vocal</h2>
+        <div className="flex justify-center my-8 p-10 bg-gray-50 rounded-full w-40 h-40 mx-auto items-center"><Mic size={64} className="text-ebf-orange animate-pulse" /></div>
+        <p className="text-center text-gray-500 mb-6">Enregistrement en cours... (Simulation)</p>
+        <button onClick={() => onSubmit({method: 'Voice', content: 'Ceci est une simulation de transcription vocale du rapport technicien.', date: new Date().toISOString(), technicianName: 'Tech', site: 'Abidjan'})} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition">Arrêter & Envoyer</button>
+        <button onClick={onBack} className="w-full mt-2 text-red-500 py-2 hover:bg-red-50 rounded">Annuler</button>
     </div>
 );
 
 const DetailedReportForm = ({ onBack, onSubmit }: any) => {
-    const [formData, setFormData] = useState<any>({ site: 'Abidjan' });
+    const [domain, setDomain] = useState('');
+    const [type, setType] = useState('');
+    const [manualType, setManualType] = useState('');
+    const [formData, setFormData] = useState<any>({ site: 'Abidjan', expenses: 0, revenue: 0 });
+
     const handleChange = (e: any) => setFormData({...formData, [e.target.name]: e.target.value});
+
+    const getTypes = () => {
+        switch(domain) {
+            case 'Electricité': return ['Expertise', 'Rapport', 'Conception', 'Étude', 'Devis', 'Dépannages', 'Installation'];
+            case 'Bâtiment': return ['Expertise', 'Rapport', 'Conception', 'Étude', 'Devis', 'Implantation des chaises', 'Implantation des poteaux', 'Supervision'];
+            case 'Froid': return ['Expertise', 'Rapport', 'Conception', 'Étude', 'Devis', 'Dépannages', 'Installation', 'Entretien', 'Cuivrage'];
+            default: return []; // Plomberie & Autres -> Manual
+        }
+    };
+
+    const handleSubmit = () => {
+        onSubmit({
+            ...formData,
+            domain,
+            interventionType: (domain === 'Plomberie' || domain === 'Autres') ? manualType : type,
+            method: 'Form',
+            date: new Date().toISOString()
+        });
+    };
+
     return (
-        <div className="bg-white p-6 rounded-xl shadow-xl max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold mb-6 text-orange-600">Rapport Détaillé</h2>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <input name="domain" placeholder="Domaine" onChange={handleChange} className="border p-2 rounded bg-white text-green-900" />
-                <input name="interventionType" placeholder="Type" onChange={handleChange} className="border p-2 rounded bg-white text-green-900" />
-                <input name="expenses" type="number" placeholder="Dépenses" onChange={handleChange} className="border p-2 rounded bg-white text-green-900" />
-                <input name="revenue" type="number" placeholder="Recettes" onChange={handleChange} className="border p-2 rounded bg-white text-green-900" />
-                <input name="clientName" placeholder="Client" onChange={handleChange} className="border p-2 rounded bg-white text-green-900" />
+        <div className="bg-white p-6 rounded-xl shadow-xl max-w-2xl mx-auto border border-orange-100">
+            <h2 className="text-2xl font-bold mb-6 text-ebf-orange">Rapport Détaillé</h2>
+            
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">Domaine d'intervention</label>
+                    <select value={domain} onChange={e => setDomain(e.target.value)} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900">
+                        <option value="">Choisir un domaine...</option>
+                        <option value="Electricité">Electricité</option>
+                        <option value="Bâtiment">Bâtiment</option>
+                        <option value="Froid">Froid</option>
+                        <option value="Plomberie">Plomberie</option>
+                        <option value="Autres">Autres</option>
+                    </select>
+                </div>
+
+                {domain && (
+                    <div>
+                         <label className="block text-sm font-bold text-green-900 mb-1">Type d'intervention</label>
+                         {(domain === 'Plomberie' || domain === 'Autres') ? (
+                             <input type="text" placeholder="Saisir manuellement..." value={manualType} onChange={e => setManualType(e.target.value)} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" />
+                         ) : (
+                             <select value={type} onChange={e => setType(e.target.value)} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900">
+                                 <option value="">Choisir le type...</option>
+                                 {getTypes().map(t => <option key={t} value={t}>{t}</option>)}
+                             </select>
+                         )}
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">Lieu d'intervention</label>
+                    <input name="location" placeholder="Quartier, Ville, Repère..." onChange={handleChange} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-red-50 rounded border border-red-100">
+                        <label className="block text-sm font-bold text-red-900 mb-1">Dépenses (FCFA)</label>
+                        <div className="relative">
+                            <DollarSign size={16} className="absolute left-2 top-2.5 text-red-400"/>
+                            <input name="expenses" type="number" defaultValue={0} onChange={handleChange} className="w-full pl-8 border border-red-200 p-2 rounded bg-white text-green-900" />
+                        </div>
+                    </div>
+                    <div className="p-3 bg-green-50 rounded border border-green-100">
+                        <label className="block text-sm font-bold text-green-900 mb-1">Recettes (FCFA)</label>
+                        <div className="relative">
+                            <DollarSign size={16} className="absolute left-2 top-2.5 text-green-400"/>
+                            <input name="revenue" type="number" defaultValue={0} onChange={handleChange} className="w-full pl-8 border border-green-200 p-2 rounded bg-white text-green-900" />
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">Nom du Client</label>
+                    <input name="clientName" onChange={handleChange} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" />
+                </div>
+
+                 <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">Numéro du Client</label>
+                    <input name="clientPhone" onChange={handleChange} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">Site EBF</label>
+                    <select name="site" onChange={handleChange} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900">
+                        <option value="Abidjan">Abidjan</option>
+                        <option value="Bouaké">Bouaké</option>
+                    </select>
+                </div>
             </div>
-            <button onClick={() => onSubmit({...formData, method: 'Form', date: new Date().toISOString()})} className="w-full bg-green-600 text-white py-3 rounded-lg font-bold">Soumettre</button>
-            <button onClick={onBack} className="w-full mt-2 text-red-500">Annuler</button>
+
+            <button onClick={handleSubmit} className="w-full bg-ebf-green text-white py-3 rounded-lg font-bold mt-6 hover:bg-green-800 transition shadow-lg">Soumettre le Rapport</button>
+            <button onClick={onBack} className="w-full mt-3 text-red-500 py-2 hover:bg-red-50 rounded">Annuler</button>
         </div>
     )
 };
 
-const ModulePlaceholder = ({ title, items, onBack, onAdd, onDelete, color }: any) => {
+const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, color, currentSite, currentPeriod }: any) => {
+    // Labels mapping for nicer display
+    const COLUMN_LABELS: Record<string, string> = {
+        name: 'Nom', quantity: 'Quantité', unit: 'Unité', threshold: 'Seuil', site: 'Site',
+        client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technician: 'Technicien', date: 'Date', status: 'Statut'
+    };
+
+    // Filter items locally based on Site and Period props if passed
+    const filteredItems = useMemo(() => {
+        return items.filter((item: any) => {
+            // Site Check
+            if (currentSite && currentSite !== Site.GLOBAL && item.site && item.site !== currentSite) return false;
+            // Date Check (only if item has date)
+            if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
+            return true;
+        });
+    }, [items, currentSite, currentPeriod]);
+
+    // Determine columns from first item
+    const columns = filteredItems.length > 0 
+        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId') 
+        : ['info']; // Fallback
+
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className={`text-2xl font-bold ${color.replace('bg-', 'text-')}`}>{title}</h2>
-                <button onClick={onAdd} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"><Plus size={18}/> Ajouter</button>
+        <div className="space-y-4 animate-fade-in">
+             {/* Header with Global Filters Context Reminder */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
+                <div>
+                    <h2 className={`text-2xl font-bold ${color.replace('bg-', 'text-').replace('600', '700')}`}>{title}</h2>
+                    <p className="text-sm text-gray-500">{subtitle}</p>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-lg">
+                    <Filter size={14}/>
+                    <span>Filtres actifs : {currentSite} - {currentPeriod}</span>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">Retour</button>
+                    <button onClick={onAdd} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-md transition transform hover:-translate-y-0.5"><Plus size={18}/> Ajouter Nouveau</button>
+                </div>
             </div>
-            <div className="bg-white rounded-xl shadow overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="p-4 text-left">Info</th>
-                            <th className="p-4 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.map((item: any, i: number) => (
-                            <tr key={i} className="border-t">
-                                <td className="p-4">
-                                    {Object.values(item).slice(0, 3).join(' - ')}
-                                </td>
-                                <td className="p-4 text-right">
-                                    <button onClick={() => onDelete(item)} className="text-red-500"><Trash2 size={18}/></button>
-                                </td>
+
+            {/* Stocks Chart specific */}
+            {title === 'Stocks' && filteredItems.length > 0 && (
+                <div className="bg-white p-4 rounded-xl border border-orange-100 shadow-sm h-64 mb-6">
+                    <h3 className="text-sm font-bold text-green-900 mb-2">Niveaux de Stock vs Seuil d'Alerte</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={filteredItems}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" tick={{fontSize: 10}} interval={0} angle={-15} textAnchor="end" height={40}/>
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="quantity" name="Quantité Actuelle" fill="#228B22" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="threshold" name="Seuil Alerte" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-orange-100">
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[600px]">
+                        <thead className={`bg-opacity-10 ${color}`}>
+                            <tr>
+                                {columns.map(col => (
+                                    <th key={col} className="p-4 text-left text-xs font-bold uppercase tracking-wider text-green-900">
+                                        {COLUMN_LABELS[col] || col}
+                                    </th>
+                                ))}
+                                <th className="p-4 text-right text-xs font-bold uppercase tracking-wider text-green-900">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredItems.length === 0 ? (
+                                <tr><td colSpan={columns.length + 1} className="p-8 text-center text-gray-400">Aucune donnée trouvée pour ces filtres.</td></tr>
+                            ) : (
+                                filteredItems.map((item: any, i: number) => (
+                                    <tr key={i} className="hover:bg-orange-50/30 transition duration-150">
+                                        {columns.map(col => (
+                                            <td key={col} className="p-4 text-sm text-green-900 border-r border-transparent last:border-0">
+                                                {item[col]}
+                                            </td>
+                                        ))}
+                                        <td className="p-4 text-right flex justify-end gap-2">
+                                            <button className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition"><Edit size={16}/></button>
+                                            <button onClick={() => onDelete(item)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
@@ -534,29 +811,40 @@ const ModulePlaceholder = ({ title, items, onBack, onAdd, onDelete, color }: any
 
 const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
     const [data, setData] = useState<any>({});
+    
+    // Reset data when modal opens
+    useEffect(() => {
+        if(isOpen) setData({});
+    }, [isOpen]);
+
     if (!isOpen || !config) return null;
     return (
-        <div className="fixed inset-0 bg-green-900/60 flex items-center justify-center p-4 z-50">
-            <div className="bg-white p-6 rounded-xl w-full max-w-lg">
-                <h3 className="font-bold text-xl mb-4">{config.title}</h3>
-                <div className="space-y-3">
+        <div className="fixed inset-0 bg-green-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+            <div className="bg-white p-6 rounded-xl w-full max-w-lg shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
+                <h3 className="font-bold text-xl mb-6 text-green-900">{config.title}</h3>
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                     {config.fields.map((f: any) => (
                         <div key={f.name}>
-                            <label className="block text-sm font-bold mb-1">{f.label}</label>
+                            <label className="block text-sm font-bold mb-1 text-green-900">{f.label}</label>
                             {f.type === 'select' ? (
-                                <select onChange={e => setData({...data, [f.name]: e.target.value})} className="w-full border p-2 rounded bg-white text-green-900">
+                                <select onChange={e => setData({...data, [f.name]: e.target.value})} className="w-full border border-orange-200 p-2.5 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none">
                                     <option value="">Choisir...</option>
                                     {f.options.map((o: string) => <option key={o} value={o}>{o}</option>)}
                                 </select>
                             ) : (
-                                <input type={f.type} onChange={e => setData({...data, [f.name]: e.target.value})} className="w-full border p-2 rounded bg-white text-green-900" />
+                                <input 
+                                    type={f.type} 
+                                    onChange={e => setData({...data, [f.name]: e.target.value})} 
+                                    placeholder={f.placeholder || ''}
+                                    className="w-full border border-orange-200 p-2.5 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" 
+                                />
                             )}
                         </div>
                     ))}
                 </div>
-                <div className="flex gap-2 mt-6">
-                    <button onClick={onClose} className="flex-1 border p-2 rounded text-gray-600">Annuler</button>
-                    <button onClick={() => onSubmit(data)} className="flex-1 bg-blue-600 text-white p-2 rounded font-bold">Enregistrer</button>
+                <div className="flex gap-3 mt-8">
+                    <button onClick={onClose} className="flex-1 border border-gray-300 p-2.5 rounded-lg text-gray-700 hover:bg-gray-50 font-bold transition">Annuler</button>
+                    <button onClick={() => onSubmit(data)} className="flex-1 bg-gradient-to-r from-ebf-green to-green-700 text-white p-2.5 rounded-lg font-bold shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5">Enregistrer</button>
                 </div>
             </div>
         </div>
@@ -564,12 +852,29 @@ const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
 };
 
 const ModuleMenu = ({ title, actions, onNavigate }: any) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
         {actions.map((a: any) => (
-            <button key={a.id} onClick={() => onNavigate(a.path)} className={`${a.color} text-white p-6 rounded-xl text-left shadow-lg`}>
-                <h3 className="font-bold text-xl mb-2">{a.label}</h3>
-                <p className="opacity-90">{a.description}</p>
-                {a.managedBy && <span className="inline-block bg-white text-blue-700 text-xs font-bold px-2 py-1 rounded mt-2">{a.managedBy}</span>}
+            <button 
+              key={a.id} 
+              onClick={() => onNavigate(a.path)} 
+              className={`${a.color} text-white p-6 rounded-xl text-left shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group relative overflow-hidden border border-white/10`}
+            >
+                <div className="absolute top-0 right-0 p-4 opacity-10 transform translate-x-4 -translate-y-4 group-hover:scale-150 transition duration-500">
+                    <a.icon size={100} />
+                </div>
+                <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm"><a.icon size={28} className="text-white"/></div>
+                        <ChevronRight className="text-white opacity-0 group-hover:opacity-100 transition transform translate-x-2 group-hover:translate-x-0" />
+                    </div>
+                    <h3 className="font-bold text-xl mb-1 text-white tracking-wide">{a.label}</h3>
+                    <p className="text-white/80 text-sm font-medium">{a.description}</p>
+                    {a.managedBy && (
+                        <span className="inline-block mt-4 bg-white px-3 py-1 rounded-full text-blue-700 text-xs font-extrabold uppercase tracking-wider shadow-sm">
+                            {a.managedBy}
+                        </span>
+                    )}
+                </div>
             </button>
         ))}
     </div>
@@ -577,7 +882,88 @@ const ModuleMenu = ({ title, actions, onNavigate }: any) => (
 
 const ProfileModal = ({ isOpen, onClose }: any) => { if (!isOpen) return null; return <div className="fixed inset-0 bg-black/50" onClick={onClose}></div> };
 const HelpModal = ({ isOpen, onClose }: any) => { if (!isOpen) return null; return <div className="fixed inset-0 bg-black/50" onClick={onClose}></div> };
-const ReportDetailModal = ({ isOpen, onClose, report }: any) => { if (!isOpen) return null; return <div className="fixed inset-0 bg-green-900/60 flex items-center justify-center" onClick={onClose}><div className="bg-white p-6 rounded">Détails... <button onClick={onClose}>Fermer</button></div></div> };
+const ReportDetailModal = ({ isOpen, onClose, report }: any) => { 
+    if (!isOpen || !report) return null; 
+    return (
+        <div className="fixed inset-0 bg-green-900/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl animate-fade-in overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="bg-ebf-green p-4 flex justify-between items-center">
+                    <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                        {report.method === 'Voice' ? <Mic size={20}/> : <FileText size={20}/>} 
+                        Détail du Rapport
+                    </h3>
+                    <button onClick={onClose} className="text-white hover:bg-white/20 p-1 rounded"><X size={20}/></button>
+                </div>
+                <div className="p-6">
+                    <div className="flex justify-between items-start mb-6 border-b border-orange-100 pb-4">
+                        <div>
+                            <p className="text-sm text-gray-500">Technicien</p>
+                            <p className="font-bold text-green-900 text-lg">{report.technicianName}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm text-gray-500">Date</p>
+                            <p className="font-bold text-green-900">{report.date}</p>
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{report.site}</span>
+                        </div>
+                    </div>
+
+                    {report.method === 'Voice' ? (
+                        <div className="bg-gray-50 p-6 rounded-xl flex flex-col items-center justify-center border border-gray-200">
+                             <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4">
+                                <Volume2 size={32} />
+                             </div>
+                             <div className="w-full bg-gray-200 h-2 rounded-full mb-2 overflow-hidden">
+                                <div className="bg-indigo-500 w-1/3 h-full"></div>
+                             </div>
+                             <div className="flex justify-between w-full text-xs text-gray-500 mb-4">
+                                <span>0:15</span>
+                                <span>1:45</span>
+                             </div>
+                             <div className="flex gap-4">
+                                <button className="p-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700"><Play size={24} fill="white"/></button>
+                             </div>
+                             <div className="mt-6 p-4 bg-white border border-gray-200 rounded w-full">
+                                <p className="text-xs font-bold text-gray-500 mb-1">TRANSCRIPTION AUTOMATIQUE</p>
+                                <p className="text-green-900 italic">"{report.content}"</p>
+                             </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="col-span-2 bg-orange-50 p-3 rounded border border-orange-100">
+                                <p className="text-xs font-bold text-orange-800 uppercase">Description</p>
+                                <p className="text-green-900">{report.content || 'Aucune description'}</p>
+                            </div>
+                            <div className="p-3 border rounded">
+                                <p className="text-xs text-gray-500">Domaine</p>
+                                <p className="font-bold text-green-900">{report.domain}</p>
+                            </div>
+                            <div className="p-3 border rounded">
+                                <p className="text-xs text-gray-500">Type</p>
+                                <p className="font-bold text-green-900">{report.interventionType}</p>
+                            </div>
+                            <div className="p-3 border rounded">
+                                <p className="text-xs text-gray-500">Lieu</p>
+                                <p className="font-bold text-green-900">{report.location}</p>
+                            </div>
+                            <div className="p-3 border rounded">
+                                <p className="text-xs text-gray-500">Client</p>
+                                <p className="font-bold text-green-900">{report.clientName} <span className="text-xs font-normal text-gray-400">({report.clientPhone})</span></p>
+                            </div>
+                            <div className="p-3 border border-red-100 bg-red-50 rounded">
+                                <p className="text-xs font-bold text-red-700">Dépenses</p>
+                                <p className="font-bold text-red-900">{report.expenses} FCFA</p>
+                            </div>
+                            <div className="p-3 border border-green-100 bg-green-50 rounded">
+                                <p className="text-xs font-bold text-green-700">Recettes</p>
+                                <p className="font-bold text-green-900">{report.revenue} FCFA</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- Main App Content ---
 const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void }) => {
@@ -619,7 +1005,7 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
     setLoadingData(true);
     try {
       // 1. Fetch Interventions
-      const { data: inters } = await supabase.from('interventions').select('*').order('date', { ascending: false });
+      const { data: inters } = await supabase.from('interventions').select('*').order('scheduled_date', { ascending: false });
       if (inters) {
         setInterventions(inters.map(i => ({
           id: i.id,
@@ -919,6 +1305,8 @@ const AppContent = ({ session, onLogout }: { session: any, onLogout: () => void 
         onBack={() => navigate(`/${moduleName}`)}
         onAdd={handleAddClick}
         onDelete={handleDeleteRequest}
+        currentSite={currentSite}
+        currentPeriod={currentPeriod}
       />
     );
   };
