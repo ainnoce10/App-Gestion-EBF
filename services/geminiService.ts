@@ -1,11 +1,22 @@
 import { GoogleGenAI } from "@google/genai";
 import { StatData, DailyReport } from '../types';
 
+// Fonction utilitaire pour accéder aux variables d'environnement de manière sécurisée
+const getEnv = (key: string) => {
+  try {
+    // @ts-ignore
+    const env = import.meta.env;
+    return env ? env[key] : '';
+  } catch (e) {
+    return '';
+  }
+};
+
 const getAiClient = () => {
-  // Adaptation pour Vite : import.meta.env
-  const apiKey = (import.meta as any).env.VITE_GOOGLE_API_KEY;
+  const apiKey = getEnv('VITE_GOOGLE_API_KEY');
+  
   if (!apiKey) {
-    console.warn("VITE_GOOGLE_API_KEY non trouvée dans les variables d'environnement");
+    console.warn("VITE_GOOGLE_API_KEY non trouvée. L'IA ne fonctionnera pas.");
     return null;
   }
   return new GoogleGenAI({ apiKey });
@@ -13,7 +24,7 @@ const getAiClient = () => {
 
 export const analyzeBusinessData = async (data: StatData[], site: string): Promise<string> => {
   const ai = getAiClient();
-  if (!ai) return "Clé API manquante. Impossible de générer l'analyse.";
+  if (!ai) return "Clé API manquante ou invalide. Configurez VITE_GOOGLE_API_KEY dans Vercel.";
 
   const prompt = `
     Tu es un expert en business intelligence pour l'entreprise EBF.
@@ -32,7 +43,7 @@ export const analyzeBusinessData = async (data: StatData[], site: string): Promi
     return response.text || "Analyse indisponible.";
   } catch (error) {
     console.error("Gemini analysis failed", error);
-    return "Erreur lors de l'analyse des données.";
+    return "Erreur lors de l'analyse des données (Vérifiez les quotas API).";
   }
 };
 
