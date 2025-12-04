@@ -165,7 +165,62 @@ const ConfirmationModal = ({
   );
 };
 
-// --- Password Update Modal (New) ---
+// --- Profile Modal ---
+const ProfileModal = ({ isOpen, onClose, profile }: any) => {
+  const [formData, setFormData] = useState({ full_name: '', email: '', phone: '' });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (profile) setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
+  }, [profile, isOpen]);
+
+  const handleUpdate = async () => {
+    setLoading(true);
+    const { error } = await supabase.from('profiles').update({ full_name: formData.full_name, phone: formData.phone }).eq('id', profile.id);
+    setLoading(false);
+    if (error) alert("Erreur mise à jour profil");
+    else { alert("Profil mis à jour !"); onClose(); window.location.reload(); }
+  };
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in">
+        <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4">Mon Profil</h3>
+        <div className="space-y-4">
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" /></div>
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Email (Lecture seule)</label><input value={formData.email} disabled className="w-full border border-gray-200 p-2 rounded bg-gray-100 text-gray-500" /></div>
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" /></div>
+           <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-2 rounded hover:bg-green-800">{loading ? '...' : 'Enregistrer'}</button>
+        </div>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X /></button>
+      </div>
+    </div>
+  );
+};
+
+// --- Help Modal ---
+const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in text-center">
+        <HelpCircle size={48} className="text-ebf-orange mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-green-900 dark:text-white mb-2">Aide & Support EBF</h3>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">Besoin d'assistance technique ?</p>
+        <div className="bg-orange-50 dark:bg-gray-700 p-4 rounded-lg mb-4 text-left">
+           <p className="font-bold text-green-900 dark:text-white">📞 Support:</p> <p className="text-gray-700 dark:text-gray-300">+225 07 07 07 07 07</p>
+           <p className="font-bold text-green-900 dark:text-white mt-2">📧 Email:</p> <p className="text-gray-700 dark:text-gray-300">support@ebf-ci.com</p>
+        </div>
+        <button onClick={onClose} className="bg-gray-200 text-gray-700 px-4 py-2 rounded font-bold hover:bg-gray-300">Fermer</button>
+      </div>
+    </div>
+  );
+};
+
+// --- Password Update Modal ---
 const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -648,17 +703,24 @@ const HeaderWithNotif = ({
   notifications, 
   userProfile, 
   userRole, 
-  markNotificationAsRead 
+  markNotificationAsRead,
+  onOpenProfile,
+  onOpenHelp,
+  darkMode,
+  onToggleTheme
 }: any) => {
     const [showDropdown, setShowDropdown] = useState(false);
+    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
     const unreadCount = notifications.filter((n: Notification) => !n.read).length;
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    
+    // Refs for clicking outside
+    const notifRef = useRef<HTMLDivElement>(null);
+    const settingsRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: any) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setShowDropdown(false);
-            }
+            if (notifRef.current && !notifRef.current.contains(event.target)) setShowDropdown(false);
+            if (settingsRef.current && !settingsRef.current.contains(event.target)) setShowSettingsDropdown(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -682,7 +744,8 @@ const HeaderWithNotif = ({
                   </div>
                </div>
 
-              <div className="relative ml-2" ref={dropdownRef}>
+              {/* Notification Bell */}
+              <div className="relative ml-2" ref={notifRef}>
                  <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-orange-50 rounded-full transition">
                      <Bell className="text-ebf-green"/>
                      {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}
@@ -720,8 +783,37 @@ const HeaderWithNotif = ({
                  )}
               </div>
 
+              {/* Flash Info Button */}
               <button onClick={onOpenFlashInfo} className="p-2 hover:bg-orange-50 rounded-full transition"><Megaphone className="text-ebf-orange"/></button>
-              <button onClick={onLogout} className="p-2 hover:bg-red-50 rounded-full transition"><LogOut className="text-red-500"/></button>
+
+              {/* Settings Dropdown */}
+              <div className="relative" ref={settingsRef}>
+                 <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition">
+                    <Settings className="text-gray-600" />
+                 </button>
+                 {showSettingsDropdown && (
+                   <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-orange-100 dark:border-gray-700 overflow-hidden animate-fade-in z-50">
+                      <div className="p-2 space-y-1">
+                         <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
+                            <User size={16} className="text-ebf-green"/> Mon Profil
+                         </button>
+                         <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
+                            <div className="flex items-center gap-3"><Moon size={16} className="text-indigo-500"/> Mode Sombre</div>
+                            <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}>
+                               <div className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                            </div>
+                         </button>
+                         <button onClick={() => { onOpenHelp(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
+                            <HelpCircle size={16} className="text-blue-500"/> Aide & Support
+                         </button>
+                         <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                         <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-sm font-bold text-red-600">
+                            <LogOut size={16}/> Se déconnecter
+                         </button>
+                      </div>
+                   </div>
+                 )}
+              </div>
            </div>
         </header>
     )
@@ -739,6 +831,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
+  // Settings Modals State
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   // Data
   const [loadingData, setLoadingData] = useState(false);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
@@ -889,11 +985,17 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
               userProfile={userProfile}
               userRole={userRole}
               markNotificationAsRead={markNotificationAsRead}
+              onOpenProfile={() => setIsProfileOpen(true)}
+              onOpenHelp={() => setIsHelpOpen(true)}
+              darkMode={darkMode}
+              onToggleTheme={() => setDarkMode(!darkMode)}
            />
            <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
         </div>
         <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={tickerMessages} onUpdate={handleTickerUpdate} />
+        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
+        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
      </div>
   );
 };
