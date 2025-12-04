@@ -3,7 +3,7 @@ import { StatData, DailyReport } from '../types';
 
 const getAiClient = () => {
   // Adaptation pour Vite : import.meta.env
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const apiKey = (import.meta as any).env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
     console.warn("VITE_GOOGLE_API_KEY non trouvée dans les variables d'environnement");
     return null;
