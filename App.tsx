@@ -9,8 +9,9 @@ import {
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
-import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification } from './types';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
+import { MOCK_STATS, MOCK_TECHNICIANS, MOCK_STOCK, MOCK_INTERVENTIONS, MOCK_REPORTS, DEFAULT_TICKER_MESSAGES } from './constants';
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -351,6 +352,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         
         // --- FEEDBACK DE RÔLE ---
         if (data.user) {
+            // Tenter de récupérer le profil
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
             if (profile) {
                 setSuccessMsg(`Bienvenue ${profile.full_name || 'Utilisateur'}, connexion en tant que ${profile.role}...`);
@@ -359,7 +361,10 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                     localStorage.setItem('ebf_has_logged_in', 'true');
                 }, 1500);
             } else {
-                localStorage.setItem('ebf_has_logged_in', 'true');
+                setSuccessMsg("Bienvenue, finalisation de votre profil...");
+                setTimeout(() => {
+                    localStorage.setItem('ebf_has_logged_in', 'true');
+                }, 1000);
             }
         }
       }
@@ -582,118 +587,6 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
   );
 };
 
-const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void }) => {
-   const team = members.filter(m => m.role !== 'Visiteur');
-   return (
-      <div className="space-y-6 animate-fade-in">
-         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
-             <div><h2 className="text-2xl font-bold text-indigo-700">Notre Équipe</h2><p className="text-sm text-gray-500">Membres actifs ({team.length})</p></div>
-             <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 font-bold">Retour</button>
-         </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {team.map(member => (
-               <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
-                  <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-4 font-bold text-2xl uppercase">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
-                  <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
-                  <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
-                  <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
-               </div>
-            ))}
-         </div>
-      </div>
-   );
-};
-
-const Sidebar = ({ isOpen, setIsOpen, currentPath, onNavigate }: any) => {
-  return (
-    <>
-      <div className={`fixed inset-0 bg-black/50 z-40 lg:hidden ${isOpen ? 'block' : 'hidden'}`} onClick={() => setIsOpen(false)} />
-      <aside className={`fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 z-50 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r border-orange-100`}>
-        <div className="h-20 flex items-center justify-center border-b border-orange-100 bg-gradient-to-r from-white to-green-50"><EbfLogo /><button onClick={() => setIsOpen(false)} className="absolute right-4 lg:hidden text-gray-500"><X /></button></div>
-        <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100%-5rem)]">
-           <div className="mb-4 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Menu Principal</div>
-           {MAIN_MENU.map(item => {
-             const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/');
-             return (
-               <button key={item.id} onClick={() => { onNavigate(item.path); setIsOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-gradient-to-r from-ebf-green to-emerald-700 text-white shadow-lg shadow-green-200' : 'text-gray-600 hover:bg-orange-50 hover:text-green-900'}`}>
-                 <item.icon className={`${isActive ? 'text-white' : item.colorClass} group-hover:scale-110 transition`} size={20} />
-                 <div className="text-left"><span className={`block font-bold ${isActive ? 'text-white' : ''}`}>{item.label}</span><span className={`text-[10px] ${isActive ? 'text-green-100' : 'text-gray-400'}`}>{item.description}</span></div>
-                 {isActive && <ChevronRight className="ml-auto text-white" size={16} />}
-               </button>
-             );
-           })}
-        </nav>
-      </aside>
-    </>
-  );
-};
-
-const ModuleMenu = ({ title, actions, onNavigate }: any) => (
-  <div className="animate-fade-in">
-    <h2 className="text-2xl font-bold text-green-900 mb-6 flex items-center"><ChevronRight className="text-ebf-orange mr-2"/> Module {title}</h2>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-       {actions.map((action: any) => (
-         <button key={action.id} onClick={() => onNavigate(action.path)} className="bg-white p-6 rounded-xl shadow-md border border-orange-100 hover:shadow-xl hover:border-ebf-orange transition group text-left relative overflow-hidden">
-           <div className={`absolute top-0 right-0 p-3 rounded-bl-2xl ${action.color} opacity-10 group-hover:opacity-20 transition`}><action.icon size={48} /></div>
-           <div className={`w-12 h-12 rounded-lg ${action.color} text-white flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition`}><action.icon size={24} /></div>
-           <h3 className="text-lg font-bold text-green-900 mb-1 group-hover:text-ebf-orange transition">{action.label}</h3>
-           <p className="text-sm text-gray-500 mb-4">{action.description}</p>
-           {action.managedBy && <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100">{action.managedBy}</span>}
-         </button>
-       ))}
-    </div>
-  </div>
-);
-
-const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
-  if (!isOpen || !config) return null;
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); const formData = new FormData(e.target as HTMLFormElement); const data: any = {}; formData.forEach((value, key) => data[key] = value); onSubmit(data); };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-green-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-6 border-b border-orange-100 bg-gray-50 rounded-t-2xl"><h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><FileText className="text-ebf-orange"/> {config.title}</h3><button onClick={onClose} className="text-gray-400 hover:text-red-500 transition"><X /></button></div>
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto custom-scrollbar space-y-4">
-           {config.fields.map((field: FormField) => (
-             <div key={field.name}><label className="block text-sm font-bold text-green-900 mb-1">{field.label}</label>{field.type === 'select' ? (<select name={field.name} className="w-full border border-orange-200 rounded-lg p-3 bg-white text-gray-700 focus:ring-2 focus:ring-ebf-green outline-none transition" required>{field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>) : (<input type={field.type} name={field.name} placeholder={field.placeholder} className="w-full border border-orange-200 rounded-lg p-3 text-gray-700 focus:ring-2 focus:ring-ebf-green outline-none transition" required />)}</div>
-           ))}
-           <div className="pt-4 flex gap-3"><button type="button" onClick={onClose} className="flex-1 py-3 border border-gray-300 text-gray-600 font-bold rounded-lg hover:bg-gray-50 transition">Annuler</button><button type="submit" className="flex-1 py-3 bg-ebf-green text-white font-bold rounded-lg hover:bg-green-800 transition shadow-lg shadow-green-200">Enregistrer</button></div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
-  const [localMsgs, setLocalMsgs] = useState<TickerMessage[]>([]); const [newMessage, setNewMessage] = useState(''); const [newType, setNewType] = useState<'info'|'alert'|'success'>('info');
-  useEffect(() => { if (isOpen) setLocalMsgs(messages); }, [isOpen, messages]);
-  const addMsg = () => { if (!newMessage) return; const newM: TickerMessage = { id: Date.now().toString(), text: newMessage, type: newType, display_order: localMsgs.length + 1 }; setLocalMsgs([...localMsgs, newM]); setNewMessage(''); };
-  const removeMsg = (id: string) => { setLocalMsgs(localMsgs.filter(m => m.id !== id)); };
-  const moveMessage = (index: number, direction: 'up' | 'down') => { const newMsgs = [...localMsgs]; if (direction === 'up' && index > 0) { [newMsgs[index], newMsgs[index-1]] = [newMsgs[index-1], newMsgs[index]]; } else if (direction === 'down' && index < newMsgs.length - 1) { [newMsgs[index], newMsgs[index+1]] = [newMsgs[index+1], newMsgs[index]]; } setLocalMsgs(newMsgs); };
-  const handleSave = () => { onUpdate(localMsgs); onClose(); };
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-green-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in">
-         <div className="p-6 border-b border-orange-100 flex justify-between items-center"><h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><Megaphone className="text-ebf-orange"/> Gestion Flash Info</h3><button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button></div>
-         <div className="p-6 space-y-4">
-            <div className="flex gap-2"><input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Nouveau message..." className="flex-1 border border-orange-200 rounded-lg p-2 text-sm focus:ring-ebf-green outline-none" /><select value={newType} onChange={(e:any) => setNewType(e.target.value)} className="border border-orange-200 rounded-lg p-2 text-sm bg-white"><option value="info">Info</option><option value="success">Succès</option><option value="alert">Alerte</option></select><button onClick={addMsg} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Plus size={20}/></button></div>
-            <div className="max-h-60 overflow-y-auto space-y-2">
-               {localMsgs.map((msg, idx) => (
-                  <div key={msg.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                     <div className="flex items-center gap-2 overflow-hidden"><span className="text-xs font-bold text-gray-400">#{idx+1}</span><span className={`w-2 h-2 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></span><span className="text-sm truncate text-gray-700">{msg.text}</span></div>
-                     <div className="flex gap-1"><button onClick={() => moveMessage(idx, 'up')} className="text-gray-400 hover:text-gray-600"><ArrowUp size={14}/></button><button onClick={() => moveMessage(idx, 'down')} className="text-gray-400 hover:text-gray-600"><ArrowDown size={14}/></button><button onClick={() => removeMsg(msg.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></div>
-                  </div>
-               ))}
-            </div>
-            <button onClick={handleSave} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition shadow-lg">Enregistrer & Diffuser</button>
-         </div>
-      </div>
-    </div>
-  );
-};
-
 // --- Header Component (Extracted) ---
 const HeaderWithNotif = ({ 
   title, 
@@ -783,7 +676,7 @@ const HeaderWithNotif = ({
                  )}
               </div>
 
-              {/* Settings Dropdown */}
+              {/* Settings Dropdown (Including Flash Info) */}
               <div className="relative" ref={settingsRef}>
                  <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition">
                     <Settings className="text-gray-600" />
@@ -819,184 +712,197 @@ const HeaderWithNotif = ({
     )
 };
 
-// --- App Content with Role Management ---
-const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any, onLogout: () => void, userRole: Role, userProfile: Profile | null }) => {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+// --- AppContent Implementation ---
+const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [currentPath, setCurrentPath] = useState('/');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
   const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalConfig, setModalConfig] = useState<FormConfig | null>(null);
-  const [showToast, setShowToast] = useState(false);
-  const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
-  // Settings Modals State
+  // Data State (Mocked)
+  const [stats] = useState<StatData[]>(MOCK_STATS);
+  const [technicians] = useState<Technician[]>(MOCK_TECHNICIANS);
+  const [stock] = useState<StockItem[]>(MOCK_STOCK);
+  const [interventions] = useState<Intervention[]>(MOCK_INTERVENTIONS);
+  const [reports] = useState<DailyReport[]>(MOCK_REPORTS);
+  const [tickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
+  const [notifications, setNotifications] = useState<Notification[]>([
+      { id: '1', title: 'Alerte Stock', message: 'Câble 2.5mm faible à Abidjan', type: 'alert', read: false, created_at: new Date().toISOString() },
+      { id: '2', title: 'Nouvelle Intervention', message: 'Hôtel Ivoire - Climatisation', type: 'info', read: false, created_at: new Date().toISOString() }
+  ]);
+
+  // Modals
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // Data
-  const [loadingData, setLoadingData] = useState(false);
-  const [interventions, setInterventions] = useState<Intervention[]>([]);
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]); 
-  const [reports, setReports] = useState<DailyReport[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>([]);
-  const [dashboardStats, setDashboardStats] = useState<StatData[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
-  const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
-  const [viewReport, setViewReport] = useState<any | null>(null);
-
-  // --- PERMISSION CHECKER ---
-  const canUserWrite = (role: Role, path: string): boolean => {
-      if (role === 'Admin') return true;
-      if (role === 'Visiteur') return false;
-      
-      // Technicien: Edit only techniciens modules
-      if (role === 'Technicien' && path.startsWith('/techniciens')) return true;
-      
-      // Secretaire: Edit only secretariat modules
-      if (role === 'Secretaire' && path.startsWith('/secretariat')) return true;
-      
-      // Magasinier: Edit only quincaillerie and materiel
-      if (role === 'Magasinier' && (path.startsWith('/quincaillerie') || path.includes('/techniciens/materiel'))) return true;
-      
-      return false;
-  };
-  
-  // Determine if current view is Read-Only based on Role
-  const isReadOnly = useMemo(() => !canUserWrite(userRole, currentPath), [userRole, currentPath]);
-
-  // --- FORM CONFIG ---
-  const technicianOptions = useMemo(() => profiles.filter(p => p.role === 'Technicien').map(p => p.full_name), [profiles]);
-  const formConfigs = useMemo<Record<string, FormConfig>>(() => ({
-      '/techniciens/interventions': {
-        title: 'Nouvelle Intervention',
-        fields: [
-          { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
-          { name: 'client', label: 'Nom du Client', type: 'text', placeholder: 'Ex: Hôtel Ivoire' },
-          { name: 'clientPhone', label: 'Numéro du Client', type: 'text', placeholder: 'Ex: 0707...' },
-          { name: 'lieu', label: 'Lieu d\'intervention', type: 'text', placeholder: 'Ex: Cocody Riviera' },
-          { name: 'description', label: 'Description', type: 'text', placeholder: 'Ex: Panne Clim R410' },
-          { name: 'technician', label: 'Technicien', type: 'select', options: technicianOptions }, 
-          { name: 'date', label: 'Date Prévue', type: 'date' },
-          { name: 'status', label: 'Statut Initial', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
-        ]
-      },
-      '/quincaillerie/stocks': {
-        title: 'Article Stock',
-        fields: [{ name: 'name', label: 'Nom Article', type: 'text' }, { name: 'quantity', label: 'Quantité Initiale', type: 'number' }, { name: 'unit', label: 'Unité', type: 'text', placeholder: 'm, kg, pcs...' }, { name: 'threshold', label: 'Seuil Alerte', type: 'number' }, { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }]
-      },
-      '/comptabilite/bilan': {
-        title: 'Nouvelle Transaction',
-        fields: [{ name: 'type', label: 'Type', type: 'select', options: ['Recette', 'Dépense'] }, { name: 'amount', label: 'Montant (FCFA)', type: 'number' }, { name: 'label', label: 'Libellé', type: 'text' }, { name: 'category', label: 'Catégorie', type: 'select', options: ['Facture Client', 'Achat Matériel', 'Salaire', 'Transport', 'Autre'] }, { name: 'date', label: 'Date', type: 'date' }, { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }]
-      }
-  }), [technicianOptions]);
-
-  // --- FETCH DATA ---
-  const fetchData = async () => {
-    setLoadingData(true);
-    try {
-      const { data: inters } = await supabase.from('interventions').select('*').order('scheduled_date', { ascending: false });
-      if (inters) setInterventions(inters.map(i => ({ id: i.id, site: i.site, client: i.client_name, clientPhone: i.client_phone, location: i.location, description: i.description, technicianId: i.technician_id, technician: 'Technicien', date: i.scheduled_date, status: i.status })));
-      const { data: stocks } = await supabase.from('stocks').select('*'); if (stocks) setStock(stocks);
-      const { data: reps } = await supabase.from('daily_reports').select('*').order('date', { ascending: false }); if (reps) setReports(reps.map(r => ({ id: r.id, technicianName: 'Technicien', date: r.date, method: r.method, site: r.site, content: r.content, audioUrl: r.audio_url, domain: r.domain, interventionType: r.intervention_type, location: r.location, expenses: r.expenses, revenue: r.revenue, clientName: r.client_name, clientPhone: r.client_phone })));
-      const { data: msgs } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true }); if (msgs) setTickerMessages(msgs);
-      const { data: profs } = await supabase.from('profiles').select('*'); if (profs) setProfiles(profs);
-      const { data: trans } = await supabase.from('transactions').select('*').order('date', { ascending: false }); if (trans) setTransactions(trans);
-      const { data: notifs } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }); if (notifs) setNotifications(notifs);
-    } catch (err) { console.error(err); } 
-    finally { setLoadingData(false); }
-  };
-  
-  useEffect(() => { fetchData(); const channels = supabase.channel('public:db-changes').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe(); return () => { supabase.removeChannel(channels); }; }, []);
-  
-  useEffect(() => {
-    const statsMap = new Map<string, StatData>();
-    reports.forEach(r => { if (!r.date) return; if (!statsMap.has(r.date)) statsMap.set(r.date, { date: r.date, site: r.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(r.date)!; const rev = Number(r.revenue || 0); const exp = Number(r.expenses || 0); s.revenue += rev; s.expenses += exp; s.profit += (rev - exp); s.interventions += 1; });
-    transactions.forEach(t => { if (!t.date) return; if (!statsMap.has(t.date)) statsMap.set(t.date, { date: t.date, site: t.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(t.date)!; if (t.type === 'Recette') { s.revenue += Number(t.amount); s.profit += Number(t.amount); } else { s.expenses += Number(t.amount); s.profit -= Number(t.amount); } });
-    setDashboardStats(Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date)));
-  }, [reports, transactions]);
-
-  // --- NOTIFICATION HELPERS ---
-  const createNotification = async (title: string, message: string, type: 'info' | 'success' | 'alert', path: string) => {
-      await supabase.from('notifications').insert([{ title, message, type, path, read: false }]);
+  const handleNavigate = (path: string) => {
+    setCurrentPath(path);
+    setIsMenuOpen(false);
   };
 
-  const markNotificationAsRead = async (notif: Notification) => {
-      await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
-      if (notif.path) navigate(notif.path);
-  };
-
-  // --- HANDLERS ---
-  const handleTickerUpdate = async (msgs: TickerMessage[]) => {
-    const currentIds = tickerMessages.map(m => m.id); const newIds = msgs.map(m => m.id); const toDelete = currentIds.filter(id => !newIds.includes(id));
-    for (const id of toDelete) await supabase.from('ticker_messages').delete().eq('id', id);
-    for (let i = 0; i < msgs.length; i++) { const msg = msgs[i]; const payload: any = { text: msg.text, type: msg.type, display_order: i }; if (msg.id.length > 15) payload.id = msg.id; await supabase.from('ticker_messages').upsert(payload); }
-    fetchData();
-  };
-
-  const navigate = (path: string) => { setCurrentPath(path); setReportMode('select'); };
-  
-  const handleFormSubmit = async (data: any) => {
-    setIsModalOpen(false);
-    try {
-      if (currentPath.includes('interventions')) { 
-          const techProfile = profiles.find(p => p.full_name === data.technician); 
-          await supabase.from('interventions').insert([{ site: data.site, client_name: data.client, client_phone: data.clientPhone, location: data.lieu, description: data.description, scheduled_date: data.date, status: data.status, technician_id: techProfile?.id }]); 
-          // TRIGGER NOTIFICATION
-          await createNotification('Nouvelle Intervention', `Nouvelle intervention créée pour ${data.client} à ${data.lieu}`, 'info', '/techniciens/interventions');
-      } 
-      // Add other module inserts here
-      setShowToast(true); setTimeout(() => setShowToast(false), 3000); fetchData();
-    } catch (e) { console.error("Insert error", e); }
+  const toggleTheme = () => {
+    setDarkMode(!darkMode);
+    document.documentElement.classList.toggle('dark');
   };
 
   const renderContent = () => {
-    if (loadingData && currentPath !== '/') return <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-ebf-green" size={48}/></div>;
-    if (currentPath === '/') return <Dashboard data={dashboardStats} tickerMessages={tickerMessages} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={navigate} />;
-    if (currentPath === '/equipe') return <TeamGrid members={profiles} onBack={() => navigate('/')} />;
-    const moduleName = currentPath.split('/')[1];
-    if (currentPath === `/${moduleName}` && MODULE_ACTIONS[moduleName]) return <ModuleMenu title={MAIN_MENU.find(m => m.id === moduleName)?.label} actions={MODULE_ACTIONS[moduleName]} onNavigate={navigate} />;
-    
-    // Lists & Forms with Permissions
-    if (currentPath === '/techniciens/rapports') { if (reportMode === 'select') return <ReportModeSelector reports={reports} onSelectMode={setReportMode} onBack={() => setCurrentPath('/techniciens')} onViewReport={setViewReport} readOnly={isReadOnly} />; }
-    
-    let items: any[] = []; let title = 'Liste'; let color = 'bg-gray-500';
-    if (currentPath === '/techniciens/interventions') { items = interventions; title = 'Interventions'; color = 'bg-orange-500'; }
-    else if (currentPath === '/quincaillerie/stocks') { items = stock; title = 'Stocks'; color = 'bg-blue-500'; }
-    
-    return <ModulePlaceholder title={title} items={items} onBack={() => navigate(`/${moduleName}`)} onAdd={!isReadOnly ? () => { setModalConfig(formConfigs[currentPath]); setIsModalOpen(true); } : undefined} onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: '...'}) : undefined} color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+     if (currentPath === '/') {
+         return <Dashboard 
+             data={stats} 
+             tickerMessages={tickerMessages} 
+             currentSite={currentSite} 
+             currentPeriod={currentPeriod} 
+             onSiteChange={setCurrentSite} 
+             onPeriodChange={setCurrentPeriod} 
+             onNavigate={handleNavigate}
+         />;
+     }
+     
+     if (currentPath === '/synthesis') {
+         return <DetailedSynthesis
+             data={stats}
+             reports={reports}
+             currentSite={currentSite}
+             currentPeriod={currentPeriod}
+             onSiteChange={setCurrentSite}
+             onPeriodChange={setCurrentPeriod}
+             onNavigate={handleNavigate}
+             onViewReport={(r) => alert(`Détail rapport: ${r.content}`)}
+         />;
+     }
+
+     // Sub-menus (Modules Roots)
+     const section = currentPath.substring(1);
+     if (MODULE_ACTIONS[section]) {
+         return (
+             <div className="space-y-6 animate-fade-in">
+                 <h2 className="text-2xl font-bold text-green-900 dark:text-white capitalize flex items-center gap-2">
+                    <ArrowLeft className="cursor-pointer" onClick={() => handleNavigate('/')} />
+                    Module {section}
+                 </h2>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {MODULE_ACTIONS[section].map((action) => (
+                        <button 
+                           key={action.id}
+                           onClick={() => handleNavigate(action.path)}
+                           className={`${action.color} text-white p-6 rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition transform text-left`}
+                        >
+                            <div className="bg-white/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                                <action.icon size={24} />
+                            </div>
+                            <h3 className="text-xl font-bold mb-1">{action.label}</h3>
+                            <p className="text-white/80 text-sm">{action.description}</p>
+                            {action.managedBy && <p className="text-xs bg-black/20 mt-2 px-2 py-1 rounded w-fit">{action.managedBy}</p>}
+                        </button>
+                    ))}
+                 </div>
+             </div>
+         );
+     }
+
+     // Specific Lists / Forms
+     if (currentPath === '/techniciens/interventions') {
+         return <ModulePlaceholder 
+            title="Interventions" 
+            subtitle="Planning et suivi des interventions techniques"
+            items={interventions}
+            onBack={() => handleNavigate('/techniciens')}
+            color="bg-orange-500"
+            currentSite={currentSite}
+            currentPeriod={currentPeriod}
+         />;
+     }
+     if (currentPath === '/techniciens/rapports') {
+         return <ReportModeSelector 
+            reports={reports} 
+            onSelectMode={() => {}} 
+            onBack={() => handleNavigate('/techniciens')}
+            onViewReport={(r: any) => alert(r.content)}
+         />;
+     }
+     if (currentPath === '/techniciens/materiel') {
+         // Stock for now as placeholder for materiel
+         return <ModulePlaceholder title="Matériel" subtitle="Gestion du matériel" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" />;
+     }
+     if (currentPath === '/quincaillerie/stocks') {
+         return <ModulePlaceholder title="Stocks" subtitle="Inventaire Quincaillerie" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} />;
+     }
+     // Technicians list
+     if (currentPath === '/equipe') {
+        return <ModulePlaceholder title="Notre Équipe" subtitle="Techniciens et Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} />;
+     }
+
+     return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+           <Wrench size={48} className="mb-4 opacity-50" />
+           <p className="text-xl">Module "{currentPath}" en cours de développement.</p>
+           <button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-green font-bold hover:underline">Retour Accueil</button>
+        </div>
+     );
   };
 
   return (
-     <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-orange-50 via-white to-green-50'}`}>
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setSidebarOpen} currentPath={currentPath} onNavigate={navigate} />
-        <div className="lg:ml-72 min-h-screen flex flex-col transition-all duration-300">
-           <HeaderWithNotif 
-              title="EBF Manager" 
-              onMenuClick={() => setSidebarOpen(true)} 
-              onLogout={onLogout} 
-              onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
-              notifications={notifications}
-              userProfile={userProfile}
-              userRole={userRole}
-              markNotificationAsRead={markNotificationAsRead}
-              onOpenProfile={() => setIsProfileOpen(true)}
-              onOpenHelp={() => setIsHelpOpen(true)}
-              darkMode={darkMode}
-              onToggleTheme={() => setDarkMode(!darkMode)}
-           />
-           <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
+    <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+        {/* Sidebar */}
+        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-900 text-white transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto shadow-2xl flex flex-col`}>
+            <div className="flex items-center justify-between h-16 px-6 bg-green-950/50">
+               <div className="transform scale-75 origin-left"><EbfLogo /></div>
+               <button onClick={() => setIsMenuOpen(false)} className="lg:hidden text-gray-300"><X /></button>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-y-auto">
+                <nav className="space-y-1">
+                    {MAIN_MENU.map(item => (
+                        <button
+                            key={item.id}
+                            onClick={() => handleNavigate(item.path)}
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'bg-white text-green-900 font-bold shadow-lg' : 'text-gray-300 hover:bg-green-800 hover:text-white'}`}
+                        >
+                            <item.icon size={20} className={`${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? item.colorClass : 'text-gray-400 group-hover:text-white'}`} />
+                            <span>{item.label}</span>
+                        </button>
+                    ))}
+                </nav>
+            </div>
+
+            <div className="p-4 bg-green-950/30">
+                <div className="flex items-center space-x-3 p-3 rounded-lg bg-green-800/50 border border-green-700">
+                    <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center font-bold text-white text-sm border-2 border-white">
+                        {userProfile?.full_name?.charAt(0) || 'U'}
+                    </div>
+                    <div className="overflow-hidden">
+                        <p className="text-sm font-bold truncate">{userProfile?.full_name || 'Utilisateur'}</p>
+                        <p className="text-xs text-gray-400 truncate">{userRole}</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+             <HeaderWithNotif 
+                title="EBF Manager" 
+                onMenuClick={() => setIsMenuOpen(true)}
+                onLogout={onLogout}
+                notifications={notifications}
+                userProfile={userProfile}
+                userRole={userRole}
+                markNotificationAsRead={(n: any) => setNotifications(notifications.map(x => x.id === n.id ? {...x, read: true} : x))}
+                onOpenProfile={() => setIsProfileOpen(true)}
+                onOpenFlashInfo={() => {}} // Placeholder
+                onOpenHelp={() => setIsHelpOpen(true)}
+                darkMode={darkMode}
+                onToggleTheme={toggleTheme}
+             />
+             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-gray-50 dark:bg-gray-900">
+                {renderContent()}
+             </main>
         </div>
-        <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
-        <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={tickerMessages} onUpdate={handleTickerUpdate} />
+
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-     </div>
+    </div>
   );
 };
 
@@ -1024,12 +930,39 @@ function App() {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      // 1. Tenter de récupérer le profil existant
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      
+      // 2. Si pas de profil, tenter de le créer à la volée (auto-fix)
+      if (!data) {
+          const { data: userData } = await supabase.auth.getUser();
+          const meta = userData.user?.user_metadata;
+          
+          if (meta) {
+              const newProfile = {
+                  id: userId,
+                  full_name: meta.full_name || 'Utilisateur',
+                  role: meta.role || 'Visiteur',
+                  site: meta.site || 'Global',
+                  email: userData.user?.email
+              };
+              
+              // Insertion de secours
+              const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
+              if (!insertError) {
+                  data = newProfile as any;
+                  console.log("Profil créé automatiquement");
+              } else {
+                  console.error("Échec création profil auto:", insertError);
+              }
+          }
+      }
+
       if (data) {
           setUserRole(data.role);
           setUserProfile(data);
       } else {
-          console.error("Profile fetch error", error);
+          console.error("Impossible de récupérer ou créer le profil", error);
       }
   };
 
