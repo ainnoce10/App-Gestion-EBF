@@ -46,6 +46,53 @@ interface FormConfig {
   fields: FormField[];
 }
 
+// --- CONFIGURATION DES FORMULAIRES (CRUD) ---
+const FORM_CONFIGS: Record<string, FormConfig> = {
+  interventions: {
+    title: 'Nouvelle Intervention',
+    fields: [
+      { name: 'client', label: 'Client', type: 'text' },
+      { name: 'clientPhone', label: 'Tél Client', type: 'text' },
+      { name: 'location', label: 'Lieu / Quartier', type: 'text' },
+      { name: 'description', label: 'Description Panne', type: 'text' },
+      { name: 'technicianId', label: 'ID Technicien (ex: T1)', type: 'text' },
+      { name: 'date', label: 'Date Prévue', type: 'date' },
+      { name: 'status', label: 'Statut', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
+    ]
+  },
+  stocks: {
+    title: 'Ajouter au Stock',
+    fields: [
+      { name: 'name', label: 'Nom Article', type: 'text' },
+      { name: 'quantity', label: 'Quantité', type: 'number' },
+      { name: 'unit', label: 'Unité (ex: pcs, m)', type: 'text' },
+      { name: 'threshold', label: 'Seuil Alerte', type: 'number' },
+      { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+    ]
+  },
+  technicians: {
+     title: 'Nouveau Technicien',
+     fields: [
+       { name: 'name', label: 'Nom & Prénom', type: 'text' },
+       { name: 'specialty', label: 'Spécialité', type: 'text' },
+       { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
+       { name: 'status', label: 'Statut', type: 'select', options: ['Available', 'Busy', 'Off'] }
+     ]
+  },
+  reports: {
+    title: 'Nouveau Rapport (Formulaire)',
+    fields: [
+      { name: 'technicianName', label: 'Nom Technicien', type: 'text' },
+      { name: 'date', label: 'Date', type: 'date' },
+      { name: 'content', label: 'Détails Intervention', type: 'text' },
+      { name: 'domain', label: 'Domaine', type: 'select', options: ['Electricité', 'Froid', 'Bâtiment', 'Plomberie'] },
+      { name: 'revenue', label: 'Recette (FCFA)', type: 'number' },
+      { name: 'expenses', label: 'Dépenses (FCFA)', type: 'number' },
+      { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] } // Hidden or fixed normally
+    ]
+  }
+};
+
 // --- Menu Configuration ---
 const MAIN_MENU: MenuItem[] = [
   { id: 'accueil', label: 'Accueil', icon: LayoutDashboard, path: '/', description: 'Vue d\'ensemble', colorClass: 'text-orange-500' },
@@ -160,6 +207,64 @@ const ConfirmationModal = ({
             <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-bold">Annuler</button>
             <button onClick={() => { onConfirm(); onClose(); }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-md">Supprimer</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Add Item Modal (Generic) ---
+const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
+  const [formData, setFormData] = useState<any>({});
+
+  useEffect(() => {
+    if (isOpen) setFormData({}); 
+  }, [isOpen]);
+
+  const handleSubmit = () => {
+    // Inject default method for reports if needed
+    if (config.title.includes('Rapport') && !formData.method) {
+        formData.method = 'Form';
+    }
+    onSubmit(formData);
+  };
+
+  if (!isOpen || !config) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in">
+        <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4">{config.title}</h3>
+        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+          {config.fields.map((field: FormField) => (
+             <div key={field.name}>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
+                {field.type === 'select' ? (
+                   <select 
+                     className="w-full border border-orange-200 p-2 rounded bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none"
+                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
+                     value={formData[field.name] || ''}
+                   >
+                     <option value="">Sélectionner...</option>
+                     {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                   </select>
+                ) : (
+                   <input 
+                     type={field.type} 
+                     className="w-full border border-orange-200 p-2 rounded bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none"
+                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
+                     value={formData[field.name] || ''}
+                   />
+                )}
+             </div>
+          ))}
+        </div>
+        <div className="mt-6 flex gap-3">
+           <button onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
+           <button onClick={handleSubmit} disabled={loading} className="flex-1 py-2 bg-ebf-green text-white rounded font-bold hover:bg-green-800 transition shadow-lg">
+             {loading ? <Loader2 className="animate-spin mx-auto"/> : "Ajouter"}
+           </button>
         </div>
       </div>
     </div>
@@ -285,7 +390,7 @@ const EbfLogo = () => (
   </div>
 );
 
-// --- Login & Register Screen (Supabase Auth & Profiles) ---
+// --- Login & Register Screen ---
 const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
@@ -339,7 +444,6 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
              if (profileError) console.error("Erreur création profil DB:", profileError);
         }
         
-        // --- SUCCÈS INSCRIPTION -> BASCULE VERS CONNEXION ---
         setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
         setIsSignUp(false); 
 
@@ -350,21 +454,14 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         );
         if (err) throw err;
         
-        // --- FEEDBACK DE RÔLE ---
         if (data.user) {
-            // Tenter de récupérer le profil
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
             if (profile) {
-                setSuccessMsg(`Bienvenue ${profile.full_name || 'Utilisateur'}, connexion en tant que ${profile.role}...`);
-                // Délai pour laisser l'utilisateur lire le message de connexion
-                setTimeout(() => {
-                    localStorage.setItem('ebf_has_logged_in', 'true');
-                }, 1500);
+                setSuccessMsg(`Bienvenue ${profile.full_name || 'Utilisateur'}...`);
+                setTimeout(() => { localStorage.setItem('ebf_has_logged_in', 'true'); }, 1500);
             } else {
-                setSuccessMsg("Bienvenue, finalisation de votre profil...");
-                setTimeout(() => {
-                    localStorage.setItem('ebf_has_logged_in', 'true');
-                }, 1000);
+                setSuccessMsg("Bienvenue...");
+                setTimeout(() => { localStorage.setItem('ebf_has_logged_in', 'true'); }, 1000);
             }
         }
       }
@@ -508,13 +605,13 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
                         <tbody className="divide-y divide-gray-100">
                             {filteredItems.length === 0 ? <tr><td colSpan={columns.length + 1} className="p-8 text-center text-gray-400">Aucune donnée.</td></tr> : 
                                 filteredItems.map((item: any, i: number) => (
-                                    <tr key={i} className="hover:bg-orange-50/30">
+                                    <tr key={i} className="hover:bg-orange-50/30 transition">
                                         {columns.map(col => (
                                             <td key={col} className="p-4 text-sm text-green-900">{renderCell(col, item[col])}</td>
                                         ))}
                                         {!readOnly && onDelete && (
                                             <td className="p-4 text-right flex justify-end gap-2">
-                                                <button onClick={() => onDelete(item)} className="p-1.5 text-red-500 bg-red-50 rounded"><Trash2 size={16}/></button>
+                                                <button onClick={() => onDelete(item)} className="p-1.5 text-red-500 bg-red-50 rounded hover:bg-red-100"><Trash2 size={16}/></button>
                                             </td>
                                         )}
                                     </tr>
@@ -587,7 +684,7 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
   );
 };
 
-// --- Header Component (Extracted) ---
+// --- Header Component ---
 const HeaderWithNotif = ({ 
   title, 
   onMenuClick, 
@@ -676,7 +773,7 @@ const HeaderWithNotif = ({
                  )}
               </div>
 
-              {/* Settings Dropdown (Including Flash Info) */}
+              {/* Settings Dropdown */}
               <div className="relative" ref={settingsRef}>
                  <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition">
                     <Settings className="text-gray-600" />
@@ -726,16 +823,20 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [reports, setReports] = useState<DailyReport[]>([]);
-  const [tickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES); // Keeping static for now, could be DB
+  const [tickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES); 
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Modals
+  // Modals & CRUD
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [crudTarget, setCrudTarget] = useState('');
+  const [itemToDelete, setItemToDelete] = useState<any>(null);
+  const [crudLoading, setCrudLoading] = useState(false);
 
   // --- DATA FETCHING & REALTIME ---
   useEffect(() => {
-    // 1. Initial Fetch
     const fetchData = async () => {
       const { data: intervData } = await supabase.from('interventions').select('*');
       if (intervData) setInterventions(intervData);
@@ -758,7 +859,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
     fetchData();
 
-    // 2. Realtime Subscriptions
+    // Realtime Subscriptions
     const channels = supabase.channel('realtime-ebf')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, (payload) => {
           if (payload.eventType === 'INSERT') setInterventions(prev => [...prev, payload.new as Intervention]);
@@ -774,6 +875,11 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
           if (payload.eventType === 'INSERT') setReports(prev => [...prev, payload.new as DailyReport]);
           else if (payload.eventType === 'UPDATE') setReports(prev => prev.map(r => r.id === payload.new.id ? payload.new as DailyReport : r));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technicians' }, (payload) => {
+          if (payload.eventType === 'INSERT') setTechnicians(prev => [...prev, payload.new as Technician]);
+          else if (payload.eventType === 'UPDATE') setTechnicians(prev => prev.map(t => t.id === payload.new.id ? payload.new as Technician : t));
+          else if (payload.eventType === 'DELETE') setTechnicians(prev => prev.filter(t => t.id !== payload.old.id));
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
           if (payload.eventType === 'INSERT') setNotifications(prev => [payload.new as Notification, ...prev]);
       })
@@ -781,7 +887,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
     return () => { supabase.removeChannel(channels); };
   }, []);
-
 
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
@@ -791,6 +896,46 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const toggleTheme = () => {
     setDarkMode(!darkMode);
     document.documentElement.classList.toggle('dark');
+  };
+
+  // --- CRUD Operations ---
+  const handleOpenAdd = (table: string) => {
+      setCrudTarget(table);
+      setIsAddOpen(true);
+  };
+
+  const handleOpenDelete = (item: any, table: string) => {
+      setItemToDelete(item);
+      setCrudTarget(table);
+      setIsDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+      if (!itemToDelete || !crudTarget) return;
+      setCrudLoading(true);
+      const { error } = await supabase.from(crudTarget).delete().eq('id', itemToDelete.id);
+      setCrudLoading(false);
+      if (error) {
+          alert("Erreur lors de la suppression: " + error.message);
+      } else {
+          setIsDeleteOpen(false);
+          setItemToDelete(null);
+      }
+  };
+
+  const confirmAdd = async (formData: any) => {
+      if (!crudTarget) return;
+      setCrudLoading(true);
+      // Auto-inject Site if missing and relevant
+      if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
+      
+      const { error } = await supabase.from(crudTarget).insert([formData]);
+      setCrudLoading(false);
+      if (error) {
+          alert("Erreur lors de l'ajout: " + error.message);
+      } else {
+          setIsAddOpen(false);
+      }
   };
 
   const renderContent = () => {
@@ -816,11 +961,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
              onSiteChange={setCurrentSite}
              onPeriodChange={setCurrentPeriod}
              onNavigate={handleNavigate}
-             onViewReport={(r) => alert(`Détail rapport: ${r.content}`)}
+             onViewReport={(r) => alert(`Détail: ${r.content}`)}
          />;
      }
 
-     // Sub-menus (Modules Roots)
      const section = currentPath.substring(1);
      if (MODULE_ACTIONS[section]) {
          return (
@@ -849,36 +993,64 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
          );
      }
 
-     // Specific Lists / Forms
      if (currentPath === '/techniciens/interventions') {
          return <ModulePlaceholder 
             title="Interventions" 
-            subtitle="Planning et suivi des interventions techniques"
+            subtitle="Planning et suivi des interventions"
             items={interventions}
             onBack={() => handleNavigate('/techniciens')}
             color="bg-orange-500"
             currentSite={currentSite}
             currentPeriod={currentPeriod}
+            onAdd={() => handleOpenAdd('interventions')}
+            onDelete={(item: any) => handleOpenDelete(item, 'interventions')}
          />;
      }
      if (currentPath === '/techniciens/rapports') {
          return <ReportModeSelector 
             reports={reports} 
-            onSelectMode={() => {}} 
+            onSelectMode={(mode: string) => {
+               if (mode === 'form') handleOpenAdd('reports');
+               else alert("Rapport vocal pas encore disponible.");
+            }} 
             onBack={() => handleNavigate('/techniciens')}
             onViewReport={(r: any) => alert(r.content)}
          />;
      }
      if (currentPath === '/techniciens/materiel') {
-         // Stock for now as placeholder for materiel
-         return <ModulePlaceholder title="Matériel" subtitle="Gestion du matériel" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" />;
+         return <ModulePlaceholder 
+            title="Matériel" 
+            subtitle="Inventaire Matériel"
+            items={stock} // Reuse stock for demo
+            onBack={() => handleNavigate('/techniciens')} 
+            color="bg-blue-600" 
+            onAdd={() => handleOpenAdd('stocks')}
+            onDelete={(item: any) => handleOpenDelete(item, 'stocks')}
+         />;
      }
      if (currentPath === '/quincaillerie/stocks') {
-         return <ModulePlaceholder title="Stocks" subtitle="Inventaire Quincaillerie" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} />;
+         return <ModulePlaceholder 
+             title="Stocks Quincaillerie" 
+             subtitle="Inventaire et Seuils" 
+             items={stock} 
+             onBack={() => handleNavigate('/quincaillerie')} 
+             color="bg-orange-600" 
+             currentSite={currentSite} 
+             onAdd={() => handleOpenAdd('stocks')}
+             onDelete={(item: any) => handleOpenDelete(item, 'stocks')}
+         />;
      }
-     // Technicians list
      if (currentPath === '/equipe') {
-        return <ModulePlaceholder title="Notre Équipe" subtitle="Techniciens et Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} />;
+        return <ModulePlaceholder 
+            title="Notre Équipe" 
+            subtitle="Techniciens et Staff" 
+            items={technicians} 
+            onBack={() => handleNavigate('/')} 
+            color="bg-indigo-500" 
+            currentSite={currentSite}
+            onAdd={() => handleOpenAdd('technicians')}
+            onDelete={(item: any) => handleOpenDelete(item, 'technicians')}
+        />;
      }
 
      return (
@@ -948,8 +1120,23 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
              </main>
         </div>
 
+        {/* Modals */}
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+        <AddModal 
+            isOpen={isAddOpen} 
+            onClose={() => setIsAddOpen(false)} 
+            config={FORM_CONFIGS[crudTarget]} 
+            onSubmit={confirmAdd}
+            loading={crudLoading}
+        />
+        <ConfirmationModal 
+            isOpen={isDeleteOpen} 
+            onClose={() => setIsDeleteOpen(false)}
+            onConfirm={confirmDelete}
+            title="Suppression"
+            message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible."
+        />
     </div>
   );
 };
@@ -978,10 +1165,8 @@ function App() {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
-      // 1. Tenter de récupérer le profil existant
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       
-      // 2. Si pas de profil, tenter de le créer à la volée (auto-fix)
       if (!data) {
           const { data: userData } = await supabase.auth.getUser();
           const meta = userData.user?.user_metadata;
@@ -994,23 +1179,14 @@ function App() {
                   site: meta.site || 'Global',
                   email: userData.user?.email
               };
-              
-              // Insertion de secours
               const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-              if (!insertError) {
-                  data = newProfile as any;
-                  console.log("Profil créé automatiquement");
-              } else {
-                  console.error("Échec création profil auto:", insertError);
-              }
+              if (!insertError) data = newProfile as any;
           }
       }
 
       if (data) {
           setUserRole(data.role);
           setUserProfile(data);
-      } else {
-          console.error("Impossible de récupérer ou créer le profil", error);
       }
   };
 
