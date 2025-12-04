@@ -11,7 +11,7 @@ import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
 import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
-import { MOCK_STATS, MOCK_TECHNICIANS, MOCK_STOCK, MOCK_INTERVENTIONS, MOCK_REPORTS, DEFAULT_TICKER_MESSAGES } from './constants';
+import { DEFAULT_TICKER_MESSAGES } from './constants';
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -468,7 +468,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     }, [items, currentSite, currentPeriod]);
 
     const columns = filteredItems.length > 0 
-        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url') 
+        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url' && k !== 'created_at') 
         : []; 
 
     const renderCell = (col: string, value: any) => {
@@ -720,21 +720,68 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
   const [darkMode, setDarkMode] = useState(false);
   
-  // Data State (Mocked)
-  const [stats] = useState<StatData[]>(MOCK_STATS);
-  const [technicians] = useState<Technician[]>(MOCK_TECHNICIANS);
-  const [stock] = useState<StockItem[]>(MOCK_STOCK);
-  const [interventions] = useState<Intervention[]>(MOCK_INTERVENTIONS);
-  const [reports] = useState<DailyReport[]>(MOCK_REPORTS);
-  const [tickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
-  const [notifications, setNotifications] = useState<Notification[]>([
-      { id: '1', title: 'Alerte Stock', message: 'Câble 2.5mm faible à Abidjan', type: 'alert', read: false, created_at: new Date().toISOString() },
-      { id: '2', title: 'Nouvelle Intervention', message: 'Hôtel Ivoire - Climatisation', type: 'info', read: false, created_at: new Date().toISOString() }
-  ]);
+  // -- REAL STATE --
+  const [stats, setStats] = useState<StatData[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [interventions, setInterventions] = useState<Intervention[]>([]);
+  const [reports, setReports] = useState<DailyReport[]>([]);
+  const [tickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES); // Keeping static for now, could be DB
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Modals
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // --- DATA FETCHING & REALTIME ---
+  useEffect(() => {
+    // 1. Initial Fetch
+    const fetchData = async () => {
+      const { data: intervData } = await supabase.from('interventions').select('*');
+      if (intervData) setInterventions(intervData);
+
+      const { data: stockData } = await supabase.from('stocks').select('*');
+      if (stockData) setStock(stockData);
+
+      const { data: techData } = await supabase.from('technicians').select('*');
+      if (techData) setTechnicians(techData);
+
+      const { data: reportsData } = await supabase.from('reports').select('*');
+      if (reportsData) setReports(reportsData);
+
+      const { data: statsData } = await supabase.from('daily_stats').select('*');
+      if (statsData) setStats(statsData);
+      
+      const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+      if (notifData) setNotifications(notifData);
+    };
+
+    fetchData();
+
+    // 2. Realtime Subscriptions
+    const channels = supabase.channel('realtime-ebf')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, (payload) => {
+          if (payload.eventType === 'INSERT') setInterventions(prev => [...prev, payload.new as Intervention]);
+          else if (payload.eventType === 'UPDATE') setInterventions(prev => prev.map(i => i.id === payload.new.id ? payload.new as Intervention : i));
+          else if (payload.eventType === 'DELETE') setInterventions(prev => prev.filter(i => i.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stocks' }, (payload) => {
+          if (payload.eventType === 'INSERT') setStock(prev => [...prev, payload.new as StockItem]);
+          else if (payload.eventType === 'UPDATE') setStock(prev => prev.map(s => s.id === payload.new.id ? payload.new as StockItem : s));
+          else if (payload.eventType === 'DELETE') setStock(prev => prev.filter(s => s.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
+          if (payload.eventType === 'INSERT') setReports(prev => [...prev, payload.new as DailyReport]);
+          else if (payload.eventType === 'UPDATE') setReports(prev => prev.map(r => r.id === payload.new.id ? payload.new as DailyReport : r));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
+          if (payload.eventType === 'INSERT') setNotifications(prev => [payload.new as Notification, ...prev]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channels); };
+  }, []);
+
 
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
@@ -750,6 +797,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      if (currentPath === '/') {
          return <Dashboard 
              data={stats} 
+             reports={reports}
              tickerMessages={tickerMessages} 
              currentSite={currentSite} 
              currentPeriod={currentPeriod} 

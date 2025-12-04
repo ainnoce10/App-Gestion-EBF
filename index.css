@@ -18,7 +18,11 @@
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #FF8C00; border-radius: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #228B22; }
 
-/* Custom utilities */
+/* Custom utilities for EBF Theme */
+body {
+    background-color: #f0fdf4; /* bg-green-50 equiv */
+}
+
 .input-primary {
   @apply bg-white text-green-900 border-orange-200 focus:ring-ebf-orange focus:border-ebf-orange;
 }

@@ -4,10 +4,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
-import { StatData, Site, Period, TickerMessage } from '../types';
+import { StatData, Site, Period, TickerMessage, DailyReport } from '../types';
 
 interface DashboardProps {
   data: StatData[];
+  reports: DailyReport[];
   tickerMessages: TickerMessage[];
   currentSite: Site;
   currentPeriod: Period;
@@ -38,7 +39,7 @@ const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass, bgClass
 );
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-  data, tickerMessages, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate 
+  data, reports, tickerMessages, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate 
 }) => {
   // Filter Data Logic
   const filteredData = useMemo(() => {
@@ -71,6 +72,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [data, currentSite, currentPeriod]);
 
+  // Filter Reports Logic for Satisfaction
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => {
+      // 1. Site Filter
+      const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
+      
+      // 2. Date Filter (Same logic as stats)
+      const date = new Date(r.date);
+      const now = new Date();
+      let matchPeriod = true;
+
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+      if (currentPeriod === Period.DAY) {
+        matchPeriod = itemDate.getTime() === today.getTime();
+      } else if (currentPeriod === Period.WEEK) {
+        const oneWeekAgo = new Date(today);
+        oneWeekAgo.setDate(today.getDate() - 7);
+        matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
+      } else if (currentPeriod === Period.MONTH) {
+        matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      } else if (currentPeriod === Period.YEAR) {
+        matchPeriod = date.getFullYear() === now.getFullYear();
+      }
+
+      return matchSite && matchPeriod;
+    });
+  }, [reports, currentSite, currentPeriod]);
+
   // Aggregated totals for the cards
   const totals = useMemo(() => {
     return filteredData.reduce((acc, curr) => ({
@@ -80,6 +111,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       expenses: acc.expenses + curr.expenses
     }), { revenue: 0, interventions: 0, profit: 0, expenses: 0 });
   }, [filteredData]);
+
+  // Calculate Average Satisfaction
+  const satisfactionStats = useMemo(() => {
+    const ratedReports = filteredReports.filter(r => r.rating !== undefined && r.rating > 0);
+    if (ratedReports.length === 0) return { avg: 0, count: 0 };
+    
+    const totalRating = ratedReports.reduce((sum, r) => sum + (r.rating || 0), 0);
+    const average = (totalRating / ratedReports.length).toFixed(1);
+    
+    return { avg: average, count: ratedReports.length };
+  }, [filteredReports]);
 
   // Calculate profit margin percentage
   const marginPercent = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(1) : "0";
@@ -204,8 +246,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         />
         <KPICard 
           title="Satisfaction Client" 
-          value="4.8/5"
-          subtext="Basé sur 25 avis"
+          value={satisfactionStats.count > 0 ? `${satisfactionStats.avg}/5` : "N/A"}
+          subtext={satisfactionStats.count > 0 ? `Basé sur ${satisfactionStats.count} avis` : "Aucune note disponible"}
           icon={Star}
           colorClass="text-yellow-500"
           bgClass="bg-yellow-50 dark:bg-gray-700"

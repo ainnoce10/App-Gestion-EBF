@@ -79,6 +79,7 @@ export interface DailyReport {
   clientName?: string;
   clientPhone?: string;
   audioUrl?: string;
+  rating?: number; // Note de satisfaction client (1-5)
 }
 
 export interface Transaction {
