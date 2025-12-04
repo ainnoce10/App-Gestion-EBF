@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, UserCog
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, UserCog, Sun
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -161,6 +161,30 @@ const ConfirmationModal = ({
             <button onClick={() => { onConfirm(); onClose(); }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-md">Supprimer</button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Help Modal ---
+const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
+         <div className="flex justify-between items-center mb-4 border-b border-orange-100 pb-2">
+            <h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><HelpCircle className="text-ebf-orange"/> Aide & Support</h3>
+            <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
+         </div>
+         <div className="space-y-4 text-sm text-gray-700">
+            <p><strong>Support Technique :</strong><br/>+225 07 07 07 07 07</p>
+            <p><strong>Email :</strong><br/>support@ebf-manager.ci</p>
+            <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+               <p className="font-bold text-ebf-orange mb-1">Besoin d'aide ?</p>
+               <p>Contactez l'administrateur pour toute réinitialisation de compte ou problème d'accès.</p>
+            </div>
+         </div>
       </div>
     </div>
   );
@@ -707,12 +731,12 @@ const ModuleMenu = ({ title, actions, onNavigate }: any) => (
     <h2 className="text-2xl font-bold text-green-900 mb-6 flex items-center"><ChevronRight className="text-ebf-orange mr-2"/> Module {title}</h2>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
        {actions.map((action: any) => (
-         <button key={action.id} onClick={() => onNavigate(action.path)} className="bg-white p-6 rounded-xl shadow-md border border-orange-100 hover:shadow-xl hover:border-ebf-orange transition group text-left relative overflow-hidden">
-           <div className={`absolute top-0 right-0 p-3 rounded-bl-2xl ${action.color} opacity-10 group-hover:opacity-20 transition`}><action.icon size={48} /></div>
-           <div className={`w-12 h-12 rounded-lg ${action.color} text-white flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition`}><action.icon size={24} /></div>
-           <h3 className="text-lg font-bold text-green-900 mb-1 group-hover:text-ebf-orange transition">{action.label}</h3>
-           <p className="text-sm text-gray-500 mb-4">{action.description}</p>
-           {action.managedBy && <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100">{action.managedBy}</span>}
+         <button key={action.id} onClick={() => onNavigate(action.path)} className={`p-6 rounded-xl shadow-md border border-orange-100 hover:shadow-xl hover:border-ebf-orange transition group text-left relative overflow-hidden ${action.color}`}>
+           <div className={`absolute top-0 right-0 p-3 rounded-bl-2xl bg-white opacity-20 group-hover:opacity-30 transition`}><action.icon size={48} /></div>
+           <div className={`w-12 h-12 rounded-lg bg-white/20 text-white flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition`}><action.icon size={24} /></div>
+           <h3 className="text-lg font-bold text-white mb-1">{action.label}</h3>
+           <p className="text-sm text-white/80 mb-4">{action.description}</p>
+           {action.managedBy && <span className="text-[10px] uppercase font-bold text-blue-700 bg-white px-2 py-1 rounded shadow-sm">{action.managedBy}</span>}
          </button>
        ))}
     </div>
@@ -739,9 +763,10 @@ const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
 };
 
 const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
-  const [localMsgs, setLocalMsgs] = useState<TickerMessage[]>([]); const [newMessage, setNewMessage] = useState(''); const [newType, setNewType] = useState<'info'|'alert'|'success'>('info');
+  const [localMsgs, setLocalMsgs] = useState<TickerMessage[]>([]); const [newMessage, setNewMessage] = useState(''); const [newType, setNewType] = useState<'info'|'alert'|'success'>('info'); const [editingId, setEditingId] = useState<string | null>(null);
   useEffect(() => { if (isOpen) setLocalMsgs(messages); }, [isOpen, messages]);
-  const addMsg = () => { if (!newMessage) return; const newM: TickerMessage = { id: Date.now().toString(), text: newMessage, type: newType, display_order: localMsgs.length + 1 }; setLocalMsgs([...localMsgs, newM]); setNewMessage(''); };
+  const handleEdit = (msg: TickerMessage) => { setEditingId(msg.id); setNewMessage(msg.text); setNewType(msg.type); };
+  const addMsg = () => { if (!newMessage) return; if (editingId) { setLocalMsgs(localMsgs.map(m => m.id === editingId ? { ...m, text: newMessage, type: newType } : m)); setEditingId(null); } else { const newM: TickerMessage = { id: Date.now().toString(), text: newMessage, type: newType, display_order: localMsgs.length + 1 }; setLocalMsgs([...localMsgs, newM]); } setNewMessage(''); };
   const removeMsg = (id: string) => { setLocalMsgs(localMsgs.filter(m => m.id !== id)); };
   const moveMessage = (index: number, direction: 'up' | 'down') => { const newMsgs = [...localMsgs]; if (direction === 'up' && index > 0) { [newMsgs[index], newMsgs[index-1]] = [newMsgs[index-1], newMsgs[index]]; } else if (direction === 'down' && index < newMsgs.length - 1) { [newMsgs[index], newMsgs[index+1]] = [newMsgs[index+1], newMsgs[index]]; } setLocalMsgs(newMsgs); };
   const handleSave = () => { onUpdate(localMsgs); onClose(); };
@@ -752,12 +777,12 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
       <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in">
          <div className="p-6 border-b border-orange-100 flex justify-between items-center"><h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><Megaphone className="text-ebf-orange"/> Gestion Flash Info</h3><button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button></div>
          <div className="p-6 space-y-4">
-            <div className="flex gap-2"><input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Nouveau message..." className="flex-1 border border-orange-200 rounded-lg p-2 text-sm focus:ring-ebf-green outline-none" /><select value={newType} onChange={(e:any) => setNewType(e.target.value)} className="border border-orange-200 rounded-lg p-2 text-sm bg-white"><option value="info">Info</option><option value="success">Succès</option><option value="alert">Alerte</option></select><button onClick={addMsg} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Plus size={20}/></button></div>
+            <div className="flex gap-2"><input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Nouveau message..." className="flex-1 border border-orange-200 rounded-lg p-2 text-sm focus:ring-ebf-green outline-none" /><select value={newType} onChange={(e:any) => setNewType(e.target.value)} className="border border-orange-200 rounded-lg p-2 text-sm bg-white"><option value="info">Info</option><option value="success">Succès</option><option value="alert">Alerte</option></select><button onClick={addMsg} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">{editingId ? <Save size={20}/> : <Plus size={20}/>}</button>{editingId && <button onClick={() => {setEditingId(null); setNewMessage('');}} className="text-gray-500 hover:text-red-500"><X size={20}/></button>}</div>
             <div className="max-h-60 overflow-y-auto space-y-2">
                {localMsgs.map((msg, idx) => (
                   <div key={msg.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
                      <div className="flex items-center gap-2 overflow-hidden"><span className="text-xs font-bold text-gray-400">#{idx+1}</span><span className={`w-2 h-2 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></span><span className="text-sm truncate text-gray-700">{msg.text}</span></div>
-                     <div className="flex gap-1"><button onClick={() => moveMessage(idx, 'up')} className="text-gray-400 hover:text-gray-600"><ArrowUp size={14}/></button><button onClick={() => moveMessage(idx, 'down')} className="text-gray-400 hover:text-gray-600"><ArrowDown size={14}/></button><button onClick={() => removeMsg(msg.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></div>
+                     <div className="flex gap-1"><button onClick={() => handleEdit(msg)} className="text-blue-400 hover:text-blue-600"><Edit size={14}/></button><button onClick={() => moveMessage(idx, 'up')} className="text-gray-400 hover:text-gray-600"><ArrowUp size={14}/></button><button onClick={() => moveMessage(idx, 'down')} className="text-gray-400 hover:text-gray-600"><ArrowDown size={14}/></button><button onClick={() => removeMsg(msg.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></div>
                   </div>
                ))}
             </div>
@@ -766,6 +791,43 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
       </div>
     </div>
   );
+};
+
+// --- Header Component (Restored Settings Menu) ---
+const HeaderWithNotif = (props: any) => {
+    const unreadCount = (props.notifications || []).filter((n:any) => !n.read).length;
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    return (
+        <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+           <div className="flex items-center gap-4"><button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button><h2 className="text-xl font-bold text-green-900">{props.title} <span className="text-xs ml-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full uppercase">{props.userRole}</span></h2></div>
+           <div className="flex items-center gap-3">
+              <div className="relative group"><button className="p-2 relative"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button></div>
+              <button onClick={props.onOpenFlashInfo} title="Flash Info"><Megaphone className="text-ebf-orange"/></button>
+              
+              {/* Settings Dropdown */}
+              <div className="relative">
+                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 hover:bg-orange-50 rounded-full transition relative"><Settings className="text-gray-600 hover:text-ebf-green"/></button>
+                {isSettingsOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)}></div>
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-orange-100 z-50 py-2 animate-fade-in">
+                       <div className="px-4 py-3 border-b border-gray-100 mb-1">
+                          <p className="text-sm font-bold text-green-900">Paramètres</p>
+                       </div>
+                       <button onClick={() => { setIsSettingsOpen(false); props.onOpenProfile(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><User size={16}/> Mon Profil</button>
+                       <button onClick={() => { props.onToggleTheme(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2">{props.darkMode ? <Sun size={16}/> : <Moon size={16}/>} Apparence</button>
+                       <button onClick={() => { setIsSettingsOpen(false); props.onOpenHelp(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><HelpCircle size={16}/> Aide & Support</button>
+                       <div className="border-t border-gray-100 mt-1 pt-1">
+                          <button onClick={() => { setIsSettingsOpen(false); props.onLogout(); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-bold"><LogOut size={16}/> Se Déconnecter</button>
+                       </div>
+                    </div>
+                  </>
+                )}
+              </div>
+           </div>
+        </header>
+    )
 };
 
 // --- App Content with Role Management ---
@@ -782,6 +844,7 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
   
   // Settings Modals
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Data
   const [loadingData, setLoadingData] = useState(false);
@@ -888,22 +951,6 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
       setShowToast(true); setTimeout(() => setShowToast(false), 3000); fetchData();
     } catch (e) { console.error("Insert error", e); }
   };
-  const HeaderWithNotif = (props: any) => {
-      const unreadCount = notifications.filter(n => !n.read).length;
-      return (
-          <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
-             <div className="flex items-center gap-4"><button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button><h2 className="text-xl font-bold text-green-900">{props.title} <span className="text-xs ml-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full uppercase">{userRole}</span></h2></div>
-             <div className="flex items-center gap-3">
-                <div className="relative group"><button className="p-2 relative"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button></div>
-                <button onClick={props.onOpenFlashInfo}><Megaphone className="text-ebf-orange"/></button>
-                <div className="relative group">
-                  <button onClick={props.onOpenProfile} className="p-2 hover:bg-orange-50 rounded-full transition"><Settings className="text-gray-600 hover:text-ebf-green"/></button>
-                </div>
-                <button onClick={props.onLogout}><LogOut className="text-red-500"/></button>
-             </div>
-          </header>
-      )
-  };
 
   const renderContent = () => {
     if (loadingData && currentPath !== '/') return <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-ebf-green" size={48}/></div>;
@@ -926,7 +973,18 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
      <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-orange-50 via-white to-green-50'}`}>
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setSidebarOpen} currentPath={currentPath} onNavigate={navigate} />
         <div className="lg:ml-72 min-h-screen flex flex-col transition-all duration-300">
-           <HeaderWithNotif onMenuClick={() => setSidebarOpen(true)} title="EBF Manager" onLogout={onLogout} onOpenFlashInfo={() => setIsFlashInfoOpen(true)} onOpenProfile={() => setIsProfileOpen(true)} />
+           <HeaderWithNotif 
+              onMenuClick={() => setSidebarOpen(true)} 
+              title="EBF Manager" 
+              userRole={userRole}
+              onLogout={onLogout} 
+              onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
+              onOpenProfile={() => setIsProfileOpen(true)} 
+              onOpenHelp={() => setIsHelpOpen(true)}
+              darkMode={darkMode}
+              onToggleTheme={() => setDarkMode(!darkMode)}
+              notifications={notifications}
+           />
            <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
         </div>
         <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
@@ -938,6 +996,7 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
           profile={currentUserProfile} 
           onUpdate={fetchData} 
         />
+        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
      </div>
   );
 };
