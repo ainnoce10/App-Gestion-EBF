@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, UserCog, Sun, Image as ImageIcon
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -166,31 +166,7 @@ const ConfirmationModal = ({
   );
 };
 
-// --- Help Modal ---
-const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
-         <div className="flex justify-between items-center mb-4 border-b border-orange-100 pb-2">
-            <h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><HelpCircle className="text-ebf-orange"/> Aide & Support</h3>
-            <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
-         </div>
-         <div className="space-y-4 text-sm text-gray-700">
-            <p><strong>Support Technique :</strong><br/>+225 07 07 07 07 07</p>
-            <p><strong>Email :</strong><br/>support@ebf-manager.ci</p>
-            <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
-               <p className="font-bold text-ebf-orange mb-1">Besoin d'aide ?</p>
-               <p>Contactez l'administrateur pour toute réinitialisation de compte ou problème d'accès.</p>
-            </div>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Password Update Modal (Recovery) ---
+// --- Password Update Modal (New) ---
 const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -223,164 +199,6 @@ const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
          <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">
            {loading ? <Loader2 className="animate-spin mx-auto"/> : "Mettre à jour"}
          </button>
-      </div>
-    </div>
-  );
-};
-
-// --- Profile Edit Modal (Settings) ---
-const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name || '');
-      setPhone(profile.phone || '');
-      setAvatarUrl(profile.avatar_url || '');
-    }
-    setPassword('');
-    setConfirmPassword('');
-  }, [profile, isOpen]);
-
-  const handleSave = async () => {
-    if (!session?.user?.id) return;
-    setLoading(true);
-
-    try {
-      // 1. Update Profile Info
-      const updates = {
-        id: session.user.id,
-        full_name: fullName,
-        phone: phone,
-        avatar_url: avatarUrl,
-        updated_at: new Date(),
-      };
-
-      const { error: profileError } = await supabase.from('profiles').upsert(updates);
-      if (profileError) throw profileError;
-
-      // 2. Update Password if provided
-      if (password) {
-        if (password !== confirmPassword) {
-          alert("Les mots de passe ne correspondent pas.");
-          setLoading(false);
-          return;
-        }
-        const { error: authError } = await supabase.auth.updateUser({ password: password });
-        if (authError) throw authError;
-      }
-
-      alert("Profil mis à jour avec succès !");
-      onUpdate(); 
-      onClose();
-
-    } catch (error: any) {
-      alert('Erreur lors de la mise à jour : ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-6 border-b border-orange-100 bg-gray-50 rounded-t-2xl">
-          <h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><UserCog className="text-ebf-green"/> Modifier Mon Profil</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition"><X /></button>
-        </div>
-        
-        <div className="p-6 space-y-4 overflow-y-auto">
-          {/* Avatar Preview */}
-          <div className="flex flex-col items-center justify-center mb-4">
-            <div className="w-24 h-24 rounded-full border-4 border-orange-100 overflow-hidden mb-2 relative bg-gray-100">
-               {avatarUrl ? (
-                 <img src={avatarUrl} alt="Profil" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150')} />
-               ) : (
-                 <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={40} /></div>
-               )}
-            </div>
-            <label className="text-xs font-bold text-ebf-green uppercase tracking-wide">Photo de profil</label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-green-900 mb-1">Nom Complet</label>
-            <div className="relative">
-              <User className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                value={fullName} 
-                onChange={e => setFullName(e.target.value)} 
-                className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-green-900 mb-1">URL Photo (Lien)</label>
-            <div className="relative">
-              <ImageIcon className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                value={avatarUrl} 
-                onChange={e => setAvatarUrl(e.target.value)} 
-                placeholder="https://exemple.com/photo.jpg"
-                className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-green-900 mb-1">Téléphone</label>
-             <div className="relative">
-              <Phone className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                value={phone} 
-                onChange={e => setPhone(e.target.value)} 
-                className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100 pt-4 mt-2">
-            <h4 className="text-sm font-bold text-orange-600 mb-3 flex items-center gap-1"><Lock size={14}/> Sécurité (Laisser vide pour ne pas changer)</h4>
-            <div className="space-y-3">
-              <div>
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  placeholder="Nouveau mot de passe"
-                  className="w-full border border-orange-200 rounded-lg p-3 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
-                />
-              </div>
-              <div>
-                <input 
-                  type="password" 
-                  value={confirmPassword} 
-                  onChange={e => setConfirmPassword(e.target.value)} 
-                  placeholder="Confirmer le mot de passe"
-                  className="w-full border border-orange-200 rounded-lg p-3 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 flex gap-3">
-            <button onClick={onClose} className="flex-1 py-3 border border-gray-300 text-gray-600 font-bold rounded-lg hover:bg-gray-50 transition">Annuler</button>
-            <button onClick={handleSave} disabled={loading} className="flex-1 py-3 bg-ebf-green text-white font-bold rounded-lg hover:bg-green-800 transition shadow-lg shadow-green-200 flex justify-center items-center gap-2">
-              {loading ? <Loader2 className="animate-spin" /> : <><Save size={18}/> Enregistrer</>}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -428,24 +246,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [hasLoggedInBefore, setHasLoggedInBefore] = useState(false);
-
-  useEffect(() => {
-    const visited = localStorage.getItem('ebf_has_logged_in');
-    if (visited) setHasLoggedInBefore(true);
-  }, []);
-
-  const handleBiometricLogin = async () => {
-    // Simulation of WebAuthn / Biometric check
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      // In a real app, this would use navigator.credentials.get() and verify with Supabase
-      // Here we simulate a successful login trigger if the user exists in session
-      alert("Authentification Biométrique réussie (Simulation). Veuillez entrer votre mot de passe pour confirmer.");
-    }, 1500);
-  };
-
+  
   const handleAuth = async () => {
     setLoading(true); setError(''); setSuccessMsg('');
 
@@ -485,20 +286,33 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         
         // --- SUCCÈS INSCRIPTION -> BASCULE VERS CONNEXION ---
         setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
-        setIsSignUp(false); // Basculer automatiquement vers l'écran de connexion
+        setIsSignUp(false); 
 
       } else {
         // --- CONNEXION ---
-        const { error: err } = await supabase.auth.signInWithPassword(
+        const { data, error: err } = await supabase.auth.signInWithPassword(
             authMethod === 'email' ? { email: identifier, password } : { phone: identifier, password }
         );
         if (err) throw err;
-        localStorage.setItem('ebf_has_logged_in', 'true');
+        
+        // --- FEEDBACK DE RÔLE ---
+        if (data.user) {
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+            if (profile) {
+                setSuccessMsg(`Bienvenue ${profile.full_name || 'Utilisateur'}, connexion en tant que ${profile.role}...`);
+                // Délai pour laisser l'utilisateur lire le message de connexion
+                setTimeout(() => {
+                    localStorage.setItem('ebf_has_logged_in', 'true');
+                }, 1500);
+            } else {
+                localStorage.setItem('ebf_has_logged_in', 'true');
+            }
+        }
       }
     } catch (err: any) {
       setError(err.message || "Erreur d'authentification.");
     } finally {
-      setLoading(false);
+      if (!successMsg) setLoading(false);
     }
   };
 
@@ -509,81 +323,63 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
           <h2 className="text-2xl font-bold text-green-900 mb-2">{isResetMode ? "Récupération" : (isSignUp ? "Rejoindre l'Équipe" : "Connexion EBF")}</h2>
           
           {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm mb-4 text-left">{error}</div>}
-          {successMsg && <div className="bg-green-50 text-green-600 p-3 rounded text-sm mb-4 text-left font-bold">{successMsg}</div>}
+          {successMsg && <div className="bg-green-50 text-green-600 p-3 rounded text-sm mb-4 text-left font-bold border border-green-200">{successMsg}</div>}
 
-          {!isResetMode && !isSignUp && hasLoggedInBefore && (
-             <div className="mb-6 bg-orange-50 p-4 rounded-xl border border-orange-100">
-                <p className="text-xs font-bold text-ebf-orange uppercase mb-3">Connexion Rapide</p>
-                <div className="flex justify-center gap-6">
-                   <button onClick={handleBiometricLogin} className="flex flex-col items-center gap-1 group">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:scale-110 transition border border-orange-200">
-                        <Fingerprint size={24} className="text-ebf-green" />
-                      </div>
-                      <span className="text-xs font-bold text-green-800">Touch ID</span>
-                   </button>
-                   <button onClick={handleBiometricLogin} className="flex flex-col items-center gap-1 group">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:scale-110 transition border border-orange-200">
-                        <ScanFace size={24} className="text-ebf-green" />
-                      </div>
-                      <span className="text-xs font-bold text-green-800">Face ID</span>
-                   </button>
-                </div>
-             </div>
-          )}
-
-          {!isResetMode && (
+          {!isResetMode && !successMsg.includes('Bienvenue') && (
             <div className="flex p-1 bg-gray-100 rounded-lg mb-6">
                <button onClick={() => setAuthMethod('email')} className={`flex-1 py-2 rounded text-sm font-bold ${authMethod === 'email' ? 'bg-white text-ebf-green shadow' : 'text-gray-500'}`}>Email</button>
                <button onClick={() => setAuthMethod('phone')} className={`flex-1 py-2 rounded text-sm font-bold ${authMethod === 'phone' ? 'bg-white text-ebf-orange shadow' : 'text-gray-500'}`}>Téléphone</button>
             </div>
           )}
 
-          <div className="space-y-4 text-left">
-             {isSignUp && (
-                <>
-                  <div>
-                    <label className="block text-sm font-bold text-green-900 mb-1">Nom Complet</label>
-                    <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" placeholder="Jean Kouassi" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                     <div>
-                        <label className="block text-sm font-bold text-green-900 mb-1">Rôle</label>
-                        <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900">
-                           <option value="Visiteur">Visiteur</option>
-                           <option value="Technicien">Technicien</option>
-                           <option value="Secretaire">Secretaire</option>
-                           <option value="Magasinier">Magasinier</option>
-                           <option value="Admin">Admin</option>
-                        </select>
-                     </div>
-                     <div>
-                        <label className="block text-sm font-bold text-green-900 mb-1">Site</label>
-                        <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900">
-                           <option value="Abidjan">Abidjan</option>
-                           <option value="Bouaké">Bouaké</option>
-                        </select>
-                     </div>
-                  </div>
-                </>
-             )}
+          {!successMsg.includes('Bienvenue') && (
+            <div className="space-y-4 text-left">
+                {isSignUp && (
+                    <>
+                    <div>
+                        <label className="block text-sm font-bold text-green-900 mb-1">Nom Complet</label>
+                        <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" placeholder="Jean Kouassi" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-sm font-bold text-green-900 mb-1">Rôle</label>
+                            <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900">
+                            <option value="Visiteur">Visiteur</option>
+                            <option value="Technicien">Technicien</option>
+                            <option value="Secretaire">Secretaire</option>
+                            <option value="Magasinier">Magasinier</option>
+                            <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-green-900 mb-1">Site</label>
+                            <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900">
+                            <option value="Abidjan">Abidjan</option>
+                            <option value="Bouaké">Bouaké</option>
+                            </select>
+                        </div>
+                    </div>
+                    </>
+                )}
 
-             <div>
-                <label className="block text-sm font-bold text-green-900 mb-1">{authMethod === 'email' ? 'Email' : 'Numéro'}</label>
-                <input value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" />
-             </div>
-             
-             {!isResetMode && (
-               <div>
-                  <label className="block text-sm font-bold text-green-900 mb-1">Mot de passe</label>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" />
-                  {!isSignUp && <button onClick={() => setIsResetMode(true)} className="text-xs text-orange-600 font-bold mt-1 block text-right">Oublié ?</button>}
-               </div>
-             )}
-             
-             <button onClick={handleAuth} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">
-                {loading ? <Loader2 className="animate-spin mx-auto"/> : (isResetMode ? "Envoyer" : (isSignUp ? "S'inscrire" : "Se Connecter"))}
-             </button>
-          </div>
+                <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">{authMethod === 'email' ? 'Email' : 'Numéro'}</label>
+                    <input value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" />
+                </div>
+                
+                {!isResetMode && (
+                <div>
+                    <label className="block text-sm font-bold text-green-900 mb-1">Mot de passe</label>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" />
+                    {!isSignUp && <button onClick={() => setIsResetMode(true)} className="text-xs text-orange-600 font-bold mt-1 block text-right">Oublié ?</button>}
+                </div>
+                )}
+                
+                <button onClick={handleAuth} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">
+                    {loading ? <Loader2 className="animate-spin mx-auto"/> : (isResetMode ? "Envoyer" : (isSignUp ? "S'inscrire" : "Se Connecter"))}
+                </button>
+            </div>
+          )}
 
           <div className="mt-4 pt-4 border-t border-gray-100">
              <button onClick={() => { setIsSignUp(!isSignUp); setIsResetMode(false); }} className="text-sm font-bold text-gray-500 hover:text-green-900">
@@ -613,7 +409,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     }, [items, currentSite, currentPeriod]);
 
     const columns = filteredItems.length > 0 
-        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url' && k !== 'phone') 
+        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url') 
         : []; 
 
     const renderCell = (col: string, value: any) => {
@@ -733,7 +529,6 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
   );
 };
 
-// --- TeamGrid Component ---
 const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void }) => {
    const team = members.filter(m => m.role !== 'Visiteur');
    return (
@@ -742,26 +537,16 @@ const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void 
              <div><h2 className="text-2xl font-bold text-indigo-700">Notre Équipe</h2><p className="text-sm text-gray-500">Membres actifs ({team.length})</p></div>
              <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 font-bold">Retour</button>
          </div>
-         {team.length === 0 ? (
-           <div className="text-center p-12 text-gray-400 bg-white rounded-xl">Aucun membre trouvé (vérifiez votre connexion ou la DB).</div>
-         ) : (
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {team.map(member => (
-                 <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
-                    <div className="w-20 h-20 rounded-full border-2 border-indigo-100 mb-4 overflow-hidden">
-                       {member.avatar_url ? (
-                         <img src={member.avatar_url} alt={member.full_name} className="w-full h-full object-cover"/>
-                       ) : (
-                         <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-2xl">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
-                       )}
-                    </div>
-                    <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
-                    <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
-                    <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
-                 </div>
-              ))}
-           </div>
-         )}
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {team.map(member => (
+               <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
+                  <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-4 font-bold text-2xl uppercase">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
+                  <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
+                  <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
+                  <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
+               </div>
+            ))}
+         </div>
       </div>
    );
 };
@@ -795,12 +580,12 @@ const ModuleMenu = ({ title, actions, onNavigate }: any) => (
     <h2 className="text-2xl font-bold text-green-900 mb-6 flex items-center"><ChevronRight className="text-ebf-orange mr-2"/> Module {title}</h2>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
        {actions.map((action: any) => (
-         <button key={action.id} onClick={() => onNavigate(action.path)} className={`p-6 rounded-xl shadow-md border border-orange-100 hover:shadow-xl hover:border-ebf-orange transition group text-left relative overflow-hidden ${action.color}`}>
-           <div className={`absolute top-0 right-0 p-3 rounded-bl-2xl bg-white opacity-20 group-hover:opacity-30 transition`}><action.icon size={48} /></div>
-           <div className={`w-12 h-12 rounded-lg bg-white/20 text-white flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition`}><action.icon size={24} /></div>
-           <h3 className="text-lg font-bold text-white mb-1">{action.label}</h3>
-           <p className="text-sm text-white/80 mb-4">{action.description}</p>
-           {action.managedBy && <span className="text-[10px] uppercase font-bold text-blue-700 bg-white px-2 py-1 rounded shadow-sm">{action.managedBy}</span>}
+         <button key={action.id} onClick={() => onNavigate(action.path)} className="bg-white p-6 rounded-xl shadow-md border border-orange-100 hover:shadow-xl hover:border-ebf-orange transition group text-left relative overflow-hidden">
+           <div className={`absolute top-0 right-0 p-3 rounded-bl-2xl ${action.color} opacity-10 group-hover:opacity-20 transition`}><action.icon size={48} /></div>
+           <div className={`w-12 h-12 rounded-lg ${action.color} text-white flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition`}><action.icon size={24} /></div>
+           <h3 className="text-lg font-bold text-green-900 mb-1 group-hover:text-ebf-orange transition">{action.label}</h3>
+           <p className="text-sm text-gray-500 mb-4">{action.description}</p>
+           {action.managedBy && <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100">{action.managedBy}</span>}
          </button>
        ))}
     </div>
@@ -827,10 +612,9 @@ const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
 };
 
 const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
-  const [localMsgs, setLocalMsgs] = useState<TickerMessage[]>([]); const [newMessage, setNewMessage] = useState(''); const [newType, setNewType] = useState<'info'|'alert'|'success'>('info'); const [editingId, setEditingId] = useState<string | null>(null);
+  const [localMsgs, setLocalMsgs] = useState<TickerMessage[]>([]); const [newMessage, setNewMessage] = useState(''); const [newType, setNewType] = useState<'info'|'alert'|'success'>('info');
   useEffect(() => { if (isOpen) setLocalMsgs(messages); }, [isOpen, messages]);
-  const handleEdit = (msg: TickerMessage) => { setEditingId(msg.id); setNewMessage(msg.text); setNewType(msg.type); };
-  const addMsg = () => { if (!newMessage) return; if (editingId) { setLocalMsgs(localMsgs.map(m => m.id === editingId ? { ...m, text: newMessage, type: newType } : m)); setEditingId(null); } else { const newM: TickerMessage = { id: Date.now().toString(), text: newMessage, type: newType, display_order: localMsgs.length + 1 }; setLocalMsgs([...localMsgs, newM]); } setNewMessage(''); };
+  const addMsg = () => { if (!newMessage) return; const newM: TickerMessage = { id: Date.now().toString(), text: newMessage, type: newType, display_order: localMsgs.length + 1 }; setLocalMsgs([...localMsgs, newM]); setNewMessage(''); };
   const removeMsg = (id: string) => { setLocalMsgs(localMsgs.filter(m => m.id !== id)); };
   const moveMessage = (index: number, direction: 'up' | 'down') => { const newMsgs = [...localMsgs]; if (direction === 'up' && index > 0) { [newMsgs[index], newMsgs[index-1]] = [newMsgs[index-1], newMsgs[index]]; } else if (direction === 'down' && index < newMsgs.length - 1) { [newMsgs[index], newMsgs[index+1]] = [newMsgs[index+1], newMsgs[index]]; } setLocalMsgs(newMsgs); };
   const handleSave = () => { onUpdate(localMsgs); onClose(); };
@@ -841,12 +625,12 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
       <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in">
          <div className="p-6 border-b border-orange-100 flex justify-between items-center"><h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><Megaphone className="text-ebf-orange"/> Gestion Flash Info</h3><button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button></div>
          <div className="p-6 space-y-4">
-            <div className="flex gap-2"><input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Nouveau message..." className="flex-1 border border-orange-200 rounded-lg p-2 text-sm focus:ring-ebf-green outline-none" /><select value={newType} onChange={(e:any) => setNewType(e.target.value)} className="border border-orange-200 rounded-lg p-2 text-sm bg-white"><option value="info">Info</option><option value="success">Succès</option><option value="alert">Alerte</option></select><button onClick={addMsg} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700">{editingId ? <Save size={20}/> : <Plus size={20}/>}</button>{editingId && <button onClick={() => {setEditingId(null); setNewMessage('');}} className="text-gray-500 hover:text-red-500"><X size={20}/></button>}</div>
+            <div className="flex gap-2"><input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Nouveau message..." className="flex-1 border border-orange-200 rounded-lg p-2 text-sm focus:ring-ebf-green outline-none" /><select value={newType} onChange={(e:any) => setNewType(e.target.value)} className="border border-orange-200 rounded-lg p-2 text-sm bg-white"><option value="info">Info</option><option value="success">Succès</option><option value="alert">Alerte</option></select><button onClick={addMsg} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Plus size={20}/></button></div>
             <div className="max-h-60 overflow-y-auto space-y-2">
                {localMsgs.map((msg, idx) => (
                   <div key={msg.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
                      <div className="flex items-center gap-2 overflow-hidden"><span className="text-xs font-bold text-gray-400">#{idx+1}</span><span className={`w-2 h-2 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></span><span className="text-sm truncate text-gray-700">{msg.text}</span></div>
-                     <div className="flex gap-1"><button onClick={() => handleEdit(msg)} className="text-blue-400 hover:text-blue-600"><Edit size={14}/></button><button onClick={() => moveMessage(idx, 'up')} className="text-gray-400 hover:text-gray-600"><ArrowUp size={14}/></button><button onClick={() => moveMessage(idx, 'down')} className="text-gray-400 hover:text-gray-600"><ArrowDown size={14}/></button><button onClick={() => removeMsg(msg.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></div>
+                     <div className="flex gap-1"><button onClick={() => moveMessage(idx, 'up')} className="text-gray-400 hover:text-gray-600"><ArrowUp size={14}/></button><button onClick={() => moveMessage(idx, 'down')} className="text-gray-400 hover:text-gray-600"><ArrowDown size={14}/></button><button onClick={() => removeMsg(msg.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></div>
                   </div>
                ))}
             </div>
@@ -857,55 +641,8 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
   );
 };
 
-// --- Header Component (Restored Settings Menu) ---
-const HeaderWithNotif = (props: any) => {
-    const unreadCount = (props.notifications || []).filter((n:any) => !n.read).length;
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    
-    // Determine profile image or default
-    const profileImage = props.userProfile?.avatar_url;
-
-    return (
-        <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
-           <div className="flex items-center gap-4"><button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button><h2 className="text-xl font-bold text-green-900">{props.title} <span className="text-xs ml-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full uppercase">{props.userRole}</span></h2></div>
-           <div className="flex items-center gap-3">
-              <div className="relative group"><button className="p-2 relative"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button></div>
-              
-              {/* Settings Dropdown */}
-              <div className="relative">
-                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 hover:bg-orange-50 rounded-full transition relative">
-                  {/* Show Avatar if exists, else Settings Icon */}
-                  {profileImage ? (
-                    <img src={profileImage} alt="Profile" className="w-8 h-8 rounded-full object-cover border border-orange-200" />
-                  ) : (
-                    <Settings className="text-gray-600 hover:text-ebf-green"/>
-                  )}
-                </button>
-                {isSettingsOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsSettingsOpen(false)}></div>
-                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-orange-100 z-50 py-2 animate-fade-in">
-                       <div className="px-4 py-3 border-b border-gray-100 mb-1">
-                          <p className="text-sm font-bold text-green-900">Paramètres</p>
-                       </div>
-                       <button onClick={() => { setIsSettingsOpen(false); props.onOpenProfile(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><User size={16}/> Mon Profil</button>
-                       <button onClick={() => { setIsSettingsOpen(false); props.onOpenFlashInfo(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><Megaphone size={16}/> Gestion Flash Info</button>
-                       <button onClick={() => { props.onToggleTheme(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2">{props.darkMode ? <Sun size={16}/> : <Moon size={16}/>} Apparence</button>
-                       <button onClick={() => { setIsSettingsOpen(false); props.onOpenHelp(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-ebf-green flex items-center gap-2"><HelpCircle size={16}/> Aide & Support</button>
-                       <div className="border-t border-gray-100 mt-1 pt-1">
-                          <button onClick={() => { setIsSettingsOpen(false); props.onLogout(); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-bold"><LogOut size={16}/> Se Déconnecter</button>
-                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
-           </div>
-        </header>
-    )
-};
-
 // --- App Content with Role Management ---
-const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: () => void, userRole: Role }) => {
+const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any, onLogout: () => void, userRole: Role, userProfile: Profile | null }) => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState('/');
   const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
@@ -916,10 +653,6 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
-  // Settings Modals
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-
   // Data
   const [loadingData, setLoadingData] = useState(false);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
@@ -934,11 +667,6 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
   const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
   const [viewReport, setViewReport] = useState<any | null>(null);
-
-  // Derive Current User Profile
-  const currentUserProfile = useMemo(() => {
-    return profiles.find(p => p.id === session.user.id);
-  }, [profiles, session.user.id]);
 
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
@@ -1008,11 +736,6 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
     transactions.forEach(t => { if (!t.date) return; if (!statsMap.has(t.date)) statsMap.set(t.date, { date: t.date, site: t.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(t.date)!; if (t.type === 'Recette') { s.revenue += Number(t.amount); s.profit += Number(t.amount); } else { s.expenses += Number(t.amount); s.profit -= Number(t.amount); } });
     setDashboardStats(Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date)));
   }, [reports, transactions]);
-  
-  // Refresh Team data explicitly when navigating to team page
-  useEffect(() => {
-      if (currentPath === '/equipe') fetchData();
-  }, [currentPath]);
 
   // --- HANDLERS ---
   const handleTickerUpdate = async (msgs: TickerMessage[]) => {
@@ -1029,6 +752,37 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
       // Add other module inserts here
       setShowToast(true); setTimeout(() => setShowToast(false), 3000); fetchData();
     } catch (e) { console.error("Insert error", e); }
+  };
+
+  const HeaderWithNotif = (props: any) => {
+      const unreadCount = notifications.filter(n => !n.read).length;
+      return (
+          <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+             <div className="flex items-center gap-4">
+                <button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button>
+                <h2 className="text-xl font-bold text-green-900 hidden md:block">{props.title}</h2>
+             </div>
+             
+             <div className="flex items-center gap-3">
+                 {/* PROFILE SECTION */}
+                 <div className="flex items-center gap-3 border-l pl-4 ml-2 border-orange-200">
+                    <div className="hidden md:block text-right">
+                       <p className="text-sm font-bold text-green-900">{userProfile?.full_name || 'Utilisateur'}</p>
+                       <p className="text-xs text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-ebf-green to-emerald-700 text-white flex items-center justify-center font-bold text-lg shadow-md border-2 border-white">
+                        {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
+                    </div>
+                 </div>
+
+                <div className="relative group ml-2">
+                   <button className="p-2 relative hover:bg-orange-50 rounded-full transition"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button>
+                </div>
+                <button onClick={props.onOpenFlashInfo} className="p-2 hover:bg-orange-50 rounded-full transition"><Megaphone className="text-ebf-orange"/></button>
+                <button onClick={props.onLogout} className="p-2 hover:bg-red-50 rounded-full transition"><LogOut className="text-red-500"/></button>
+             </div>
+          </header>
+      )
   };
 
   const renderContent = () => {
@@ -1052,89 +806,56 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
      <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-orange-50 via-white to-green-50'}`}>
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setSidebarOpen} currentPath={currentPath} onNavigate={navigate} />
         <div className="lg:ml-72 min-h-screen flex flex-col transition-all duration-300">
-           <HeaderWithNotif 
-              onMenuClick={() => setSidebarOpen(true)} 
-              title="EBF Manager" 
-              userRole={userRole}
-              userProfile={currentUserProfile}
-              onLogout={onLogout} 
-              onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
-              onOpenProfile={() => setIsProfileOpen(true)} 
-              onOpenHelp={() => setIsHelpOpen(true)}
-              darkMode={darkMode}
-              onToggleTheme={() => setDarkMode(!darkMode)}
-              notifications={notifications}
-           />
+           <HeaderWithNotif onMenuClick={() => setSidebarOpen(true)} title="EBF Manager" onLogout={onLogout} onOpenFlashInfo={() => setIsFlashInfoOpen(true)} />
            <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
         </div>
         <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={tickerMessages} onUpdate={handleTickerUpdate} />
-        <ProfileModal 
-          isOpen={isProfileOpen} 
-          onClose={() => setIsProfileOpen(false)} 
-          session={session} 
-          profile={currentUserProfile} 
-          onUpdate={fetchData} 
-        />
-        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
      </div>
   );
 };
 
-const App = () => {
+// --- App Wrapper ---
+function App() {
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<Role>('Visiteur');
-  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-          fetchUserRole(session.user.id);
-      } else {
-          setLoading(false);
-      }
+        setSession(session);
+        if (session) fetchUserProfile(session.user.id);
     });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-         fetchUserRole(session.user.id);
-      } else {
-         setUserRole('Visiteur');
-         setLoading(false);
-      }
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+            setIsPasswordResetOpen(true);
+        }
+        setSession(session);
+        if (session) fetchUserProfile(session.user.id);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserRole = async (userId: string) => {
-    try {
-       // Check if profile exists
-       const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-       
-       if (data) {
-           setUserRole(data.role as Role);
-       }
-    } catch (e) {
-        console.error("Role fetch error", e);
-    } finally {
-        setLoading(false);
-    }
+  const fetchUserProfile = async (userId: string) => {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) {
+          setUserRole(data.role);
+          setUserProfile(data);
+      } else {
+          console.error("Profile fetch error", error);
+      }
   };
 
-  if (loading) {
-     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-ebf-green" size={48}/></div>;
-  }
+  if (!session) return <LoginScreen onLogin={() => {}} />;
 
-  return !session ? <LoginScreen onLogin={() => {}} /> : <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userRole} />;
-};
+  return (
+    <>
+      <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userRole} userProfile={userProfile} />
+      <PasswordUpdateModal isOpen={isPasswordResetOpen} onClose={() => setIsPasswordResetOpen(false)} />
+    </>
+  );
+}
 
 export default App;

@@ -21,7 +21,6 @@ export interface Profile {
   role: Role;
   site: Site;
   phone?: string;
-  avatar_url?: string;
 }
 
 export interface Technician {
