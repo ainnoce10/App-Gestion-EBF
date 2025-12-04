@@ -12,6 +12,25 @@ export enum Period {
   YEAR = 'Année'
 }
 
+export type Role = 'Admin' | 'Technicien' | 'Secretaire' | 'Magasinier' | 'Visiteur';
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  site: Site;
+  phone?: string;
+}
+
+export interface Technician {
+  id: string;
+  name: string;
+  specialty: string;
+  status: 'Available' | 'Busy' | 'Off';
+  site: Site;
+}
+
 export interface StatData {
   date: string;
   revenue: number;
@@ -19,15 +38,6 @@ export interface StatData {
   profit: number;
   expenses: number;
   site: Site;
-}
-
-export interface Technician {
-  id: string;
-  name: string;
-  specialty: string; // Mapped from 'role'
-  status: 'Available' | 'Busy' | 'Leave'; // Mocked or added to DB later
-  site: Site;
-  email?: string;
 }
 
 export interface StockItem {
@@ -47,9 +57,9 @@ export interface Intervention {
   location: string; 
   description: string;
   technicianId: string;
-  technicianName?: string;
+  technicianName?: string; // Nom affiché venant du profil
   date: string;
-  status: 'Pending' | 'In Progress' | 'Completed';
+  status: 'Pending' | 'In Progress' | 'Completed'; // Mapped to Planifié, En cours, Exécuté
 }
 
 export interface DailyReport {
@@ -85,4 +95,15 @@ export interface TickerMessage {
   id: string;
   text: string;
   type: 'alert' | 'success' | 'info';
+  display_order: number;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string; // From DB
+  type: 'alert' | 'success' | 'info';
+  read: boolean;
+  path?: string;
 }

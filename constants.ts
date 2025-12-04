@@ -78,8 +78,8 @@ export const MOCK_REPORTS: DailyReport[] = [
 ];
 
 export const DEFAULT_TICKER_MESSAGES: TickerMessage[] = [
-  { id: '1', text: 'Bienvenue sur EBF Manager v1.0', type: 'info' },
-  { id: '2', text: 'Félicitations ! Nous sommes à 30% de profits aujourd\'hui', type: 'success' },
-  { id: '3', text: 'Attention ! Stock de câble faible à Abidjan', type: 'alert' },
-  { id: '4', text: 'Réunion générale Lundi à 08h00', type: 'info' },
+  { id: '1', text: 'Bienvenue sur EBF Manager v1.0', type: 'info', display_order: 1 },
+  { id: '2', text: 'Félicitations ! Nous sommes à 30% de profits aujourd\'hui', type: 'success', display_order: 2 },
+  { id: '3', text: 'Attention ! Stock de câble faible à Abidjan', type: 'alert', display_order: 3 },
+  { id: '4', text: 'Réunion générale Lundi à 08h00', type: 'info', display_order: 4 },
 ];
