@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, UserCog
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -166,7 +166,7 @@ const ConfirmationModal = ({
   );
 };
 
-// --- Password Update Modal (New) ---
+// --- Password Update Modal (Recovery) ---
 const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -199,6 +199,135 @@ const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
          <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">
            {loading ? <Loader2 className="animate-spin mx-auto"/> : "Mettre à jour"}
          </button>
+      </div>
+    </div>
+  );
+};
+
+// --- Profile Edit Modal (Settings) ---
+const ProfileModal = ({ isOpen, onClose, session, profile, onUpdate }: any) => {
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setPhone(profile.phone || '');
+    }
+    setPassword('');
+    setConfirmPassword('');
+  }, [profile, isOpen]);
+
+  const handleSave = async () => {
+    if (!session?.user?.id) return;
+    setLoading(true);
+
+    try {
+      // 1. Update Profile Info
+      const updates = {
+        id: session.user.id,
+        full_name: fullName,
+        phone: phone,
+        updated_at: new Date(),
+      };
+
+      const { error: profileError } = await supabase.from('profiles').upsert(updates);
+      if (profileError) throw profileError;
+
+      // 2. Update Password if provided
+      if (password) {
+        if (password !== confirmPassword) {
+          alert("Les mots de passe ne correspondent pas.");
+          setLoading(false);
+          return;
+        }
+        const { error: authError } = await supabase.auth.updateUser({ password: password });
+        if (authError) throw authError;
+      }
+
+      alert("Profil mis à jour avec succès !");
+      onUpdate(); 
+      onClose();
+
+    } catch (error: any) {
+      alert('Erreur lors de la mise à jour : ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center p-6 border-b border-orange-100 bg-gray-50 rounded-t-2xl">
+          <h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><UserCog className="text-ebf-green"/> Modifier Mon Profil</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition"><X /></button>
+        </div>
+        
+        <div className="p-6 space-y-4 overflow-y-auto">
+          <div>
+            <label className="block text-sm font-bold text-green-900 mb-1">Nom Complet</label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                value={fullName} 
+                onChange={e => setFullName(e.target.value)} 
+                className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-green-900 mb-1">Téléphone</label>
+             <div className="relative">
+              <Phone className="absolute left-3 top-3 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                value={phone} 
+                onChange={e => setPhone(e.target.value)} 
+                className="w-full border border-orange-200 rounded-lg p-3 pl-10 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 mt-2">
+            <h4 className="text-sm font-bold text-orange-600 mb-3 flex items-center gap-1"><Lock size={14}/> Sécurité (Laisser vide pour ne pas changer)</h4>
+            <div className="space-y-3">
+              <div>
+                <input 
+                  type="password" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  placeholder="Nouveau mot de passe"
+                  className="w-full border border-orange-200 rounded-lg p-3 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
+                />
+              </div>
+              <div>
+                <input 
+                  type="password" 
+                  value={confirmPassword} 
+                  onChange={e => setConfirmPassword(e.target.value)} 
+                  placeholder="Confirmer le mot de passe"
+                  className="w-full border border-orange-200 rounded-lg p-3 bg-white text-green-900 focus:ring-2 focus:ring-ebf-green outline-none" 
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 flex gap-3">
+            <button onClick={onClose} className="flex-1 py-3 border border-gray-300 text-gray-600 font-bold rounded-lg hover:bg-gray-50 transition">Annuler</button>
+            <button onClick={handleSave} disabled={loading} className="flex-1 py-3 bg-ebf-green text-white font-bold rounded-lg hover:bg-green-800 transition shadow-lg shadow-green-200 flex justify-center items-center gap-2">
+              {loading ? <Loader2 className="animate-spin" /> : <><Save size={18}/> Enregistrer</>}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -651,6 +780,9 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
+  // Settings Modals
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   // Data
   const [loadingData, setLoadingData] = useState(false);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
@@ -665,6 +797,11 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
   const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
   const [viewReport, setViewReport] = useState<any | null>(null);
+
+  // Derive Current User Profile
+  const currentUserProfile = useMemo(() => {
+    return profiles.find(p => p.id === session.user.id);
+  }, [profiles, session.user.id]);
 
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
@@ -758,7 +895,11 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
              <div className="flex items-center gap-4"><button onClick={props.onMenuClick} className="lg:hidden p-2"><Menu/></button><h2 className="text-xl font-bold text-green-900">{props.title} <span className="text-xs ml-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full uppercase">{userRole}</span></h2></div>
              <div className="flex items-center gap-3">
                 <div className="relative group"><button className="p-2 relative"><Bell className="text-ebf-green"/>{unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}</button></div>
-                <button onClick={props.onOpenFlashInfo}><Megaphone className="text-ebf-orange"/></button><button onClick={props.onLogout}><LogOut className="text-red-500"/></button>
+                <button onClick={props.onOpenFlashInfo}><Megaphone className="text-ebf-orange"/></button>
+                <div className="relative group">
+                  <button onClick={props.onOpenProfile} className="p-2 hover:bg-orange-50 rounded-full transition"><Settings className="text-gray-600 hover:text-ebf-green"/></button>
+                </div>
+                <button onClick={props.onLogout}><LogOut className="text-red-500"/></button>
              </div>
           </header>
       )
@@ -785,11 +926,18 @@ const AppContent = ({ session, onLogout, userRole }: { session: any, onLogout: (
      <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-orange-50 via-white to-green-50'}`}>
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setSidebarOpen} currentPath={currentPath} onNavigate={navigate} />
         <div className="lg:ml-72 min-h-screen flex flex-col transition-all duration-300">
-           <HeaderWithNotif onMenuClick={() => setSidebarOpen(true)} title="EBF Manager" onLogout={onLogout} onOpenFlashInfo={() => setIsFlashInfoOpen(true)} />
+           <HeaderWithNotif onMenuClick={() => setSidebarOpen(true)} title="EBF Manager" onLogout={onLogout} onOpenFlashInfo={() => setIsFlashInfoOpen(true)} onOpenProfile={() => setIsProfileOpen(true)} />
            <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
         </div>
         <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={tickerMessages} onUpdate={handleTickerUpdate} />
+        <ProfileModal 
+          isOpen={isProfileOpen} 
+          onClose={() => setIsProfileOpen(false)} 
+          session={session} 
+          profile={currentUserProfile} 
+          onUpdate={fetchData} 
+        />
      </div>
   );
 };
