@@ -24,18 +24,5 @@
   <body class="bg-green-50/30 text-green-950 antialiased selection:bg-ebf-orange selection:text-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-    <script>
-        // Force inputs white override script as backup
-        document.addEventListener('DOMContentLoaded', () => {
-            const style = document.createElement('style');
-            style.innerHTML = `
-                input, select, textarea { 
-                    background-color: #ffffff !important; 
-                    color: #14532d !important;
-                }
-            `;
-            document.head.appendChild(style);
-        });
-    </script>
   </body>
 </html>

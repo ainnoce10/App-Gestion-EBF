@@ -190,9 +190,9 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
       <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in">
         <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4">Mon Profil</h3>
         <div className="space-y-4">
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" /></div>
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
            <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Email (Lecture seule)</label><input value={formData.email} disabled className="w-full border border-gray-200 p-2 rounded bg-gray-100 text-gray-500" /></div>
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900" /></div>
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-orange-200 p-2 rounded bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
            <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-2 rounded hover:bg-green-800">{loading ? '...' : 'Enregistrer'}</button>
         </div>
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X /></button>
@@ -249,7 +249,7 @@ const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
            value={newPassword} 
            onChange={e => setNewPassword(e.target.value)} 
            placeholder="Entrez votre nouveau mot de passe"
-           className="w-full border border-orange-200 p-3 rounded-lg mb-4 bg-white text-green-900" 
+           className="w-full border border-orange-200 p-3 rounded-lg mb-4 bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" 
          />
          <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">
            {loading ? <Loader2 className="animate-spin mx-auto"/> : "Mettre à jour"}
@@ -397,12 +397,12 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                     <>
                     <div>
                         <label className="block text-sm font-bold text-green-900 mb-1">Nom Complet</label>
-                        <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" placeholder="Jean Kouassi" />
+                        <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" placeholder="Jean Kouassi" />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="block text-sm font-bold text-green-900 mb-1">Rôle</label>
-                            <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900">
+                            <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none">
                             <option value="Visiteur">Visiteur</option>
                             <option value="Technicien">Technicien</option>
                             <option value="Secretaire">Secretaire</option>
@@ -412,7 +412,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-green-900 mb-1">Site</label>
-                            <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900">
+                            <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none">
                             <option value="Abidjan">Abidjan</option>
                             <option value="Bouaké">Bouaké</option>
                             </select>
@@ -423,13 +423,13 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
 
                 <div>
                     <label className="block text-sm font-bold text-green-900 mb-1">{authMethod === 'email' ? 'Email' : 'Numéro'}</label>
-                    <input value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" />
+                    <input value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" />
                 </div>
                 
                 {!isResetMode && (
                 <div>
                     <label className="block text-sm font-bold text-green-900 mb-1">Mot de passe</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900" />
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none" />
                     {!isSignUp && <button onClick={() => setIsResetMode(true)} className="text-xs text-orange-600 font-bold mt-1 block text-right">Oublié ?</button>}
                 </div>
                 )}
@@ -843,7 +843,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   return (
-    <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
+    <div className={`flex h-screen bg-green-50/30 dark:bg-gray-900 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
         {/* Sidebar */}
         <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-900 text-white transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto shadow-2xl flex flex-col`}>
             <div className="flex items-center justify-between h-16 px-6 bg-green-950/50">
@@ -895,7 +895,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
                 darkMode={darkMode}
                 onToggleTheme={toggleTheme}
              />
-             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-gray-50 dark:bg-gray-900">
+             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-green-50/10 dark:bg-gray-900">
                 {renderContent()}
              </main>
         </div>
