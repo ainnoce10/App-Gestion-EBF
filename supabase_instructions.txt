@@ -1,0 +1,16 @@
+
+INSTRUCTIONS POUR RÉGLER LES PROBLÈMES D'EMAIL :
+
+Si vous ne recevez pas les emails dans Gmail :
+
+1. Connectez-vous à votre compte Supabase (https://supabase.com/dashboard).
+2. Ouvrez votre Projet.
+3. Allez dans le menu de gauche : Authentication > Providers.
+4. Cliquez sur "Email".
+5. DÉCOCHEZ la case "Confirm email" (Confirm email addresses).
+6. Cliquez sur "Save".
+
+POURQUOI ?
+La version gratuite de Supabase limite fortement l'envoi d'emails (rate limit).
+En désactivant cette option, les utilisateurs seront connectés immédiatement après l'inscription sans avoir besoin de cliquer sur un lien.
+C'est la meilleure solution pour une application en cours de développement/test.

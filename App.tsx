@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target, RefreshCcw
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -191,18 +191,22 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
   return true;
 };
 
-// --- Helper: Permission Check ---
+// --- Helper: Permission Check (STRICT) ---
 const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  if (role === 'Admin') return { canWrite: true };
-  if (role === 'Visiteur') return { canWrite: false };
+  if (role === 'Admin') return { canWrite: true }; // Admin a tous les droits
+  if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
 
-  // Roles internes spécifiques
+  // Rôles internes spécifiques
+  // Technicien écrit UNIQUEMENT dans /techniciens
   if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
+  
+  // Magasinier écrit UNIQUEMENT dans /quincaillerie
   if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
+  
+  // Secrétaire écrit UNIQUEMENT dans /secretariat
   if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
   
-  // TOUT LE RESTE (y compris /equipe, /comptabilite) est Lecture Seule pour les non-Admins
-  // Cela empêche les autres rôles de modifier les sections critiques
+  // TOUT LE RESTE (y compris /equipe, /comptabilite pour les non-admins) est strictement Lecture Seule
   return { canWrite: false };
 };
 
@@ -291,6 +295,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [resentCount, setResentCount] = useState(0);
   
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,7 +354,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
              onLoginSuccess();
              return;
         } else if (signUpResp.data.user && !signUpResp.data.session) {
-            setSuccessMsg("Compte créé ! Veuillez vérifier vos emails pour valider l'inscription avant de vous connecter.");
+            setSuccessMsg("Compte créé ! Veuillez vérifier vos emails (et SPAMS) pour valider l'inscription.");
             setIsSignUp(false);
         } else {
             setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
@@ -365,9 +370,11 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         if (err) {
             console.error("Login Error Full:", err);
             if (err.message.includes("Email not confirmed")) {
-                throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception (et spams).");
+                throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception (et SPAMS).");
             } else if (err.message.includes("Invalid login credentials")) {
-                throw new Error("Email ou mot de passe incorrect. Vérifiez les majuscules et espaces.");
+                throw new Error("Email ou mot de passe incorrect.");
+            } else if (err.message.includes("Phone signups are disabled")) {
+                throw new Error("L'inscription par téléphone est désactivée sur le serveur. Utilisez l'option Email.");
             } else {
                 throw new Error(err.message);
             }
@@ -379,6 +386,24 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
       setError(err.message || "Une erreur est survenue.");
     } finally {
       if (!successMsg && !isSignUp) setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!identifier) return;
+    setLoading(true);
+    try {
+        const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email: identifier.trim()
+        });
+        if (error) throw error;
+        setResentCount(prev => prev + 1);
+        alert("Email de confirmation renvoyé ! Pensez à vérifier le dossier SPAM.");
+    } catch (e: any) {
+        alert("Erreur lors du renvoi : " + e.message);
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -398,13 +423,39 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
           
           {error && (
              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in">
-                <AlertCircle size={18} className="flex-shrink-0"/> <span>{error}</span>
+                <AlertCircle size={18} className="flex-shrink-0"/> 
+                <div className="flex-1">
+                    <span>{error}</span>
+                    {error.includes("pas confirmé") && (
+                        <button 
+                            type="button" 
+                            onClick={handleResendConfirmation} 
+                            className="block mt-2 text-xs bg-red-100 px-2 py-1 rounded hover:bg-red-200 font-bold transition flex items-center gap-1"
+                        >
+                            <RefreshCcw size={10}/> Renvoyer l'email de confirmation
+                        </button>
+                    )}
+                </div>
              </div>
           )}
           
           {successMsg && (
-             <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in">
-                <CheckCircle size={18} className="flex-shrink-0"/> <span>{successMsg}</span>
+             <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex flex-col gap-2 animate-slide-in">
+                <div className="flex items-center gap-2">
+                    <CheckCircle size={18} className="flex-shrink-0"/> <span>{successMsg}</span>
+                </div>
+                {successMsg.includes("Vérifiez vos emails") && (
+                    <div className="pl-6 space-y-2">
+                        <p className="text-xs text-green-800 italic">Rien reçu ? Vérifiez vos <strong>SPAMS</strong> ou courriers indésirables.</p>
+                        <button 
+                            onClick={handleResendConfirmation} 
+                            disabled={loading || resentCount > 2}
+                            className="text-xs bg-white border border-green-200 px-3 py-1.5 rounded font-bold hover:bg-green-100 transition disabled:opacity-50"
+                        >
+                            {resentCount > 2 ? "Trop de tentatives" : "Renvoyer l'email de confirmation"}
+                        </button>
+                    </div>
+                )}
              </div>
           )}
 
