@@ -1442,54 +1442,57 @@ export default function App() {
 
   // Helper to fetch profile data
   const fetchUserProfile = async (userId: string) => {
-      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      // 1. Get Auth Metadata (Source of Truth for Signup Role)
+      const { data: { user } } = await supabase.auth.getUser();
+      const metaRole = user?.user_metadata?.role as Role | undefined;
+
+      // 2. Get Profile from DB
+      let { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
       
-      // Fallback: Create profile if it doesn't exist
-      if (!data) {
-          const { data: userData } = await supabase.auth.getUser();
-          const meta = userData.user?.user_metadata;
+      // 3. FORCE SYNC: If Metadata exists (Admin) but DB says Visitor (default/error), UPDATE DB
+      if (profile && metaRole && profile.role !== metaRole) {
+          console.log(`Syncing Role: DB=${profile.role} -> Meta=${metaRole}`);
+          await supabase.from('profiles').update({ role: metaRole }).eq('id', userId);
+          profile.role = metaRole; // Update local reference immediately
+      }
+
+      // 4. Fallback: Create profile if it doesn't exist (using Metadata)
+      if (!profile) {
+          const meta = user?.user_metadata;
           if (meta) {
               const newProfile = {
                   id: userId,
                   full_name: meta.full_name || 'Utilisateur',
                   role: meta.role || 'Visiteur',
                   site: meta.site || 'Global',
-                  email: userData.user?.email
+                  email: user?.email
               };
               const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-              if (!insertError) data = newProfile as any;
+              if (!insertError) profile = newProfile as any;
           }
       }
 
-      if (data) {
-          // --- FORCE ADMIN MODE (POUR LE DÉVELOPPEUR) ---
-          // Cela vous garantit d'être Admin même si la base de données dit "Visiteur"
-          if (data.role !== 'Admin') {
-              console.log("DEV MODE: Promotion automatique en Admin");
-              await supabase.from('profiles').update({ role: 'Admin' }).eq('id', userId);
-              data.role = 'Admin'; // On force la donnée locale
-          }
-
-          setUserRole(data.role);
-          setUserProfile(data);
+      if (profile) {
+          setUserRole(profile.role);
+          setUserProfile(profile);
           
           // Ensure user is in 'Notre Équipe' if not Visitor
-          if (data.role !== 'Visiteur') {
+          if (profile.role !== 'Visiteur') {
                const { data: tech } = await supabase.from('technicians').select('id').eq('id', userId).single();
                if (!tech) {
-                   let specialty = data.role;
-                   if (data.role === 'Admin') specialty = 'Administration';
+                   let specialty = profile.role;
+                   if (profile.role === 'Admin') specialty = 'Administration';
                    
                    await supabase.from('technicians').insert([{
                        id: userId,
-                       name: data.full_name,
+                       name: profile.full_name,
                        specialty: specialty,
-                       site: data.site,
+                       site: profile.site,
                        status: 'Available'
                    }]);
                }
           }
-          return data;
+          return profile;
       }
       return null;
   };
