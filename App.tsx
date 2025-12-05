@@ -611,7 +611,9 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
              onLoginSuccess();
              return;
         } else {
-             setError("Compte créé mais connexion bloquée. ALERTE CONFIG : Veuillez DÉSACTIVER 'Confirm Email' dans votre dashboard Supabase > Auth > Providers.");
+             // Modification pour ne plus bloquer l'utilisateur si la session n'est pas immédiate
+             setIsSignUp(false);
+             setSuccessMsg("Compte créé avec succès ! Connectez-vous avec vos identifiants.");
         }
 
       } else {
