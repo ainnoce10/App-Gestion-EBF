@@ -13,6 +13,10 @@ import { DetailedSynthesis } from './components/DetailedSynthesis';
 import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
 
+// --- CONFIGURATION DEBUG / DEV ---
+// Mettre à TRUE pour désactiver la connexion et être Admin d'office
+const DEV_MODE_BYPASS_LOGIN = true; 
+
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
   id: string;
@@ -1189,7 +1193,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
 
-  const { canWrite } = getPermission(currentPath, userRole);
+  // Force Write Permission if Dev Mode or Admin
+  const { canWrite } = userRole === 'Admin' ? { canWrite: true } : getPermission(currentPath, userRole);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1502,6 +1507,20 @@ export default function App() {
 
   // Main Effect to check Session on Load
   useEffect(() => {
+    // --- BYPASS LOGIN (DEV MODE) ---
+    if (DEV_MODE_BYPASS_LOGIN) {
+        setAppState('APP');
+        setUserRole('Admin');
+        setUserProfile({
+            id: 'dev-admin',
+            full_name: 'Administrateur (Dev)',
+            email: 'dev@ebf.ci',
+            role: 'Admin',
+            site: Site.GLOBAL
+        });
+        return;
+    }
+
     const init = async () => {
       const { data: { session: existingSession } } = await supabase.auth.getSession();
       
@@ -1555,7 +1574,10 @@ export default function App() {
   return (
     <AppContent 
         session={session} 
-        onLogout={() => supabase.auth.signOut()} 
+        onLogout={() => { 
+            if (DEV_MODE_BYPASS_LOGIN) alert("Déconnexion simulée en Mode Dev. Pour réactiver la connexion, changez la variable DEV_MODE_BYPASS_LOGIN dans le code.");
+            else supabase.auth.signOut(); 
+        }} 
         userRole={userRole} 
         userProfile={userProfile} 
     />
