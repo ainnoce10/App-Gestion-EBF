@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, Sparkles, Target
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -205,38 +205,80 @@ const getPermission = (path: string, role: Role): { canWrite: boolean } => {
   return { canWrite: false };
 };
 
-// --- EBF Logo (Modernized - Orange & White Theme) ---
+// --- EBF Vector Logo (Globe + Plug) ---
+const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
+    // Scaling factor
+    const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
+    const width = 200 * scale;
+    const height = 100 * scale;
+    
+    return (
+        <svg width={width} height={height} viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{stopColor:'#3b82f6', stopOpacity:1}} />
+                    <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
+                </linearGradient>
+            </defs>
+            {/* Globe */}
+            <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
+            {/* Continents (Stylized) */}
+            <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
+            <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
+            
+            {/* Cord */}
+            <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
+            
+            {/* Plug */}
+            <rect x="70" y="20" width="20" height="25" rx="3" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
+            <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
+            
+            {/* Divider Line */}
+            <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
+            
+            {/* Text E.B.F */}
+            <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
+            <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
+            <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
+            
+            {/* Banner */}
+            <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
+            <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
+                Electricité - Bâtiment - Froid
+            </text>
+        </svg>
+    );
+};
+
+// --- EBF Logo ---
+// Extrait du changement :
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
-  const scale = size === 'small' ? 0.75 : size === 'large' ? 1.5 : 1;
+  const [imgError, setImgError] = useState(false); // Nouvel état pour gérer l'erreur
+  
+  // Si l'image 'logo.png' ne charge pas, on affiche le SVG
+  if (imgError) {
+      return <EbfSvgLogo size={size} />;
+  }
+
   return (
-    <div className="flex items-center space-x-3 select-none" style={{ transform: `scale(${scale})` }}>
-      <div className="relative w-12 h-12 flex-shrink-0">
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-md flex items-center justify-center overflow-hidden border border-orange-400">
-           <div className="text-white font-black text-2xl tracking-tighter">EBF</div>
-        </div>
-        <div className="absolute -bottom-1 -right-1 bg-green-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-white">
-           CI
-        </div>
-      </div>
-      <div className="flex flex-col">
-         <div className="flex items-baseline space-x-0.5 text-3xl font-black tracking-tight leading-none">
-           <span className="text-gray-800">E</span>
-           <span className="text-ebf-orange">.</span>
-           <span className="text-gray-800">B</span>
-           <span className="text-ebf-orange">.</span>
-           <span className="text-gray-800">F</span>
-         </div>
-         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Manager</div>
-      </div>
+    <div className="flex items-center justify-center">
+        <img 
+            src="/logo.png" 
+            alt="EBF Logo" 
+            className={`${size === 'small' ? 'h-10' : size === 'large' ? 'h-32' : 'h-16'} w-auto object-contain`}
+            onError={() => setImgError(true)} // Détecte si l'image manque
+        />
     </div>
   );
 };
-
 // --- Login Screen (Redesigned - Light Theme) ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   // Registration Fields
   const [fullName, setFullName] = useState('');
@@ -253,70 +295,87 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     e.preventDefault();
     setLoading(true); setError(''); setSuccessMsg('');
 
+    // --- IMPORTANT: Nettoyage des entrées (Trim) ---
+    // Les espaces à la fin sont la cause n°1 des erreurs "Invalid login credentials" après inscription.
+    const cleanIdentifier = identifier.trim();
+    const cleanPassword = password.trim();
+    const cleanName = fullName.trim();
+
     try {
       if (isResetMode) {
         if (authMethod !== 'email') throw new Error("La réinitialisation n'est disponible que par Email.");
-        const { error } = await supabase.auth.resetPasswordForEmail(identifier, { redirectTo: window.location.origin });
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanIdentifier, { redirectTo: window.location.origin });
         if (error) throw error;
         setSuccessMsg("Lien envoyé ! Vérifiez vos emails."); setLoading(false); return;
       }
 
       if (isSignUp) {
         // --- INSCRIPTION ---
+        const metadata = { full_name: cleanName, role: role, site: site };
+        
+        // Tentative d'inscription
         let signUpResp;
-        const metadata = { full_name: fullName, role: role, site: site };
-
         if (authMethod === 'email') {
-          signUpResp = await supabase.auth.signUp({ email: identifier, password, options: { data: metadata } });
+          signUpResp = await supabase.auth.signUp({ email: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
         } else {
-          signUpResp = await supabase.auth.signUp({ phone: identifier, password, options: { data: metadata } });
+          signUpResp = await supabase.auth.signUp({ phone: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
         }
 
         if (signUpResp.error) throw signUpResp.error;
 
-        // Try to insert profile immediately (works if email confirmation is off or triggers exist)
-        if (signUpResp.data.user) {
-             const userId = signUpResp.data.user.id;
-             const { error: profileError } = await supabase.from('profiles').insert([{
-                 id: userId,
-                 email: authMethod === 'email' ? identifier : '',
-                 phone: authMethod === 'phone' ? identifier : '',
-                 full_name: fullName,
-                 role: role,
-                 site: site
-             }]);
-
-             if (role !== 'Visiteur') {
-                 let specialty = role as string;
-                 if (role === 'Admin') specialty = 'Administration';
-                 
-                 await supabase.from('technicians').insert([{
+        // --- GESTION POST-INSCRIPTION ---
+        // Si Supabase renvoie une session, l'email confirmation est OFF (ou non requis) -> On connecte direct
+        if (signUpResp.data.session) {
+             // Création immédiate du profil car on est connecté
+             const userId = signUpResp.data.user?.id;
+             if (userId) {
+                 await supabase.from('profiles').upsert([{
                      id: userId,
-                     name: fullName,
-                     specialty: specialty,
-                     site: site,
-                     status: 'Available'
+                     email: authMethod === 'email' ? cleanIdentifier : '',
+                     phone: authMethod === 'phone' ? cleanIdentifier : '',
+                     full_name: cleanName,
+                     role: role,
+                     site: site
                  }]);
+                 
+                 // Ajout technique si nécessaire
+                 if (role !== 'Visiteur') {
+                     let specialty = role as string;
+                     if (role === 'Admin') specialty = 'Administration';
+                     await supabase.from('technicians').upsert([{
+                         id: userId,
+                         name: cleanName,
+                         specialty: specialty,
+                         site: site,
+                         status: 'Available'
+                     }]);
+                 }
              }
+             // TRIGGER AUTO-LOGIN SUCCESS
+             onLoginSuccess();
+             return;
+        } else if (signUpResp.data.user && !signUpResp.data.session) {
+            // Si user créé mais pas de session -> Email confirmation requis
+            setSuccessMsg("Compte créé ! Veuillez vérifier vos emails pour valider l'inscription avant de vous connecter.");
+            setIsSignUp(false);
+        } else {
+            setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
+            setIsSignUp(false); 
         }
-        
-        setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
-        setIsSignUp(false); 
 
       } else {
         // --- CONNEXION ---
         const { data, error: err } = await supabase.auth.signInWithPassword(
-            authMethod === 'email' ? { email: identifier, password } : { phone: identifier, password }
+            authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
         
         if (err) {
-            console.error("Login Error:", err);
-            // Afficher le VRAI message d'erreur pour aider l'utilisateur
-            // Souvent c'est "Email not confirmed"
+            console.error("Login Error Full:", err);
+            // Gestion explicite des erreurs pour guider l'utilisateur
             if (err.message.includes("Email not confirmed")) {
-                throw new Error("Veuillez confirmer votre email avant de vous connecter.");
+                throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception (et spams).");
             } else if (err.message.includes("Invalid login credentials")) {
-                throw new Error("Email ou mot de passe incorrect.");
+                throw new Error("Email ou mot de passe incorrect. Vérifiez les majuscules et espaces.");
             } else {
                 throw new Error(err.message);
             }
@@ -328,7 +387,8 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
     } finally {
-      if (!successMsg) setLoading(false);
+      if (!successMsg && !isSignUp) setLoading(false);
+      // Note: On laisse le loading true si auto-login pour éviter le flash
     }
   };
 
@@ -358,14 +418,14 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
              </div>
           )}
 
-          {!isResetMode && !successMsg.includes('Inscription') && (
+          {!isResetMode && !successMsg.includes('Veuillez vous connecter') && !successMsg.includes('Vérifiez vos emails') && (
             <div className="flex p-1 bg-gray-100 rounded-lg mb-6 shadow-inner">
                <button onClick={() => setAuthMethod('email')} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all duration-300 ${authMethod === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Email</button>
                <button onClick={() => setAuthMethod('phone')} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all duration-300 ${authMethod === 'phone' ? 'bg-white text-ebf-orange shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Téléphone</button>
             </div>
           )}
 
-          {!successMsg.includes('Inscription') && (
+          {!successMsg.includes('Veuillez vous connecter') && !successMsg.includes('Vérifiez vos emails') && (
             <form onSubmit={handleAuth} className="space-y-4">
                 {isSignUp && (
                     <div className="space-y-4 animate-fade-in">
@@ -414,7 +474,10 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                     </div>
                     <div className="relative">
                         <Lock className="absolute left-3 top-3 text-gray-400" size={18}/>
-                        <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium" placeholder="••••••••" />
+                        <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium" placeholder="••••••••" />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                     </div>
                 </div>
                 )}
@@ -810,8 +873,6 @@ function App() {
              // standard web behavior is to stay logged in. 
              // However, to force the flow requested ("Future connections instant" implying others are not),
              // we can decide here. 
-             // Logic: If already logged in via persistence, assume we can go to APP, 
-             // unless we want to force re-onboarding.
              // Let's go to APP to be user-friendly, the Onboarding only happens on Explicit Login.
              setAppState('APP');
          }

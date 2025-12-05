@@ -3,8 +3,10 @@ import React, { useMemo, useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X } from 'lucide-react';
+import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X, Download } from 'lucide-react';
 import { StatData, Site, Period, TickerMessage, DailyReport, StockItem } from '../types';
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface DashboardProps {
   data: StatData[];
@@ -161,6 +163,84 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // --- EXPORT PDF FUNCTION ---
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const todayStr = new Date().toLocaleDateString('fr-FR');
+
+    // -- Header --
+    doc.setFillColor(255, 140, 0); // EBF Orange
+    doc.rect(0, 0, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("EBF MANAGER - RAPPORT DE SYNTHÈSE", 14, 13);
+    
+    // -- Sub-Header --
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Généré le : ${todayStr}`, 14, 30);
+    doc.text(`Site concerné : ${currentSite}`, 14, 35);
+    doc.text(`Période : ${currentPeriod}`, 14, 40);
+
+    // -- Financial Summary Box --
+    doc.setDrawColor(34, 139, 34); // EBF Green
+    doc.setLineWidth(0.5);
+    doc.roundedRect(14, 45, 180, 25, 3, 3);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(34, 139, 34); // Green Text
+    doc.text("RÉSUMÉ FINANCIER", 20, 53);
+
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Chiffre d'Affaires : ${totals.revenue.toLocaleString()} FCFA`, 20, 62);
+    doc.text(`Bénéfice Net : ${totals.profit.toLocaleString()} FCFA (${marginPercent}%)`, 100, 62);
+    doc.text(`Volume Interventions : ${totals.interventions}`, 20, 67);
+
+    // -- Table Data --
+    const tableBody = filteredReports.map(r => [
+      r.date,
+      r.technicianName,
+      r.domain || '-',
+      r.content || '',
+      r.revenue ? `${r.revenue.toLocaleString()} F` : '-'
+    ]);
+
+    // -- Generate Table --
+    autoTable(doc, {
+      startY: 75,
+      head: [['Date', 'Technicien', 'Domaine', 'Détails', 'Recette']],
+      body: tableBody,
+      theme: 'grid',
+      headStyles: { fillColor: [255, 140, 0], textColor: 255 }, // Orange header
+      alternateRowStyles: { fillColor: [240, 240, 240] },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 'auto' },
+        4: { cellWidth: 25, halign: 'right' },
+      }
+    });
+
+    // -- Footer --
+    const pageCount = doc.getNumberOfPages();
+    for(let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text('EBF Manager - Document confidentiel interne', 14, 285);
+        doc.text(`Page ${i} / ${pageCount}`, 190, 285, { align: 'right' });
+    }
+
+    doc.save(`Rapport_EBF_${currentSite}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       
@@ -241,13 +321,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </select>
         </div>
         
-        <button 
-          onClick={() => onNavigate('/synthesis')}
-          className="flex items-center justify-center space-x-2 bg-gradient-to-r from-ebf-green to-emerald-600 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg hover:shadow-lg hover:shadow-green-200 transition transform hover:-translate-y-0.5 text-sm md:text-base"
-        >
-          <Maximize2 size={16} className="md:w-5 md:h-5" />
-          <span className="font-medium">Synthèse Détaillée</span>
-        </button>
+        <div className="flex gap-2">
+            <button 
+                onClick={handleExportPDF}
+                className="flex items-center justify-center space-x-2 bg-white border border-ebf-orange text-ebf-orange px-3 py-2 md:px-4 md:py-2.5 rounded-lg hover:bg-orange-50 transition transform hover:-translate-y-0.5 text-sm md:text-base font-medium shadow-sm"
+            >
+                <Download size={16} className="md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Export PDF</span>
+            </button>
+            <button 
+            onClick={() => onNavigate('/synthesis')}
+            className="flex items-center justify-center space-x-2 bg-gradient-to-r from-ebf-green to-emerald-600 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg hover:shadow-lg hover:shadow-green-200 transition transform hover:-translate-y-0.5 text-sm md:text-base"
+            >
+            <Maximize2 size={16} className="md:w-5 md:h-5" />
+            <span className="font-medium">Synthèse Détaillée</span>
+            </button>
+        </div>
       </div>
 
       {/* KPIs Grid */}
