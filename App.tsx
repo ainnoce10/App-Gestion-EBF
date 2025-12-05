@@ -669,8 +669,16 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
           )}
 
           <div className="mt-4 pt-4 border-t border-gray-100">
-             <button onClick={() => { setIsSignUp(!isSignUp); setIsResetMode(false); }} className="text-sm font-bold text-gray-500 hover:text-green-900">
-                {isSignUp ? "J'ai déjà un compte" : "Créer un compte"}
+             <button onClick={() => { 
+                 if (successMsg) {
+                     setSuccessMsg('');
+                     setIsSignUp(false);
+                 } else {
+                     setIsSignUp(!isSignUp); 
+                     setIsResetMode(false); 
+                 }
+             }} className="text-sm font-bold text-gray-500 hover:text-green-900">
+                {successMsg ? "Se connecter" : (isSignUp ? "J'ai déjà un compte" : "Créer un compte")}
              </button>
           </div>
        </div>
