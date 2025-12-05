@@ -12,7 +12,15 @@ export enum Period {
   YEAR = 'Année'
 }
 
-export type Role = 'Admin' | 'Technicien' | 'Secretaire' | 'Magasinier' | 'Visiteur';
+export type Role = 'Admin' | 'DG' | 'Technicien' | 'Secretaire' | 'Magasinier' | 'Visiteur';
+
+export interface UserPermissions {
+  technique?: boolean;
+  comptabilite?: boolean;
+  secretariat?: boolean;
+  quincaillerie?: boolean;
+  rh?: boolean;
+}
 
 export interface Profile {
   id: string;
@@ -21,6 +29,9 @@ export interface Profile {
   role: Role;
   site: Site;
   phone?: string;
+  photo_url?: string;
+  date_hired?: string;
+  permissions?: UserPermissions;
 }
 
 export interface Technician {

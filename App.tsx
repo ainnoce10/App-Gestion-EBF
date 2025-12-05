@@ -6,16 +6,16 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target, RefreshCcw, Shield
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target, RefreshCcw, Shield, Camera, Award, Unlock
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
-import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician, UserPermissions } from './types';
 import { supabase } from './services/supabaseClient';
 
 // --- CONFIGURATION DEBUG / DEV ---
-// Mettre à TRUE pour désactiver la connexion et être Admin d'office
-const DEV_MODE_BYPASS_LOGIN = true; 
+// Mettre à FALSE pour réactiver l'écran de connexion et tester l'inscription
+const DEV_MODE_BYPASS_LOGIN = false; 
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -282,22 +282,32 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
   return true;
 };
 
-// --- Helper: Permission Check (STRICT) ---
-const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  if (role === 'Admin') return { canWrite: true }; // Admin a tous les droits
+// --- Helper: Permission Check (DYNAMIC) ---
+const getPermission = (path: string, role: Role, userPermissions: UserPermissions | undefined): { canWrite: boolean } => {
+  // 1. Admin et DG ont TOUS les droits par défaut
+  if (role === 'Admin' || role === 'DG') return { canWrite: true };
   if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
 
-  // Rôles internes spécifiques
-  // Technicien écrit UNIQUEMENT dans /techniciens
-  if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
+  // 2. Pour les autres, on regarde la configuration précise définie par l'admin
+  // Par défaut (si undefined), c'est FALSE (Lecture seule à l'inscription)
+  if (!userPermissions) return { canWrite: false };
+
+  // Modules Techniques
+  if (path.startsWith('/techniciens') && userPermissions.technique) return { canWrite: true };
   
-  // Magasinier écrit UNIQUEMENT dans /quincaillerie
-  if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
+  // Modules Compta
+  if (path.startsWith('/comptabilite') && userPermissions.comptabilite) return { canWrite: true };
   
-  // Secrétaire écrit UNIQUEMENT dans /secretariat
-  if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
+  // Modules Secrétariat
+  if (path.startsWith('/secretariat') && userPermissions.secretariat) return { canWrite: true };
   
-  // TOUT LE RESTE (y compris /equipe, /comptabilite pour les non-admins) est strictement Lecture Seule
+  // Modules Stocks
+  if (path.startsWith('/quincaillerie') && userPermissions.quincaillerie) return { canWrite: true };
+  
+  // Modules RH / Equipe
+  if (path.startsWith('/equipe') && userPermissions.rh) return { canWrite: true };
+
+  // Si non explicitement autorisé, c'est lecture seule
   return { canWrite: false };
 };
 
@@ -598,12 +608,16 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      phone: authMethod === 'phone' ? cleanIdentifier : '',
                      full_name: cleanName,
                      role: role,
-                     site: site
+                     site: site,
+                     permissions: {} // Default empty = Read Only
                  }]);
                  
+                 // Ajout automatique dans 'Notre Équipe' si pas visiteur
                  if (role !== 'Visiteur') {
                      let specialty = role as string;
                      if (role === 'Admin') specialty = 'Administration';
+                     if (role === 'DG') specialty = 'Direction Générale';
+                     
                      await supabase.from('technicians').upsert([{
                          id: userId,
                          name: cleanName,
@@ -618,6 +632,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
              return; 
         } else {
              // NO SESSION = CONFIRMATION REQUIRED BY SERVER
+             // But user asked to assume success and auto-add to team logic is triggered on login if missing
              setIsSignUp(false);
              setSuccessMsg("Inscription réussie ! Si la connexion échoue, vérifiez vos emails pour valider le compte.");
         }
@@ -695,6 +710,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Rôle</label>
                                 <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
                                     <option value="Admin">Admin</option>
+                                    <option value="DG">Directeur Général (DG)</option>
                                     <option value="Visiteur">Visiteur</option>
                                     <option value="Technicien">Technicien</option>
                                     <option value="Secretaire">Secretaire</option>
@@ -1001,18 +1017,129 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMess
     );
 };
 
-// --- Profile Modal ---
-const ProfileModal = ({ isOpen, onClose, profile }: any) => {
-  const [formData, setFormData] = useState({ full_name: '', email: '', phone: '' });
+// --- Permissions Management Modal ---
+const PermissionsModal = ({ isOpen, onClose }: any) => {
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (profile) setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
+    if (isOpen) {
+      setLoading(true);
+      supabase.from('profiles').select('*').then(({ data, error }) => {
+        setLoading(false);
+        if (data) setUsers(data as Profile[]);
+        if (error) console.error(error);
+      });
+    }
+  }, [isOpen]);
+
+  const togglePermission = async (userId: string, module: keyof UserPermissions, currentValue: boolean) => {
+     // Optimistic update
+     setUsers(users.map(u => {
+        if (u.id === userId) {
+            const newPerms = { ...u.permissions, [module]: !currentValue };
+            return { ...u, permissions: newPerms };
+        }
+        return u;
+     }));
+
+     // DB Update
+     const user = users.find(u => u.id === userId);
+     if (user) {
+         const updatedPerms = { ...user.permissions, [module]: !currentValue };
+         await supabase.from('profiles').update({ permissions: updatedPerms }).eq('id', userId);
+     }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-4xl p-6 shadow-2xl animate-fade-in border-t-4 border-purple-600 flex flex-col max-h-[85vh]">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+             <Shield size={24} className="text-purple-600"/> Gestion des Permissions
+          </h3>
+          <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {loading ? <div className="text-center p-10"><Loader2 className="animate-spin mx-auto text-purple-600"/></div> : (
+                <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                        <tr>
+                            <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Utilisateur</th>
+                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Technique</th>
+                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Comptabilité</th>
+                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Secrétariat</th>
+                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Stocks</th>
+                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">RH / Équipe</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {users.map(user => {
+                            if (user.role === 'Admin' || user.role === 'DG') return null; // Admins have all rights implicitly
+                            return (
+                                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    <td className="p-3">
+                                        <div className="font-bold text-sm text-gray-900 dark:text-white">{user.full_name}</div>
+                                        <div className="text-xs text-gray-500">{user.role} - {user.site}</div>
+                                    </td>
+                                    {['technique', 'comptabilite', 'secretariat', 'quincaillerie', 'rh'].map(mod => (
+                                        <td key={mod} className="p-3 text-center">
+                                            <button 
+                                                onClick={() => togglePermission(user.id, mod as keyof UserPermissions, !!user.permissions?.[mod as keyof UserPermissions])}
+                                                className={`w-10 h-6 rounded-full transition-colors relative ${user.permissions?.[mod as keyof UserPermissions] ? 'bg-green-500' : 'bg-gray-300'}`}
+                                            >
+                                                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${user.permissions?.[mod as keyof UserPermissions] ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                                            </button>
+                                        </td>
+                                    ))}
+                                </tr>
+                            );
+                        })}
+                        {users.filter(u => u.role !== 'Admin' && u.role !== 'DG').length === 0 && (
+                            <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucun utilisateur à gérer (hors Admin/DG).</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Profile Modal (Enhanced) ---
+const ProfileModal = ({ isOpen, onClose, profile }: any) => {
+  const [formData, setFormData] = useState({ full_name: '', email: '', phone: '', photo_url: '', date_hired: '' });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (profile) setFormData({ 
+        full_name: profile.full_name || '', 
+        email: profile.email || '', 
+        phone: profile.phone || '', 
+        photo_url: profile.photo_url || '',
+        date_hired: profile.date_hired || ''
+    });
   }, [profile, isOpen]);
 
   const handleUpdate = async () => {
+    if (profile.role !== 'Visiteur' && !formData.date_hired) {
+        alert("La date d'entrée est obligatoire pour le personnel.");
+        return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.from('profiles').update({ full_name: formData.full_name, phone: formData.phone }).eq('id', profile.id);
+    const { error } = await supabase.from('profiles').update({ 
+        full_name: formData.full_name, 
+        phone: formData.phone,
+        photo_url: formData.photo_url,
+        date_hired: formData.date_hired
+    }).eq('id', profile.id);
+
     if (!error && profile.role !== 'Visiteur') {
        await supabase.from('technicians').update({ name: formData.full_name }).eq('id', profile.id);
     }
@@ -1021,19 +1148,67 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
     else { alert("Profil mis à jour !"); onClose(); window.location.reload(); }
   };
 
+  const calculateSeniority = (dateString: string) => {
+      if (!dateString) return "Non définie";
+      const start = new Date(dateString);
+      const now = new Date();
+      let years = now.getFullYear() - start.getFullYear();
+      let months = now.getMonth() - start.getMonth();
+      if (months < 0) {
+          years--;
+          months += 12;
+      }
+      if (years === 0 && months === 0) return "Moins d'un mois";
+      return `${years > 0 ? years + ' an(s) ' : ''}${months} mois`;
+  };
+
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-purple-500">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Mon Profil</h3>
-        <div className="space-y-4">
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange flex flex-col max-h-[90vh]">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
+        
+        {/* Visual Identity Card */}
+        <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-6 shadow-inner">
+            <div className="w-20 h-20 rounded-full bg-white border-2 border-ebf-orange p-1 flex-shrink-0 overflow-hidden">
+                {formData.photo_url ? (
+                    <img src={formData.photo_url} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400"><User size={32}/></div>
+                )}
+            </div>
+            <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">{formData.full_name || 'Nom Inconnu'}</h3>
+                <div className="flex flex-wrap gap-2 mt-1">
+                    <span className="text-xs font-bold bg-ebf-orange text-white px-2 py-0.5 rounded uppercase">{profile.role}</span>
+                    <span className="text-xs font-bold bg-green-600 text-white px-2 py-0.5 rounded uppercase">{profile.site}</span>
+                </div>
+                {formData.date_hired && (
+                    <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                        <Award size={12}/> Ancienneté: <span className="font-bold text-gray-700">{calculateSeniority(formData.date_hired)}</span>
+                    </p>
+                )}
+            </div>
+        </div>
+
+        <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2">
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Photo (Lien URL)</label><input value={formData.photo_url} onChange={e => setFormData({...formData, photo_url: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" placeholder="https://..." /></div>
+           
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" placeholder="0707..." /></div>
+           
+           <div>
+               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                   Date d'Entrée {profile.role !== 'Visiteur' && <span className="text-red-500">*</span>}
+               </label>
+               <input type="date" value={formData.date_hired} onChange={e => setFormData({...formData, date_hired: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" />
+           </div>
+
            <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
            <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Email (Lecture seule)</label><input value={formData.email} disabled className="w-full border border-gray-200 p-2 rounded-lg bg-gray-100 text-gray-500" /></div>
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
-           <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-orange text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 shadow-md">{loading ? '...' : 'Enregistrer'}</button>
+           
+           <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-orange text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 shadow-md mt-4">{loading ? '...' : 'Enregistrer les modifications'}</button>
         </div>
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
       </div>
     </div>
   );
@@ -1041,7 +1216,7 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
 
 // --- HEADER WITH NOTIFICATIONS ---
 const HeaderWithNotif = ({ 
-  title, onMenuClick, onLogout, onOpenFlashInfo, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
+  title, onMenuClick, onLogout, onOpenFlashInfo, onOpenPermissions, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
 }: any) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
@@ -1058,7 +1233,8 @@ const HeaderWithNotif = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const canEditFlashInfo = userRole === 'Admin';
+    const canEditFlashInfo = userRole === 'Admin' || userRole === 'DG';
+    const canManagePermissions = userRole === 'Admin' || userRole === 'DG';
 
     return (
         <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
@@ -1072,8 +1248,8 @@ const HeaderWithNotif = ({
                      <p className="text-sm font-bold text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
                      <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg shadow-inner border border-green-200">
-                      {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg shadow-inner border border-green-200 overflow-hidden">
+                      {userProfile?.photo_url ? <img src={userProfile.photo_url} alt="Profile" className="w-full h-full object-cover" /> : (userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>)}
                   </div>
                </div>
               <div className="relative ml-2" ref={notifRef}>
@@ -1117,13 +1293,20 @@ const HeaderWithNotif = ({
                              <User size={18} className="text-ebf-orange"/> Modifier Profil
                          </button>
 
-                         {canEditFlashInfo && (
+                         {(canEditFlashInfo || canManagePermissions) && (
                             <>
                                 <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
                                 <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Administration</div>
-                                <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    <Megaphone size={18} className="text-blue-500"/> Gestion Flash Info
-                                </button>
+                                {canEditFlashInfo && (
+                                    <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
+                                        <Megaphone size={18} className="text-blue-500"/> Gestion Flash Info
+                                    </button>
+                                )}
+                                {canManagePermissions && (
+                                    <button onClick={() => { onOpenPermissions(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
+                                        <Shield size={18} className="text-purple-500"/> Gestion des Permissions
+                                    </button>
+                                )}
                             </>
                          )}
 
@@ -1165,7 +1348,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
   const [darkMode, setDarkMode] = useState(false);
   
-  const [stats, setStats] = useState<StatData[]>([]);
+  // Note: We won't use 'stats' from daily_stats anymore for real-time dashboard
+  // We will compute it from transactions and reports
+  const [stats, setStats] = useState<StatData[]>([]); // Keep it for legacy or if needed
+  
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
@@ -1187,14 +1373,15 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [crudTarget, setCrudTarget] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
 
-  // Force Write Permission if Dev Mode or Admin
-  const { canWrite } = userRole === 'Admin' ? { canWrite: true } : getPermission(currentPath, userRole);
+  // Force Write Permission if Dev Mode or Admin/DG or Allowed
+  const { canWrite } = getPermission(currentPath, userRole, userProfile?.permissions);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1207,6 +1394,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       if (techData) setTechnicians(techData);
       const { data: reportsData } = await supabase.from('reports').select('*');
       if (reportsData) setReports(reportsData);
+      // We still fetch stats for initial load but will rely on calculation
       const { data: statsData } = await supabase.from('daily_stats').select('*');
       if (statsData) setStats(statsData);
       const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
@@ -1214,7 +1402,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       const { data: tickerData } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
       if (tickerData) setManualTickerMessages(tickerData.map((m: any) => ({ ...m, isManual: true })));
 
-      // New Modules Fetching (Best Effort)
+      // New Modules Fetching
       const { data: chantiersData } = await supabase.from('chantiers').select('*');
       if (chantiersData) setChantiers(chantiersData);
       
@@ -1241,6 +1429,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     };
 
     fetchData();
+
+    // REALTIME SUBSCRIPTIONS FOR ALL DATA SOURCES
     const channels = supabase.channel('realtime-ebf')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, (payload) => {
           if (payload.eventType === 'INSERT') setInterventions(prev => [...prev, payload.new as Intervention]);
@@ -1252,17 +1442,75 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
           else if (payload.eventType === 'UPDATE') setStock(prev => prev.map(s => s.id === payload.new.id ? payload.new as StockItem : s));
           else if (payload.eventType === 'DELETE') setStock(prev => prev.filter(s => s.id !== payload.old.id));
       })
-      // ... (other existing subscriptions) ...
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
+          if (payload.eventType === 'INSERT') setReports(prev => [...prev, payload.new as DailyReport]);
+          else if (payload.eventType === 'UPDATE') setReports(prev => prev.map(r => r.id === payload.new.id ? payload.new as DailyReport : r));
+          else if (payload.eventType === 'DELETE') setReports(prev => prev.filter(r => r.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+          if (payload.eventType === 'INSERT') setTransactions(prev => [...prev, payload.new as any]);
+          else if (payload.eventType === 'UPDATE') setTransactions(prev => prev.map(t => t.id === payload.new.id ? payload.new as any : t));
+          else if (payload.eventType === 'DELETE') setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
+      })
       .subscribe();
+
     return () => { supabase.removeChannel(channels); };
   }, []);
 
+  // --- REAL-TIME STATS CALCULATION ENGINE ---
+  // Instead of relying on daily_stats table, we calculate aggregate on the fly from raw data
+  const calculatedStats = useMemo(() => {
+      const statsMap = new Map<string, StatData>();
+
+      const getKey = (date: string, site: Site) => `${date}_${site}`;
+      const initStat = (date: string, site: Site): StatData => ({
+          date, site, revenue: 0, expenses: 0, profit: 0, interventions: 0
+      });
+
+      // 1. Process Reports (Revenue + Expenses from technicians)
+      reports.forEach(r => {
+          if (!r.date) return;
+          const key = getKey(r.date, r.site);
+          if (!statsMap.has(key)) statsMap.set(key, initStat(r.date, r.site));
+          const stat = statsMap.get(key)!;
+          stat.revenue += (r.revenue || 0);
+          stat.expenses += (r.expenses || 0);
+      });
+
+      // 2. Process Transactions (Accounting)
+      transactions.forEach(t => {
+          if (!t.date) return;
+          const key = getKey(t.date, t.site);
+          if (!statsMap.has(key)) statsMap.set(key, initStat(t.date, t.site));
+          const stat = statsMap.get(key)!;
+          if (t.type === 'Recette') stat.revenue += (t.amount || 0);
+          if (t.type === 'Dépense') stat.expenses += (t.amount || 0);
+      });
+
+      // 3. Process Interventions (Count)
+      interventions.forEach(i => {
+          if (!i.date) return;
+          const key = getKey(i.date, i.site);
+          if (!statsMap.has(key)) statsMap.set(key, initStat(i.date, i.site));
+          const stat = statsMap.get(key)!;
+          stat.interventions += 1;
+      });
+
+      // 4. Calculate Profit & Format
+      const result = Array.from(statsMap.values()).map(s => ({
+          ...s,
+          profit: s.revenue - s.expenses
+      }));
+
+      // Sort by date
+      return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  }, [reports, transactions, interventions]);
+
   useEffect(() => {
-    if (stats.length > 0) generateAutoTickerMessages(stats);
+    if (calculatedStats.length > 0) generateAutoTickerMessages(calculatedStats);
     else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', type: 'info', display_order: 0, isManual: false }]);
-    const interval = setInterval(() => { if (stats.length > 0) generateAutoTickerMessages(stats); }, 600000);
-    return () => clearInterval(interval);
-  }, [stats]);
+  }, [calculatedStats]);
 
   const generateAutoTickerMessages = (data: StatData[]) => {
       const messages: TickerMessage[] = [];
@@ -1313,6 +1561,15 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   const confirmDelete = async () => {
       if (!itemToDelete || !crudTarget) return;
+
+      // SAFETY CHECK FOR USER DELETION
+      if ((crudTarget === 'technicians' || crudTarget === 'profiles') && userRole !== 'Admin' && userRole !== 'DG') {
+          alert("Seul l'Administrateur peut supprimer des comptes utilisateurs.");
+          setIsDeleteOpen(false);
+          setItemToDelete(null);
+          return;
+      }
+
       setCrudLoading(true);
       const { error } = await supabase.from(crudTarget).delete().eq('id', itemToDelete.id);
       setCrudLoading(false);
@@ -1345,8 +1602,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const renderContent = () => {
-     if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
-     if (currentPath === '/synthesis') return <DetailedSynthesis data={stats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
+     if (currentPath === '/') return <Dashboard data={calculatedStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
+     if (currentPath === '/synthesis') return <DetailedSynthesis data={calculatedStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
      const section = currentPath.substring(1);
      if (MODULE_ACTIONS[section]) return (
              <div className="space-y-6 animate-fade-in">
@@ -1369,7 +1626,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      if (currentPath === '/techniciens/rapports') return <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else alert("Rapport vocal pas encore disponible."); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />;
      if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
      if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} readOnly={!canWrite} />;
+     // MODIFIED: Only Admin/DG can delete users in Team
+     if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(userRole === 'Admin' || userRole === 'DG') ? (item: any) => handleOpenDelete(item, 'technicians') : undefined} readOnly={!canWrite} />;
 
      // NEWLY CONFIGURED ROUTES
      if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} readOnly={!canWrite} />;
@@ -1377,7 +1635,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} readOnly={!canWrite} />;
      if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} readOnly={!canWrite} />;
      if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={true} />; // Read only here usually
-     if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} readOnly={!canWrite} />;
+     if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données CRM" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} readOnly={!canWrite} />;
      if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} readOnly={!canWrite} />;
      if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} readOnly={!canWrite} />;
      if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} readOnly={!canWrite} />;
@@ -1401,8 +1659,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
             </div>
             <div className="p-4 bg-green-900/30">
                 <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center font-bold text-white text-sm border border-green-700">
-                        {userProfile?.full_name?.charAt(0) || 'U'}
+                    <div className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center font-bold text-white text-sm border border-green-700 overflow-hidden">
+                        {userProfile?.photo_url ? <img src={userProfile.photo_url} alt="Profile" className="w-full h-full object-cover" /> : (userProfile?.full_name?.charAt(0) || 'U')}
                     </div>
                     <div className="overflow-hidden">
                         <p className="text-sm font-bold truncate text-white">{userProfile?.full_name || 'Utilisateur'}</p>
@@ -1422,6 +1680,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
                  markNotificationAsRead={(n: any) => setNotifications(notifications.map(x => x.id === n.id ? {...x, read: true} : x))} 
                  onOpenProfile={() => setIsProfileOpen(true)} 
                  onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
+                 onOpenPermissions={() => setIsPermissionsOpen(true)}
                  onOpenHelp={() => setIsHelpOpen(true)} 
                  darkMode={darkMode} 
                  onToggleTheme={toggleTheme} 
@@ -1432,6 +1691,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
+        <PermissionsModal isOpen={isPermissionsOpen} onClose={() => setIsPermissionsOpen(false)} />
         <AddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} />
         <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
     </div>
@@ -1473,7 +1733,8 @@ export default function App() {
                   full_name: meta.full_name || 'Utilisateur',
                   role: meta.role || 'Visiteur',
                   site: meta.site || 'Global',
-                  email: user?.email
+                  email: user?.email,
+                  permissions: {} // Default empty = Read Only
               };
               const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
               if (!insertError) profile = newProfile as any;
@@ -1490,6 +1751,7 @@ export default function App() {
                if (!tech) {
                    let specialty = profile.role;
                    if (profile.role === 'Admin') specialty = 'Administration';
+                   if (profile.role === 'DG') specialty = 'Direction Générale';
                    
                    await supabase.from('technicians').insert([{
                        id: userId,
@@ -1516,7 +1778,8 @@ export default function App() {
             full_name: 'Administrateur (Dev)',
             email: 'dev@ebf.ci',
             role: 'Admin',
-            site: Site.GLOBAL
+            site: Site.GLOBAL,
+            permissions: { technique: true, comptabilite: true, secretariat: true, quincaillerie: true, rh: true }
         });
         return;
     }
