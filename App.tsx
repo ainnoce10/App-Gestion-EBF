@@ -631,7 +631,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         const msg = err.message || err.error_description || JSON.stringify(err);
 
         if (msg.includes("Invalid login credentials") || msg.includes("invalid_grant")) {
-            userMsg = "Email ou mot de passe incorrect.";
+            userMsg = "Email ou mot de passe incorrect (ou email non confirmé).";
         } else if (msg.includes("Email not confirmed")) {
             userMsg = "Veuillez confirmer votre email avant de vous connecter.";
         } else if (msg.includes("User already registered")) {
@@ -648,7 +648,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
         setError(userMsg);
     } finally {
-      if (!successMsg && !isSignUp) setLoading(false);
+      setLoading(false); // STOP LOADING IN ALL CASES
     }
   };
 
