@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -71,10 +72,10 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
     ]
   },
   technicians: {
-     title: 'Nouveau Technicien',
+     title: 'Nouveau Membre Équipe',
      fields: [
        { name: 'name', label: 'Nom & Prénom', type: 'text' },
-       { name: 'specialty', label: 'Spécialité', type: 'text' },
+       { name: 'specialty', label: 'Rôle / Spécialité', type: 'text' },
        { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
        { name: 'status', label: 'Statut', type: 'select', options: ['Available', 'Busy', 'Off'] }
      ]
@@ -88,6 +89,7 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'domain', label: 'Domaine', type: 'select', options: ['Electricité', 'Froid', 'Bâtiment', 'Plomberie'] },
       { name: 'revenue', label: 'Recette (FCFA)', type: 'number' },
       { name: 'expenses', label: 'Dépenses (FCFA)', type: 'number' },
+      { name: 'rating', label: 'Note Satisfaction (1-5)', type: 'number' },
       { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] } // Hidden or fixed normally
     ]
   }
@@ -190,6 +192,20 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
   return true;
 };
 
+// --- Helper: Permission Check ---
+const getPermission = (path: string, role: Role): { canWrite: boolean } => {
+  if (role === 'Admin') return { canWrite: true };
+  if (role === 'Visiteur') return { canWrite: false };
+
+  // Roles internes spécifiques
+  if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
+  if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
+  if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
+  
+  // Par défaut, lecture seule pour les autres sections
+  return { canWrite: false };
+};
+
 // --- Confirmation Modal ---
 const ConfirmationModal = ({ 
   isOpen, onClose, onConfirm, title, message 
@@ -255,6 +271,7 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
                      className="w-full border border-orange-200 p-2 rounded bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none"
                      onChange={e => setFormData({...formData, [field.name]: e.target.value})}
                      value={formData[field.name] || ''}
+                     placeholder={field.placeholder || ''}
                    />
                 )}
              </div>
@@ -283,6 +300,12 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   const handleUpdate = async () => {
     setLoading(true);
     const { error } = await supabase.from('profiles').update({ full_name: formData.full_name, phone: formData.phone }).eq('id', profile.id);
+    
+    // Si c'est un membre de l'équipe, on met aussi à jour la table technicians
+    if (!error && profile.role !== 'Visiteur') {
+       await supabase.from('technicians').update({ name: formData.full_name }).eq('id', profile.id);
+    }
+
     setLoading(false);
     if (error) alert("Erreur mise à jour profil");
     else { alert("Profil mis à jour !"); onClose(); window.location.reload(); }
@@ -406,6 +429,18 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+
+  // Auto-login Effect for Biometrics simulation
+  useEffect(() => {
+    const checkBio = async () => {
+      const bioActive = localStorage.getItem('ebf_biometric_active');
+      if (bioActive === 'true') {
+        // Here we would trigger the native WebAuthn prompt
+        console.log("Biometric auto-login triggered");
+      }
+    };
+    checkBio();
+  }, []);
   
   const handleAuth = async () => {
     setLoading(true); setError(''); setSuccessMsg('');
@@ -431,10 +466,10 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
 
         if (signUpResp.error) throw signUpResp.error;
 
-        // Création explicite du profil
         if (signUpResp.data.user) {
+             const userId = signUpResp.data.user.id;
              const { error: profileError } = await supabase.from('profiles').insert([{
-                 id: signUpResp.data.user.id,
+                 id: userId,
                  email: authMethod === 'email' ? identifier : '',
                  phone: authMethod === 'phone' ? identifier : '',
                  full_name: fullName,
@@ -442,6 +477,19 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                  site: site
              }]);
              if (profileError) console.error("Erreur création profil DB:", profileError);
+
+             if (role !== 'Visiteur') {
+                 let specialty = role as string;
+                 if (role === 'Admin') specialty = 'Administration';
+                 
+                 await supabase.from('technicians').insert([{
+                     id: userId,
+                     name: fullName,
+                     specialty: specialty,
+                     site: site,
+                     status: 'Available'
+                 }]);
+             }
         }
         
         setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
@@ -454,19 +502,12 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         );
         if (err) throw err;
         
-        if (data.user) {
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            if (profile) {
-                setSuccessMsg(`Bienvenue ${profile.full_name || 'Utilisateur'}...`);
-                setTimeout(() => { localStorage.setItem('ebf_has_logged_in', 'true'); }, 1500);
-            } else {
-                setSuccessMsg("Bienvenue...");
-                setTimeout(() => { localStorage.setItem('ebf_has_logged_in', 'true'); }, 1000);
-            }
-        }
+        // La suite logique (message de rôle + biométrie) est gérée par le composant BiometricOnboarding
+        // déclenché par le changement de session dans App
       }
     } catch (err: any) {
-      setError(err.message || "Erreur d'authentification.");
+      // ⛔️ Message d'erreur strict demandé
+      setError("Email ou mot de passe incorrect.");
     } finally {
       if (!successMsg) setLoading(false);
     }
@@ -478,17 +519,17 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
           <div className="flex justify-center mb-6 transform scale-125"><EbfLogo /></div>
           <h2 className="text-2xl font-bold text-green-900 mb-2">{isResetMode ? "Récupération" : (isSignUp ? "Rejoindre l'Équipe" : "Connexion EBF")}</h2>
           
-          {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm mb-4 text-left">{error}</div>}
+          {error && <div className="bg-red-50 text-red-600 p-3 rounded text-sm mb-4 text-left font-bold">{error}</div>}
           {successMsg && <div className="bg-green-50 text-green-600 p-3 rounded text-sm mb-4 text-left font-bold border border-green-200">{successMsg}</div>}
 
-          {!isResetMode && !successMsg.includes('Bienvenue') && (
+          {!isResetMode && !successMsg.includes('Inscription') && (
             <div className="flex p-1 bg-gray-100 rounded-lg mb-6">
                <button onClick={() => setAuthMethod('email')} className={`flex-1 py-2 rounded text-sm font-bold ${authMethod === 'email' ? 'bg-white text-ebf-green shadow' : 'text-gray-500'}`}>Email</button>
                <button onClick={() => setAuthMethod('phone')} className={`flex-1 py-2 rounded text-sm font-bold ${authMethod === 'phone' ? 'bg-white text-ebf-orange shadow' : 'text-gray-500'}`}>Téléphone</button>
             </div>
           )}
 
-          {!successMsg.includes('Bienvenue') && (
+          {!successMsg.includes('Inscription') && (
             <div className="space-y-4 text-left">
                 {isSignUp && (
                     <>
@@ -500,7 +541,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                         <div>
                             <label className="block text-sm font-bold text-green-900 mb-1">Rôle</label>
                             <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full border border-orange-200 p-3 rounded-lg bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none">
-                            <option value="Visiteur">Visiteur</option>
+                            <option value="Visiteur">Visiteur (Lecture seule)</option>
                             <option value="Technicien">Technicien</option>
                             <option value="Secretaire">Secretaire</option>
                             <option value="Magasinier">Magasinier</option>
@@ -531,7 +572,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                 </div>
                 )}
                 
-                <button onClick={handleAuth} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition">
+                <button onClick={handleAuth} disabled={loading} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition shadow-lg">
                     {loading ? <Loader2 className="animate-spin mx-auto"/> : (isResetMode ? "Envoyer" : (isSignUp ? "S'inscrire" : "Se Connecter"))}
                 </button>
             </div>
@@ -547,6 +588,76 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   );
 };
 
+// --- Biometric Onboarding Flow ---
+const BiometricOnboarding = ({ profile, onComplete }: { profile: Profile | null, onComplete: () => void }) => {
+  const [step, setStep] = useState<'message' | 'modal'>('message');
+
+  useEffect(() => {
+    // Transition from Message to Modal after short delay for readability
+    if (step === 'message') {
+      const timer = setTimeout(() => setStep('modal'), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
+
+  const handleEnableBiometrics = () => {
+    // Check Native Capability (Mocked here for PWA context, would use navigator.credentials.create in real impl)
+    if (window.PublicKeyCredential) {
+      localStorage.setItem('ebf_biometric_active', 'true');
+      alert("Biométrie configurée avec succès !");
+    } else {
+      alert("Votre appareil ne supporte pas la biométrie via le navigateur.");
+    }
+    localStorage.setItem('ebf_biometric_choice', 'true'); // Flag to not show again
+    onComplete();
+  };
+
+  const handleSkip = () => {
+    localStorage.setItem('ebf_biometric_choice', 'skipped');
+    onComplete();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-green-900/90 backdrop-blur-md transition-all duration-500">
+      
+      {/* 1. Success Message Toast */}
+      <div className={`transition-all duration-700 transform ${step === 'message' ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'} bg-white p-6 rounded-xl shadow-2xl max-w-md text-center border-l-8 border-ebf-green mb-8`}>
+        <CheckCircle className="mx-auto text-ebf-green mb-3 h-12 w-12" />
+        <h3 className="text-xl font-bold text-green-900 mb-1">Connexion réussie</h3>
+        <p className="text-gray-600 font-medium">Vous allez vous connecter en tant que <span className="text-ebf-orange font-bold uppercase">{profile?.role || '...'}</span>.</p>
+      </div>
+
+      {/* 2. Biometric Modal */}
+      {step === 'modal' && (
+        <div className="bg-white rounded-2xl w-full max-w-sm p-8 shadow-2xl animate-fade-in border-t-4 border-ebf-orange relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-4 opacity-5"><ScanFace size={120}/></div>
+           
+           <div className="flex justify-center mb-6">
+             <div className="p-4 bg-orange-50 rounded-full text-ebf-orange shadow-inner">
+               <Fingerprint size={48} />
+             </div>
+           </div>
+           
+           <h3 className="text-2xl font-bold text-center text-green-900 mb-2">Connexion Rapide</h3>
+           <p className="text-gray-600 text-center mb-8">
+             Souhaitez-vous activer la connexion par empreinte digitale ou reconnaissance faciale pour faciliter vos prochaines connexions ?
+           </p>
+           
+           <div className="space-y-3">
+             <button onClick={handleEnableBiometrics} className="w-full bg-ebf-green text-white font-bold py-3.5 rounded-xl hover:bg-green-800 transition shadow-lg flex items-center justify-center gap-2">
+               <ScanFace size={20}/> Oui, activer
+             </button>
+             <button onClick={handleSkip} className="w-full bg-white text-gray-500 font-bold py-3.5 rounded-xl hover:bg-gray-50 border border-gray-200 transition">
+               Plus tard
+             </button>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 // --- Module Placeholder (Lists) ---
 const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, color, currentSite, currentPeriod, readOnly }: any) => {
     const COLUMN_LABELS: Record<string, string> = {
@@ -559,6 +670,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     const filteredItems = useMemo(() => {
         return items.filter((item: any) => {
             if (currentSite && currentSite !== Site.GLOBAL && item.site && item.site !== currentSite) return false;
+            // Only filter by date if the item HAS a date
             if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
             return true;
         });
@@ -823,8 +935,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [reports, setReports] = useState<DailyReport[]>([]);
-  const [tickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES); 
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  // Real-time ticker derived from notifications
+  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
 
   // Modals & CRUD
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -834,6 +948,9 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [crudTarget, setCrudTarget] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
+
+  // Determine permissions based on current path and user role
+  const { canWrite } = getPermission(currentPath, userRole);
 
   // --- DATA FETCHING & REALTIME ---
   useEffect(() => {
@@ -854,7 +971,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       if (statsData) setStats(statsData);
       
       const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-      if (notifData) setNotifications(notifData);
+      if (notifData) {
+         setNotifications(notifData);
+         updateTickerFromNotifs(notifData);
+      }
     };
 
     fetchData();
@@ -881,12 +1001,31 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
           else if (payload.eventType === 'DELETE') setTechnicians(prev => prev.filter(t => t.id !== payload.old.id));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
-          if (payload.eventType === 'INSERT') setNotifications(prev => [payload.new as Notification, ...prev]);
+          if (payload.eventType === 'INSERT') {
+            setNotifications(prev => {
+                const updated = [payload.new as Notification, ...prev];
+                updateTickerFromNotifs(updated);
+                return updated;
+            });
+          }
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channels); };
   }, []);
+
+  const updateTickerFromNotifs = (notifs: Notification[]) => {
+      // Convert top 5 recent notifications to ticker messages
+      if (notifs.length === 0) return;
+      
+      const newTicker = notifs.slice(0, 5).map((n, idx) => ({
+          id: n.id,
+          text: `${n.title}: ${n.message}`,
+          type: n.type,
+          display_order: idx + 1
+      }));
+      setTickerMessages(newTicker);
+  };
 
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
@@ -926,10 +1065,23 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const confirmAdd = async (formData: any) => {
       if (!crudTarget) return;
       setCrudLoading(true);
+      
       // Auto-inject Site if missing and relevant
       if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
       
-      const { error } = await supabase.from(crudTarget).insert([formData]);
+      // CONVERSION DES TYPES (Important pour les inputs HTML qui renvoient des strings)
+      const config = FORM_CONFIGS[crudTarget];
+      const processedData = { ...formData };
+      
+      if (config) {
+          config.fields.forEach(f => {
+              if (f.type === 'number' && processedData[f.name]) {
+                  processedData[f.name] = Number(processedData[f.name]);
+              }
+          });
+      }
+
+      const { error } = await supabase.from(crudTarget).insert([processedData]);
       setCrudLoading(false);
       if (error) {
           alert("Erreur lors de l'ajout: " + error.message);
@@ -1004,6 +1156,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
             currentPeriod={currentPeriod}
             onAdd={() => handleOpenAdd('interventions')}
             onDelete={(item: any) => handleOpenDelete(item, 'interventions')}
+            readOnly={!canWrite}
          />;
      }
      if (currentPath === '/techniciens/rapports') {
@@ -1015,6 +1168,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
             }} 
             onBack={() => handleNavigate('/techniciens')}
             onViewReport={(r: any) => alert(r.content)}
+            readOnly={!canWrite}
          />;
      }
      if (currentPath === '/techniciens/materiel') {
@@ -1026,6 +1180,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
             color="bg-blue-600" 
             onAdd={() => handleOpenAdd('stocks')}
             onDelete={(item: any) => handleOpenDelete(item, 'stocks')}
+            readOnly={!canWrite}
          />;
      }
      if (currentPath === '/quincaillerie/stocks') {
@@ -1038,18 +1193,20 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
              currentSite={currentSite} 
              onAdd={() => handleOpenAdd('stocks')}
              onDelete={(item: any) => handleOpenDelete(item, 'stocks')}
+             readOnly={!canWrite}
          />;
      }
      if (currentPath === '/equipe') {
         return <ModulePlaceholder 
             title="Notre Équipe" 
-            subtitle="Techniciens et Staff" 
+            subtitle="Techniciens, Administration et Staff" 
             items={technicians} 
             onBack={() => handleNavigate('/')} 
             color="bg-indigo-500" 
             currentSite={currentSite}
             onAdd={() => handleOpenAdd('technicians')}
             onDelete={(item: any) => handleOpenDelete(item, 'technicians')}
+            readOnly={!canWrite}
         />;
      }
 
@@ -1147,22 +1304,36 @@ function App() {
   const [userRole, setUserRole] = useState<Role>('Visiteur');
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
+  const [showBiometricFlow, setShowBiometricFlow] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
-        if (session) fetchUserProfile(session.user.id);
+        if (session) handleSessionInit(session);
     });
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
             setIsPasswordResetOpen(true);
         }
+        
+        // On Login Success, check for Biometric flow
+        if (event === 'SIGNED_IN' && session) {
+           const bioChoice = localStorage.getItem('ebf_biometric_choice');
+           if (!bioChoice) {
+             setShowBiometricFlow(true);
+           }
+        }
+
         setSession(session);
-        if (session) fetchUserProfile(session.user.id);
+        if (session) handleSessionInit(session);
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  const handleSessionInit = async (session: any) => {
+      await fetchUserProfile(session.user.id);
+  };
 
   const fetchUserProfile = async (userId: string) => {
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -1191,6 +1362,11 @@ function App() {
   };
 
   if (!session) return <LoginScreen onLogin={() => {}} />;
+
+  // Si on est connecté mais qu'on doit montrer l'onboarding biométrique
+  if (showBiometricFlow) {
+    return <BiometricOnboarding profile={userProfile} onComplete={() => setShowBiometricFlow(false)} />;
+  }
 
   return (
     <>
