@@ -89,7 +89,7 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'revenue', label: 'Recette (FCFA)', type: 'number' },
       { name: 'expenses', label: 'Dépenses (FCFA)', type: 'number' },
       { name: 'rating', label: 'Note Satisfaction (1-5)', type: 'number' },
-      { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] } // Hidden or fixed normally
+      { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] }
     ]
   }
 };
@@ -197,22 +197,17 @@ const getPermission = (path: string, role: Role): { canWrite: boolean } => {
   if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
 
   // Rôles internes spécifiques
-  // Technicien écrit UNIQUEMENT dans /techniciens
   if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
-  
-  // Magasinier écrit UNIQUEMENT dans /quincaillerie
   if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
-  
-  // Secrétaire écrit UNIQUEMENT dans /secretariat
   if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
   
-  // TOUT LE RESTE (y compris /equipe, /comptabilite pour les non-admins) est strictement Lecture Seule
+  // TOUT LE RESTE est strictement Lecture Seule
   return { canWrite: false };
 };
 
-// --- EBF Vector Logo (Globe + Plug) ---
+// --- COMPONENTS ---
+
 const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
-    // Scaling factor
     const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
     const width = 200 * scale;
     const height = 100 * scale;
@@ -225,30 +220,18 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
                     <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
                 </linearGradient>
             </defs>
-            {/* Globe */}
             <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
-            {/* Continents (Stylized) */}
             <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
             <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
-            
-            {/* Cord */}
             <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
-            
-            {/* Plug */}
             <rect x="70" y="20" width="20" height="25" rx="3" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
             <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
-            
-            {/* Divider Line */}
             <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
-            
-            {/* Text E.B.F */}
             <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
             <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
             <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
             <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
             <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
-            
-            {/* Banner */}
             <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
             <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
                 Electricité - Bâtiment - Froid
@@ -257,25 +240,186 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
     );
 };
 
-// --- EBF Logo ---
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
-  const [imgError, setImgError] = useState(false); // Nouvel état pour gérer l'erreur
-  
-  // Si l'image 'logo.png' ne charge pas, on affiche le SVG
-  if (imgError) {
-      return <EbfSvgLogo size={size} />;
-  }
-
+  const [imgError, setImgError] = useState(false);
+  if (imgError) return <EbfSvgLogo size={size} />;
   return (
     <div className="flex items-center justify-center">
         <img 
             src="/logo.png" 
             alt="EBF Logo" 
             className={`${size === 'small' ? 'h-10' : size === 'large' ? 'h-32' : 'h-16'} w-auto object-contain`}
-            onError={() => setImgError(true)} // Détecte si l'image manque
+            onError={() => setImgError(true)} 
         />
     </div>
   );
+};
+
+// --- Module Placeholder (Generic List/Table) ---
+const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
+    // Basic Filtering
+    const filteredItems = items.filter((item: any) => {
+        if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
+        if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
+        return true;
+    });
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-gray-100 shadow-sm transition"><ArrowLeft size={20} className="text-gray-600"/></button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            {title}
+                            {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 ml-2"><Lock size={12}/> Lecture Seule</span>}
+                        </h2>
+                        <p className="text-gray-500">{subtitle}</p>
+                    </div>
+                </div>
+                {!readOnly && onAdd && (
+                    <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow-md hover:opacity-90 transition flex items-center gap-2`}>
+                        <Plus size={18}/> Ajouter
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-600">
+                            <tr>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">ID</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Nom / Client</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Détails</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Site</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Statut / Qté</th>
+                                {!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                            {filteredItems.length === 0 ? (
+                                <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucune donnée trouvée.</td></tr>
+                            ) : (
+                                filteredItems.map((item: any) => (
+                                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition">
+                                        <td className="p-4 text-sm font-mono text-gray-400">#{item.id.substring(0, 4)}</td>
+                                        <td className="p-4">
+                                            <p className="font-bold text-gray-800 dark:text-white">{item.name || item.client || item.full_name}</p>
+                                            {item.clientPhone && <p className="text-xs text-gray-500">{item.clientPhone}</p>}
+                                        </td>
+                                        <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
+                                            {item.description || item.specialty || item.unit || '-'}
+                                            {item.date && <span className="block text-xs text-gray-400">{item.date}</span>}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.site === 'Abidjan' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                                                {item.site || 'Global'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            {item.status ? (
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Available' || item.status === 'Completed' ? 'bg-green-100 text-green-700' : item.status === 'Busy' || item.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {item.status}
+                                                </span>
+                                            ) : (
+                                                <span className={`font-bold ${item.quantity <= (item.threshold || 0) ? 'text-red-500' : 'text-gray-800'}`}>
+                                                    {item.quantity} {item.unit}
+                                                </span>
+                                            )}
+                                        </td>
+                                        {!readOnly && onDelete && (
+                                            <td className="p-4 text-right">
+                                                <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Report Mode Selector ---
+const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
+    return (
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex items-center gap-3">
+                <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-gray-100 shadow-sm transition"><ArrowLeft size={20} className="text-gray-600"/></button>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    Rapports Journaliers
+                    {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 ml-2"><Lock size={12}/> Lecture Seule</span>}
+                </h2>
+            </div>
+
+            {!readOnly ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-blue-400">
+                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition"><Mic size={40} /></div>
+                        <h3 className="text-2xl font-bold mb-2">Rapport Vocal</h3>
+                        <p className="text-blue-100">Dictez votre rapport, l'IA le rédige pour vous.</p>
+                    </button>
+                    <button onClick={() => onSelectMode('form')} className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-orange-400">
+                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition"><FileText size={40} /></div>
+                        <h3 className="text-2xl font-bold mb-2">Formulaire Détaillé</h3>
+                        <p className="text-orange-100">Saisie manuelle des travaux et finances.</p>
+                    </button>
+                </div>
+            ) : (
+                <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg text-orange-800 text-center">
+                    <p className="font-bold flex items-center justify-center gap-2"><Lock size={16}/> Création de rapports désactivée</p>
+                    <p className="text-sm">Vous n'avez pas les droits pour créer de nouveaux rapports.</p>
+                </div>
+            )}
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Historique Récent</h3>
+                <div className="space-y-3">
+                    {reports.slice(0, 5).map((r: any) => (
+                        <div key={r.id} onClick={() => onViewReport(r)} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-orange-50 cursor-pointer transition border border-gray-100 dark:border-gray-600">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${r.method === 'Voice' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                                    {r.method === 'Voice' ? <Mic size={18} /> : <FileText size={18} />}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-800 dark:text-white text-sm">{r.technicianName}</p>
+                                    <p className="text-xs text-gray-500">{r.date}</p>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-gray-400"/>
+                        </div>
+                    ))}
+                    {reports.length === 0 && <p className="text-gray-400 text-center italic">Aucun rapport.</p>}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Help Modal ---
+const HelpModal = ({ isOpen, onClose }: any) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border border-gray-100">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><HelpCircle className="text-green-500"/> Aide & Support</h3>
+                    <button onClick={onClose}><X className="text-gray-400"/></button>
+                </div>
+                <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                    <p><strong>Flash Info :</strong> Les messages automatiques sont générés par l'IA en fonction de la rentabilité.</p>
+                    <p><strong>Mode Sombre :</strong> Activez-le dans les paramètres pour réduire la fatigue visuelle.</p>
+                    <p><strong>Export PDF :</strong> Disponible dans le tableau de bord pour imprimer les rapports.</p>
+                    <p><strong>Support Technique :</strong> Contactez l'admin au 07 07 00 00 00.</p>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // --- Login Screen (Redesigned - Light Theme) ---
@@ -295,13 +439,11 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [resentCount, setResentCount] = useState(0);
   
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError(''); setSuccessMsg('');
 
-    // --- IMPORTANT: Nettoyage des entrées (Trim) ---
     const cleanIdentifier = identifier.trim();
     const cleanPassword = password.trim();
     const cleanName = fullName.trim();
@@ -315,9 +457,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
       }
 
       if (isSignUp) {
-        // --- INSCRIPTION ---
         const metadata = { full_name: cleanName, role: role, site: site };
-        
         let signUpResp;
         if (authMethod === 'email') {
           signUpResp = await supabase.auth.signUp({ email: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
@@ -353,16 +493,12 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
              }
              onLoginSuccess();
              return;
-        } else if (signUpResp.data.user && !signUpResp.data.session) {
-            setSuccessMsg("Compte créé ! Veuillez vérifier vos emails (et SPAMS) pour valider l'inscription.");
-            setIsSignUp(false);
         } else {
-            setSuccessMsg("Inscription réussie ! Veuillez vous connecter.");
-            setIsSignUp(false); 
+            // Fallback error if session is null but no explicit error (rare with auto-confirm)
+             setError("Compte créé mais connexion bloquée. ALERTE CONFIG : Veuillez DÉSACTIVER 'Confirm Email' dans votre dashboard Supabase > Auth > Providers.");
         }
 
       } else {
-        // --- CONNEXION ---
         const { data, error: err } = await supabase.auth.signInWithPassword(
             authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
@@ -370,7 +506,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         if (err) {
             console.error("Login Error Full:", err);
             if (err.message.includes("Email not confirmed")) {
-                throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception (et SPAMS).");
+                throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception.");
             } else if (err.message.includes("Invalid login credentials")) {
                 throw new Error("Email ou mot de passe incorrect.");
             } else if (err.message.includes("Phone signups are disabled")) {
@@ -379,7 +515,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                 throw new Error(err.message);
             }
         }
-        
         onLoginSuccess();
       }
     } catch (err: any) {
@@ -389,28 +524,9 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     }
   };
 
-  const handleResendConfirmation = async () => {
-    if (!identifier) return;
-    setLoading(true);
-    try {
-        const { error } = await supabase.auth.resend({
-            type: 'signup',
-            email: identifier.trim()
-        });
-        if (error) throw error;
-        setResentCount(prev => prev + 1);
-        alert("Email de confirmation renvoyé ! Pensez à vérifier le dossier SPAM.");
-    } catch (e: any) {
-        alert("Erreur lors du renvoi : " + e.message);
-    } finally {
-        setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-ebf-pattern p-4 font-sans">
        <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 relative overflow-hidden animate-fade-in">
-          {/* Decorative Elements */}
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-orange-600"></div>
           
           <div className="flex flex-col items-center mb-8">
@@ -424,50 +540,24 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
           {error && (
              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in">
                 <AlertCircle size={18} className="flex-shrink-0"/> 
-                <div className="flex-1">
-                    <span>{error}</span>
-                    {error.includes("pas confirmé") && (
-                        <button 
-                            type="button" 
-                            onClick={handleResendConfirmation} 
-                            className="block mt-2 text-xs bg-red-100 px-2 py-1 rounded hover:bg-red-200 font-bold transition flex items-center gap-1"
-                        >
-                            <RefreshCcw size={10}/> Renvoyer l'email de confirmation
-                        </button>
-                    )}
-                </div>
+                <span>{error}</span>
              </div>
           )}
           
           {successMsg && (
-             <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex flex-col gap-2 animate-slide-in">
-                <div className="flex items-center gap-2">
-                    <CheckCircle size={18} className="flex-shrink-0"/> <span>{successMsg}</span>
-                </div>
-                {successMsg.includes("Vérifiez vos emails") && (
-                    <div className="pl-6 space-y-2">
-                        <p className="text-xs text-green-800 italic">Rien reçu ? Vérifiez vos <strong>SPAMS</strong> ou courriers indésirables.</p>
-                        <button 
-                            onClick={handleResendConfirmation} 
-                            disabled={loading || resentCount > 2}
-                            className="text-xs bg-white border border-green-200 px-3 py-1.5 rounded font-bold hover:bg-green-100 transition disabled:opacity-50"
-                        >
-                            {resentCount > 2 ? "Trop de tentatives" : "Renvoyer l'email de confirmation"}
-                        </button>
-                    </div>
-                )}
+             <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in">
+                <CheckCircle size={18} className="flex-shrink-0"/> <span>{successMsg}</span>
              </div>
           )}
 
-          {!isResetMode && !successMsg.includes('Veuillez vous connecter') && !successMsg.includes('Vérifiez vos emails') && (
+          {!isResetMode && (
             <div className="flex p-1 bg-gray-100 rounded-lg mb-6 shadow-inner">
                <button onClick={() => setAuthMethod('email')} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all duration-300 ${authMethod === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Email</button>
                <button onClick={() => setAuthMethod('phone')} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all duration-300 ${authMethod === 'phone' ? 'bg-white text-ebf-orange shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Téléphone</button>
             </div>
           )}
 
-          {!successMsg.includes('Veuillez vous connecter') && !successMsg.includes('Vérifiez vos emails') && (
-            <form onSubmit={handleAuth} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
                 {isSignUp && (
                     <div className="space-y-4 animate-fade-in">
                         <div>
@@ -527,7 +617,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                     {loading ? <Loader2 className="animate-spin" size={20}/> : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter"))}
                 </button>
             </form>
-          )}
 
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
              <button onClick={() => { 
@@ -554,18 +643,16 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => void }) => {
   const [step, setStep] = useState<'message' | 'biometric'>('message');
 
-  // Timer for the Message Step
   useEffect(() => {
     if (step === 'message') {
       const timer = setTimeout(() => {
          setStep('biometric');
-      }, 3000); // 3 seconds reading time
+      }, 3000); 
       return () => clearTimeout(timer);
     }
   }, [step]);
 
   const handleEnableBiometrics = () => {
-    // Check if browser supports PublicKeyCredential (standard for WebAuthn/Biometrics)
     if (window.PublicKeyCredential) {
       localStorage.setItem('ebf_biometric_active', 'true');
       onComplete();
@@ -583,18 +670,13 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
 
   return (
      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-900/50 backdrop-blur-md transition-all duration-700">
-        
-        {/* STEP 1: WELCOME MESSAGE BY ROLE */}
         {step === 'message' && (
            <div className="bg-white p-10 rounded-3xl shadow-2xl max-w-lg w-full text-center border border-white/40 animate-fade-in relative overflow-hidden mx-4">
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-orange-600"></div>
-              
               <div className="mx-auto bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100">
                   <CheckCircle className="text-green-600 h-10 w-10" />
               </div>
-              
               <h3 className="text-2xl font-extrabold text-gray-800 mb-4">Connexion réussie</h3>
-              
               <div className="text-gray-600 text-lg leading-relaxed">
                  Vous allez vous connecter en tant que<br/>
                  <span className="text-ebf-orange font-black text-2xl uppercase tracking-wide mt-2 block transform scale-105 transition-transform">
@@ -604,25 +686,20 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
            </div>
         )}
 
-        {/* STEP 2: BIOMETRIC PROMPT */}
         {step === 'biometric' && (
            <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full mx-4 border border-white/40 animate-slide-in relative overflow-hidden">
-               {/* Background Icon */}
                <div className="absolute -top-10 -right-10 text-gray-50 opacity-50 pointer-events-none">
                   <ScanFace size={200} />
                </div>
-
                <div className="flex justify-center mb-8 relative z-10">
                   <div className="p-5 bg-orange-50 rounded-full text-ebf-orange shadow-inner ring-1 ring-orange-100">
                      <Fingerprint size={56} />
                   </div>
                </div>
-               
                <h3 className="text-2xl font-bold text-center text-gray-800 mb-3 relative z-10">Connexion Rapide</h3>
                <p className="text-gray-500 text-center mb-10 leading-relaxed relative z-10">
                   Souhaitez-vous activer la connexion par <strong className="text-gray-800">empreinte digitale</strong> ou <strong className="text-gray-800">reconnaissance faciale</strong> ?
                </p>
-               
                <div className="space-y-3 relative z-10">
                   <button onClick={handleEnableBiometrics} className="w-full bg-ebf-orange text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3">
                      <ScanFace size={22}/> Oui, activer
@@ -637,7 +714,7 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
   );
 };
 
-// --- Loading Screen (Styled) ---
+// --- Loading Screen ---
 const LoadingScreen = () => (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-ebf-pattern">
         <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center backdrop-blur-sm border border-gray-100">
@@ -841,141 +918,7 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   );
 };
 
-// --- App Wrapper with State Machine ---
-function App() {
-  const [appState, setAppState] = useState<'LOADING' | 'LOGIN' | 'ONBOARDING' | 'APP'>('LOADING');
-  const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<Role>('Visiteur');
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-
-  // Helper to fetch profile data
-  const fetchUserProfile = async (userId: string) => {
-      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      
-      // Fallback: Create profile if it doesn't exist (e.g., first login weirdness)
-      if (!data) {
-          const { data: userData } = await supabase.auth.getUser();
-          const meta = userData.user?.user_metadata;
-          if (meta) {
-              const newProfile = {
-                  id: userId,
-                  full_name: meta.full_name || 'Utilisateur',
-                  role: meta.role || 'Visiteur',
-                  site: meta.site || 'Global',
-                  email: userData.user?.email
-              };
-              const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-              if (!insertError) data = newProfile as any;
-          }
-      }
-
-      if (data) {
-          setUserRole(data.role);
-          setUserProfile(data);
-          
-          // --- FIX: Ensure user is in 'Notre Équipe' (technicians table) if not Visitor ---
-          if (data.role !== 'Visiteur') {
-               const { data: tech } = await supabase.from('technicians').select('id').eq('id', userId).single();
-               if (!tech) {
-                   let specialty = data.role;
-                   if (data.role === 'Admin') specialty = 'Administration';
-                   
-                   await supabase.from('technicians').insert([{
-                       id: userId,
-                       name: data.full_name,
-                       specialty: specialty,
-                       site: data.site,
-                       status: 'Available'
-                   }]);
-               }
-          }
-          // -------------------------------------------------------------------------------
-
-          return data;
-      }
-      return null;
-  };
-
-  // Main Effect to check Session on Load
-  useEffect(() => {
-    const init = async () => {
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      
-      if (existingSession) {
-         setSession(existingSession);
-         const profile = await fetchUserProfile(existingSession.user.id);
-         
-         // CHECK BIOMETRIC PREFERENCE for "Instant Login"
-         const bioActive = localStorage.getItem('ebf_biometric_active');
-         if (bioActive === 'true') {
-             setAppState('APP');
-         } else {
-             // If preference is 'false' or not set, BUT we have a session from local storage,
-             // standard web behavior is to stay logged in. 
-             // However, to force the flow requested ("Future connections instant" implying others are not),
-             // we can decide here. 
-             // Let's go to APP to be user-friendly, the Onboarding only happens on Explicit Login.
-             setAppState('APP');
-         }
-      } else {
-         setAppState('LOGIN');
-      }
-    };
-    init();
-
-    // Listener for Auth Changes (Sign Out, etc)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-            setSession(null);
-            setUserProfile(null);
-            setAppState('LOGIN');
-        }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // --- HANDLERS ---
-  
-  const handleExplicitLoginSuccess = async () => {
-      // Called when user clicks "Se connecter" in LoginScreen
-      setAppState('LOADING');
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-          setSession(session);
-          await fetchUserProfile(session.user.id);
-          // Go to Onboarding Flow (Role Message -> Biometric)
-          setAppState('ONBOARDING');
-      } else {
-          setAppState('LOGIN'); // Should not happen if login success
-      }
-  };
-
-  const handleOnboardingComplete = () => {
-      setAppState('APP');
-  };
-
-  // --- RENDER ---
-
-  if (appState === 'LOADING') return <LoadingScreen />;
-
-  if (appState === 'LOGIN') return <LoginScreen onLoginSuccess={handleExplicitLoginSuccess} />;
-
-  if (appState === 'ONBOARDING') {
-      return <OnboardingFlow role={userRole} onComplete={handleOnboardingComplete} />;
-  }
-
-  // APP STATE
-  return (
-    <AppContent 
-        session={session} 
-        onLogout={() => supabase.auth.signOut()} 
-        userRole={userRole} 
-        userProfile={userProfile} 
-    />
-  );
-}
-
+// --- HEADER WITH NOTIFICATIONS ---
 const HeaderWithNotif = ({ 
   title, onMenuClick, onLogout, onOpenFlashInfo, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
 }: any) => {
@@ -1048,13 +991,11 @@ const HeaderWithNotif = ({
                  {showSettingsDropdown && (
                    <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fade-in z-50">
                       <div className="py-2">
-                         {/* SECTION MON COMPTE */}
                          <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Mon Compte</div>
                          <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
                              <User size={18} className="text-ebf-orange"/> Modifier Profil
                          </button>
 
-                         {/* SECTION ADMIN (VISIBLE SEULEMENT POUR ADMIN) */}
                          {canEditFlashInfo && (
                             <>
                                 <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
@@ -1067,7 +1008,6 @@ const HeaderWithNotif = ({
 
                          <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
 
-                         {/* SECTION SECURITE */}
                          <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Sécurité</div>
                          <button onClick={() => { onResetBiometrics(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
                              <ScanFace size={18} className="text-purple-500"/> Réinitialiser Biométrie
@@ -1075,7 +1015,6 @@ const HeaderWithNotif = ({
 
                          <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
                          
-                         {/* SECTION APPLICATION */}
                          <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Application</div>
                          <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
                             <div className="flex items-center gap-3"><Moon size={18} className="text-indigo-500"/> Mode Sombre</div>
@@ -1343,3 +1282,121 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     </div>
   );
 };
+
+// --- App Wrapper with State Machine ---
+export default function App() {
+  const [appState, setAppState] = useState<'LOADING' | 'LOGIN' | 'ONBOARDING' | 'APP'>('LOADING');
+  const [session, setSession] = useState<any>(null);
+  const [userRole, setUserRole] = useState<Role>('Visiteur');
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+
+  // Helper to fetch profile data
+  const fetchUserProfile = async (userId: string) => {
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      
+      // Fallback: Create profile if it doesn't exist
+      if (!data) {
+          const { data: userData } = await supabase.auth.getUser();
+          const meta = userData.user?.user_metadata;
+          if (meta) {
+              const newProfile = {
+                  id: userId,
+                  full_name: meta.full_name || 'Utilisateur',
+                  role: meta.role || 'Visiteur',
+                  site: meta.site || 'Global',
+                  email: userData.user?.email
+              };
+              const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
+              if (!insertError) data = newProfile as any;
+          }
+      }
+
+      if (data) {
+          setUserRole(data.role);
+          setUserProfile(data);
+          
+          // Ensure user is in 'Notre Équipe' if not Visitor
+          if (data.role !== 'Visiteur') {
+               const { data: tech } = await supabase.from('technicians').select('id').eq('id', userId).single();
+               if (!tech) {
+                   let specialty = data.role;
+                   if (data.role === 'Admin') specialty = 'Administration';
+                   
+                   await supabase.from('technicians').insert([{
+                       id: userId,
+                       name: data.full_name,
+                       specialty: specialty,
+                       site: data.site,
+                       status: 'Available'
+                   }]);
+               }
+          }
+          return data;
+      }
+      return null;
+  };
+
+  // Main Effect to check Session on Load
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      
+      if (existingSession) {
+         setSession(existingSession);
+         const profile = await fetchUserProfile(existingSession.user.id);
+         
+         // CHECK BIOMETRIC PREFERENCE for "Instant Login"
+         const bioActive = localStorage.getItem('ebf_biometric_active');
+         if (bioActive === 'true') {
+             setAppState('APP');
+         } else {
+             // Default to APP if session exists, Onboarding only on Explicit Login
+             setAppState('APP');
+         }
+      } else {
+         setAppState('LOGIN');
+      }
+    };
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') {
+            setSession(null);
+            setUserProfile(null);
+            setAppState('LOGIN');
+        }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleExplicitLoginSuccess = async () => {
+      setAppState('LOADING');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+          setSession(session);
+          await fetchUserProfile(session.user.id);
+          // Go to Onboarding Flow
+          setAppState('ONBOARDING');
+      } else {
+          setAppState('LOGIN');
+      }
+  };
+
+  const handleOnboardingComplete = () => {
+      setAppState('APP');
+  };
+
+  if (appState === 'LOADING') return <LoadingScreen />;
+  if (appState === 'LOGIN') return <LoginScreen onLoginSuccess={handleExplicitLoginSuccess} />;
+  if (appState === 'ONBOARDING') return <OnboardingFlow role={userRole} onComplete={handleOnboardingComplete} />;
+
+  return (
+    <AppContent 
+        session={session} 
+        onLogout={() => supabase.auth.signOut()} 
+        userRole={userRole} 
+        userProfile={userProfile} 
+    />
+  );
+}
