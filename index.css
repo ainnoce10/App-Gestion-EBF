@@ -16,30 +16,31 @@
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #FF8C00; border-radius: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #228B22; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #ea580c; }
 
 /* Custom utilities for EBF Theme */
 body {
-    background-color: #f0fdf4; /* bg-green-50 equiv */
+    background-color: #f9fafb; /* bg-gray-50 */
+    color: #1f2937; /* text-gray-800 */
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .input-primary {
-  @apply bg-white text-green-900 border-orange-200 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none transition-all duration-200;
+  @apply bg-white text-gray-900 border-gray-200 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none transition-all duration-200;
 }
 
-/* Fond moderne pour le Login */
+/* Fond moderne pour le Login - Version Light/Orange */
 .bg-ebf-pattern {
-  background-color: #052e16;
-  background-image: radial-gradient(#228B22 1px, transparent 1px), radial-gradient(#FF8C00 1px, transparent 1px);
-  background-size: 40px 40px;
-  background-position: 0 0, 20px 20px;
+  background-color: #ffff;
+  background-image: radial-gradient(#FF8C00 0.5px, transparent 0.5px), radial-gradient(#e5e7eb 0.5px, transparent 0.5px);
+  background-size: 30px 30px;
+  background-position: 0 0, 15px 15px;
   position: relative;
 }
 .bg-ebf-pattern::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at center, transparent 0%, #052e16 100%);
+    background: radial-gradient(circle at center, transparent 0%, #fff 90%);
     pointer-events: none;
 }
