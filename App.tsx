@@ -584,6 +584,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
         if (signUpResp.error) throw signUpResp.error;
 
+        // CRITICAL: Check if we have a session immediately
         if (signUpResp.data.session) {
              const userId = signUpResp.data.user?.id;
              if (userId) {
@@ -608,12 +609,13 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      }]);
                  }
              }
+             // DIRECT SUCCESS LOGIN
              onLoginSuccess();
-             return;
+             return; 
         } else {
-             // Modification pour ne plus bloquer l'utilisateur si la session n'est pas immédiate
+             // NO SESSION = CONFIRMATION REQUIRED BY SERVER
              setIsSignUp(false);
-             setSuccessMsg("Compte créé avec succès ! Connectez-vous avec vos identifiants.");
+             setSuccessMsg("Inscription réussie ! Si la connexion échoue, vérifiez vos emails pour valider le compte.");
         }
 
       } else {
@@ -631,11 +633,11 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         const msg = err.message || err.error_description || JSON.stringify(err);
 
         if (msg.includes("Invalid login credentials") || msg.includes("invalid_grant")) {
-            userMsg = "Email ou mot de passe incorrect (ou email non confirmé).";
+            userMsg = "Email ou mot de passe incorrect (ou email non confirmé par le serveur).";
         } else if (msg.includes("Email not confirmed")) {
-            userMsg = "Veuillez confirmer votre email avant de vous connecter.";
+            userMsg = "Votre email n'est pas encore confirmé. Vérifiez votre boîte mail (et les spams).";
         } else if (msg.includes("User already registered")) {
-            userMsg = "Un compte existe déjà avec cet email/téléphone.";
+            userMsg = "Un compte existe déjà avec cet email/téléphone. Connectez-vous.";
         } else if (msg.includes("Password should be at least")) {
             userMsg = "Le mot de passe doit contenir au moins 6 caractères.";
         } else if (msg.includes("Phone signups are disabled")) {
@@ -733,16 +735,19 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
             </form>
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
              <button onClick={() => { 
-                 if (successMsg) {
+                 if (successMsg && !successMsg.includes("Inscription réussie")) {
                      setSuccessMsg('');
                      setIsSignUp(false);
+                 } else if (successMsg && successMsg.includes("Inscription réussie")) {
+                     setSuccessMsg('');
+                     // Keep on login screen
                  } else {
                      setIsSignUp(!isSignUp); 
                      setIsResetMode(false); 
                      setError('');
                  }
              }} className="text-sm font-semibold text-gray-500 hover:text-orange-600 transition">
-                {successMsg ? (
+                {successMsg && !successMsg.includes("Inscription réussie") ? (
                     <span className="flex items-center justify-center gap-2 font-bold text-orange-600"><ArrowLeft size={16}/> Retour à la connexion</span>
                 ) : (isSignUp ? "Déjà un compte ? Se connecter" : "Pas encore de compte ? S'inscrire")}
              </button>
