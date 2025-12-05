@@ -6,13 +6,12 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
 import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
-import { DEFAULT_TICKER_MESSAGES } from './constants';
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -286,6 +285,97 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
       </div>
     </div>
   );
+};
+
+// --- Flash Info Configuration Modal ---
+const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMessage }: any) => {
+    const [newMessage, setNewMessage] = useState({ text: '', type: 'info' });
+    
+    if (!isOpen) return null;
+
+    const handleSubmit = () => {
+        if (!newMessage.text) return;
+        onSaveMessage(newMessage.text, newMessage.type);
+        setNewMessage({ text: '', type: 'info' });
+    };
+
+    return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl p-6 shadow-2xl animate-fade-in flex flex-col max-h-[85vh]">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-green-900 dark:text-white flex items-center gap-2">
+                        <Megaphone className="text-ebf-orange"/> Configuration Flash Info
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X /></button>
+                </div>
+
+                {/* Add New Message */}
+                <div className="bg-orange-50 dark:bg-gray-700 p-4 rounded-lg mb-6 border border-orange-100">
+                    <label className="block text-sm font-bold text-green-900 dark:text-gray-200 mb-2">Ajouter un message manuel</label>
+                    <div className="flex gap-2 mb-2">
+                        <input 
+                            value={newMessage.text}
+                            onChange={(e) => setNewMessage({...newMessage, text: e.target.value})}
+                            placeholder="Ex: Réunion générale demain à 10h"
+                            className="flex-1 border border-orange-200 p-2 rounded bg-white text-green-900 focus:ring-2 focus:ring-ebf-orange outline-none"
+                        />
+                        <select 
+                            value={newMessage.type}
+                            onChange={(e) => setNewMessage({...newMessage, type: e.target.value})}
+                            className="border border-orange-200 p-2 rounded bg-white text-green-900 outline-none cursor-pointer"
+                        >
+                            <option value="info">Info (Bleu)</option>
+                            <option value="success">Succès (Vert)</option>
+                            <option value="alert">Alerte (Rouge)</option>
+                        </select>
+                        <button onClick={handleSubmit} className="bg-ebf-green text-white px-4 py-2 rounded font-bold hover:bg-green-800">
+                            Ajouter
+                        </button>
+                    </div>
+                </div>
+
+                {/* List Messages */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <h4 className="text-sm font-bold text-gray-500 uppercase mb-2">Messages Actifs (Manuels)</h4>
+                    <div className="space-y-2">
+                        {messages.filter((m: TickerMessage) => m.isManual).length === 0 ? (
+                            <p className="text-gray-400 text-sm italic text-center py-4">Aucun message manuel configuré.</p>
+                        ) : (
+                            messages.filter((m: TickerMessage) => m.isManual).map((msg: TickerMessage, idx: number) => (
+                                <div key={msg.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded shadow-sm hover:shadow-md transition">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></div>
+                                        <span className="text-sm font-medium text-gray-800">{msg.text}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500 font-mono">#{idx + 1}</span>
+                                        <button onClick={() => onDeleteMessage(msg.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition">
+                                            <Trash2 size={16}/>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <h4 className="text-sm font-bold text-gray-500 uppercase mt-6 mb-2">Messages Automatiques (Prévisualisation)</h4>
+                     <div className="space-y-2 opacity-75">
+                        {messages.filter((m: TickerMessage) => !m.isManual).map((msg: TickerMessage) => (
+                                <div key={msg.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></div>
+                                        <span className="text-sm font-medium text-gray-600 italic">{msg.text}</span>
+                                    </div>
+                                    <span className="text-xs bg-gray-200 px-2 py-1 rounded text-gray-500">AUTO</span>
+                                </div>
+                            ))
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // --- Profile Modal ---
@@ -828,6 +918,8 @@ const HeaderWithNotif = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const canEditFlashInfo = userRole === 'Admin';
+
     return (
         <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
            <div className="flex items-center gap-4">
@@ -896,9 +988,11 @@ const HeaderWithNotif = ({
                          <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <User size={16} className="text-ebf-green"/> Mon Profil
                          </button>
-                         <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
-                            <Megaphone size={16} className="text-ebf-orange"/> Configurer Flash Info
-                         </button>
+                         {canEditFlashInfo && (
+                             <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
+                                <Megaphone size={16} className="text-ebf-orange"/> Configurer Flash Info
+                             </button>
+                         )}
                          <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <div className="flex items-center gap-3"><Moon size={16} className="text-indigo-500"/> Mode Sombre</div>
                             <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}>
@@ -937,12 +1031,14 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
-  // Real-time ticker derived from notifications
-  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
+  // Ticker Logic
+  const [manualTickerMessages, setManualTickerMessages] = useState<TickerMessage[]>([]);
+  const [autoTickerMessages, setAutoTickerMessages] = useState<TickerMessage[]>([]);
 
   // Modals & CRUD
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [crudTarget, setCrudTarget] = useState('');
@@ -971,9 +1067,17 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       if (statsData) setStats(statsData);
       
       const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-      if (notifData) {
-         setNotifications(notifData);
-         updateTickerFromNotifs(notifData);
+      if (notifData) setNotifications(notifData);
+      
+      // Fetch manual ticker messages (mocking table if not exists, or implementing logic)
+      // Assuming table 'ticker_messages' exists
+      const { data: tickerData } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
+      if (tickerData) {
+          const manual = tickerData.map((m: any) => ({ ...m, isManual: true }));
+          setManualTickerMessages(manual);
+      } else {
+          // If no table, use default manual ones from constants as fallback? No, strict manual requirement.
+          setManualTickerMessages([]); 
       }
     };
 
@@ -1001,31 +1105,121 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
           else if (payload.eventType === 'DELETE') setTechnicians(prev => prev.filter(t => t.id !== payload.old.id));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setNotifications(prev => {
-                const updated = [payload.new as Notification, ...prev];
-                updateTickerFromNotifs(updated);
-                return updated;
-            });
-          }
+          if (payload.eventType === 'INSERT') setNotifications(prev => [payload.new as Notification, ...prev]);
+      })
+      // Listen to manual ticker updates
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticker_messages' }, (payload) => {
+          if (payload.eventType === 'INSERT') setManualTickerMessages(prev => [...prev, { ...payload.new, isManual: true } as TickerMessage]);
+          else if (payload.eventType === 'DELETE') setManualTickerMessages(prev => prev.filter(m => m.id !== payload.old.id));
+          // Re-fetch for reorder/update simplicity
+          fetchData(); 
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channels); };
   }, []);
 
-  const updateTickerFromNotifs = (notifs: Notification[]) => {
-      // Convert top 5 recent notifications to ticker messages
-      if (notifs.length === 0) return;
+  // --- AUTOMATIC TICKER CALCULATION ENGINE ---
+  useEffect(() => {
+    generateAutoTickerMessages(stats);
+    // Re-run every 10 minutes to refresh calculation (even if data hasn't changed, relative dates might)
+    const interval = setInterval(() => generateAutoTickerMessages(stats), 600000);
+    return () => clearInterval(interval);
+  }, [stats]); // Re-calc when stats change
+
+  const generateAutoTickerMessages = (data: StatData[]) => {
+      const messages: TickerMessage[] = [];
+      const now = new Date();
       
-      const newTicker = notifs.slice(0, 5).map((n, idx) => ({
-          id: n.id,
-          text: `${n.title}: ${n.message}`,
-          type: n.type,
-          display_order: idx + 1
-      }));
-      setTickerMessages(newTicker);
+      // Helper to sum rev/exp for a set of filtered items
+      const calcPerf = (items: StatData[]) => {
+          const revenue = items.reduce((acc, curr) => acc + curr.revenue, 0);
+          const expenses = items.reduce((acc, curr) => acc + curr.expenses, 0);
+          const profit = revenue - expenses;
+          const percent = revenue > 0 ? (profit / revenue) * 100 : 0;
+          return { profit, percent };
+      };
+
+      // 1. TODAY (Jour)
+      const todayStats = data.filter(d => isInPeriod(d.date, Period.DAY));
+      if (todayStats.length > 0) {
+          const { percent } = calcPerf(todayStats);
+          if (percent !== 0) {
+              const isPositive = percent > 0;
+              messages.push({
+                  id: 'auto-day',
+                  text: isPositive 
+                      ? `Félicitations ! Nous sommes à +${percent.toFixed(1)}% de bénéfice aujourd'hui.`
+                      : `Alerte : Nous sommes à ${percent.toFixed(1)}% de perte aujourd'hui.`,
+                  type: isPositive ? 'success' : 'alert',
+                  display_order: 100,
+                  isManual: false
+              });
+          }
+      }
+
+      // 2. WEEK (Semaine)
+      const weekStats = data.filter(d => isInPeriod(d.date, Period.WEEK));
+      if (weekStats.length > 0) {
+          const { percent } = calcPerf(weekStats);
+          if (percent !== 0) {
+             const isPositive = percent > 0;
+             messages.push({
+                 id: 'auto-week',
+                 text: isPositive 
+                     ? `Bravo ! Cette semaine enregistre +${percent.toFixed(1)}% de marge positive.`
+                     : `Attention ! Nous sommes à ${percent.toFixed(1)}% de perte cette semaine.`,
+                 type: isPositive ? 'success' : 'alert',
+                 display_order: 101,
+                 isManual: false
+             });
+          }
+      }
+
+      // 3. MONTH (Mois)
+      const monthStats = data.filter(d => isInPeriod(d.date, Period.MONTH));
+      if (monthStats.length > 0) {
+          const { percent } = calcPerf(monthStats);
+          if (percent !== 0) {
+              const isPositive = percent > 0;
+              messages.push({
+                  id: 'auto-month',
+                  text: isPositive
+                      ? `Excellent ! Le mois en cours est à +${percent.toFixed(1)}% de rentabilité.`
+                      : `Vigilance : Le cumul mensuel est à ${percent.toFixed(1)}%.`,
+                  type: isPositive ? 'success' : 'alert',
+                  display_order: 102,
+                  isManual: false
+              });
+          }
+      }
+
+       // 4. YEAR (Année)
+       const yearStats = data.filter(d => isInPeriod(d.date, Period.YEAR));
+       if (yearStats.length > 0) {
+           const { percent } = calcPerf(yearStats);
+           if (percent !== 0) {
+               const isPositive = percent > 0;
+               messages.push({
+                   id: 'auto-year',
+                   text: `Bilan Annuel Global : ${isPositive ? '+' : ''}${percent.toFixed(1)}% de marge.`,
+                   type: isPositive ? 'info' : 'alert',
+                   display_order: 103,
+                   isManual: false
+               });
+           }
+       }
+
+      setAutoTickerMessages(messages);
   };
+
+  // Combine Manual (First) + Auto (Second)
+  const combinedTickerMessages = useMemo(() => {
+     // If no messages at all, we return empty array (no fake fallback)
+     if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
+     
+     return [...manualTickerMessages, ...autoTickerMessages];
+  }, [manualTickerMessages, autoTickerMessages]);
 
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
@@ -1090,12 +1284,28 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       }
   };
 
+  // --- Flash Info Manual Management ---
+  const saveManualTickerMessage = async (text: string, type: string) => {
+      // Assuming 'ticker_messages' table exists
+      const { error } = await supabase.from('ticker_messages').insert([{
+          text,
+          type,
+          display_order: manualTickerMessages.length + 1
+      }]);
+      if (error) alert("Erreur ajout message: " + error.message);
+  };
+
+  const deleteManualTickerMessage = async (id: string) => {
+      const { error } = await supabase.from('ticker_messages').delete().eq('id', id);
+      if (error) alert("Erreur suppression: " + error.message);
+  };
+
   const renderContent = () => {
      if (currentPath === '/') {
          return <Dashboard 
              data={stats} 
              reports={reports}
-             tickerMessages={tickerMessages} 
+             tickerMessages={combinedTickerMessages} 
              currentSite={currentSite} 
              currentPeriod={currentPeriod} 
              onSiteChange={setCurrentSite} 
@@ -1267,7 +1477,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
                 userRole={userRole}
                 markNotificationAsRead={(n: any) => setNotifications(notifications.map(x => x.id === n.id ? {...x, read: true} : x))}
                 onOpenProfile={() => setIsProfileOpen(true)}
-                onOpenFlashInfo={() => {}} // Placeholder
+                onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
                 onOpenHelp={() => setIsHelpOpen(true)}
                 darkMode={darkMode}
                 onToggleTheme={toggleTheme}
@@ -1280,6 +1490,13 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         {/* Modals */}
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+        <FlashInfoModal 
+            isOpen={isFlashInfoOpen} 
+            onClose={() => setIsFlashInfoOpen(false)} 
+            messages={combinedTickerMessages}
+            onSaveMessage={saveManualTickerMessage}
+            onDeleteMessage={deleteManualTickerMessage}
+        />
         <AddModal 
             isOpen={isAddOpen} 
             onClose={() => setIsAddOpen(false)} 

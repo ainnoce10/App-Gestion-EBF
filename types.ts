@@ -97,6 +97,7 @@ export interface TickerMessage {
   text: string;
   type: 'alert' | 'success' | 'info';
   display_order: number;
+  isManual?: boolean; // Pour distinguer les messages admin des messages auto
 }
 
 export interface Notification {
