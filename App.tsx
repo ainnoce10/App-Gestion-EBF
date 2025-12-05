@@ -621,22 +621,32 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
             authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
         
-        if (err) {
-            console.error("Login Error Full:", err);
-            if (err.message.includes("Email not confirmed")) {
-                throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception.");
-            } else if (err.message.includes("Invalid login credentials")) {
-                throw new Error("Email ou mot de passe incorrect.");
-            } else if (err.message.includes("Phone signups are disabled")) {
-                throw new Error("L'inscription par téléphone est désactivée sur le serveur. Utilisez l'option Email.");
-            } else {
-                throw new Error(err.message);
-            }
-        }
+        if (err) throw err;
         onLoginSuccess();
       }
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue.");
+        console.error("Auth Error:", err);
+        let userMsg = "Une erreur technique est survenue.";
+        // Normalize error message
+        const msg = err.message || err.error_description || JSON.stringify(err);
+
+        if (msg.includes("Invalid login credentials") || msg.includes("invalid_grant")) {
+            userMsg = "Email ou mot de passe incorrect.";
+        } else if (msg.includes("Email not confirmed")) {
+            userMsg = "Veuillez confirmer votre email avant de vous connecter.";
+        } else if (msg.includes("User already registered")) {
+            userMsg = "Un compte existe déjà avec cet email/téléphone.";
+        } else if (msg.includes("Password should be at least")) {
+            userMsg = "Le mot de passe doit contenir au moins 6 caractères.";
+        } else if (msg.includes("Phone signups are disabled")) {
+            userMsg = "L'inscription par téléphone est désactivée. Utilisez l'email.";
+        } else if (msg.includes("Failed to fetch") || msg.includes("Network request failed")) {
+            userMsg = "Problème de connexion internet. Vérifiez votre réseau.";
+        } else if (msg.includes("Too many requests") || msg.includes("rate_limit")) {
+            userMsg = "Trop de tentatives. Veuillez patienter quelques minutes.";
+        }
+
+        setError(userMsg);
     } finally {
       if (!successMsg && !isSignUp) setLoading(false);
     }
@@ -745,6 +755,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 // --- Onboarding Flow ---
 const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => void }) => {
   const [step, setStep] = useState<'message' | 'biometric'>('message');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (step === 'message') {
@@ -760,9 +771,7 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
       localStorage.setItem('ebf_biometric_active', 'true');
       onComplete();
     } else {
-      alert("Votre appareil ne semble pas supporter la biométrie sécurisée.");
-      localStorage.setItem('ebf_biometric_active', 'false'); 
-      onComplete();
+      setError("Votre appareil ne supporte pas l'authentification biométrique sécurisée.");
     }
   };
 
@@ -799,6 +808,7 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
                   </div>
                </div>
                <h3 className="text-2xl font-bold text-center text-gray-800 mb-3 relative z-10">Connexion Rapide</h3>
+               {error && <p className="text-red-500 bg-red-50 p-3 rounded-lg text-sm text-center mb-4 font-bold relative z-10">{error}</p>}
                <p className="text-gray-500 text-center mb-10 leading-relaxed relative z-10">
                   Souhaitez-vous activer la connexion par <strong className="text-gray-800">empreinte digitale</strong> ou <strong className="text-gray-800">reconnaissance faciale</strong> ?
                </p>

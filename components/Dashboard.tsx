@@ -12,7 +12,7 @@ interface DashboardProps {
   data: StatData[];
   reports: DailyReport[];
   tickerMessages: TickerMessage[];
-  stock: StockItem[]; // Ajout de la prop Stock
+  stock: StockItem[];
   currentSite: Site;
   currentPeriod: Period;
   onSiteChange: (site: Site) => void;
@@ -48,27 +48,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [reportToDelete, setReportToDelete] = useState<DailyReport | null>(null);
 
   // --- LOGIC: SCAN STOCK FOR ALERTS ---
+  // Analyse des stocks en temps réel pour injecter des alertes dans le ticker
   const combinedTickerMessages = useMemo(() => {
     // 1. Identifier les stocks critiques
     const stockAlerts: TickerMessage[] = stock
       .filter(item => {
-        // Filtre par site si nécessaire (optionnel, ici on scanne tout ou on respecte le filtre global)
+        // Filtre par site si nécessaire : Global voit tout, sinon filtre par site
         const isSiteRelevant = currentSite === Site.GLOBAL || item.site === currentSite;
+        // Condition d'alerte : Quantité <= Seuil
         return isSiteRelevant && item.quantity <= item.threshold;
       })
       .map(item => ({
         id: `stock-alert-${item.id}`,
+        // Message clair avec icône alerte
         text: `⚠️ STOCK CRITIQUE : ${item.name} (${item.quantity} ${item.unit} restants) à ${item.site}`,
         type: 'alert',
-        display_order: 0, // Priorité haute
+        display_order: 0, // Priorité haute pour apparaître en premier
         isManual: false
       }));
 
-    // 2. Fusionner avec les messages existants (Flash Info Auto & Manuel)
-    // On met les alertes de stock en premier
+    // 2. Fusionner avec les messages existants (Flash Info Auto & Manuel passés via props)
+    // Les alertes stock sont placées en premier
     return [...stockAlerts, ...tickerMessages];
   }, [stock, tickerMessages, currentSite]);
-
 
   // Filter Data Logic
   const filteredData = useMemo(() => {
@@ -81,7 +83,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const now = new Date();
       let matchPeriod = true;
 
-      // Reset time parts for accurate day comparison
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -104,10 +105,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Filter Reports Logic for Satisfaction
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
-      // 1. Site Filter
       const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
       
-      // 2. Date Filter (Same logic as stats)
       const date = new Date(r.date);
       const now = new Date();
       let matchPeriod = true;
@@ -254,7 +253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           {/* Container dupliqué pour animation infinie */}
           <div className="animate-ticker flex items-center pl-4 group-hover:pause">
-            {/* Séquence 1 avec Marge Droite pour la Pause */}
+            {/* Séquence 1 */}
             <div className="flex space-x-12 items-center pr-96 min-w-max">
               {combinedTickerMessages.map((msg) => (
                 <div key={msg.id} className="flex items-center space-x-2 whitespace-nowrap">
@@ -272,7 +271,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               ))}
             </div>
 
-            {/* Séquence 2 (Copie exacte pour la boucle) */}
+            {/* Séquence 2 (Copie pour boucle) */}
             <div className="flex space-x-12 items-center pr-96 min-w-max">
               {combinedTickerMessages.map((msg) => (
                 <div key={`dup-${msg.id}`} className="flex items-center space-x-2 whitespace-nowrap">
