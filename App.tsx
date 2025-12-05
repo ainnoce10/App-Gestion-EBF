@@ -519,18 +519,6 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-
-  // Auto-login Effect for Biometrics simulation
-  useEffect(() => {
-    const checkBio = async () => {
-      const bioActive = localStorage.getItem('ebf_biometric_active');
-      if (bioActive === 'true') {
-        // Here we would trigger the native WebAuthn prompt
-        console.log("Biometric auto-login triggered");
-      }
-    };
-    checkBio();
-  }, []);
   
   const handleAuth = async () => {
     setLoading(true); setError(''); setSuccessMsg('');
@@ -592,11 +580,9 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         );
         if (err) throw err;
         
-        // La suite logique (message de rôle + biométrie) est gérée par le composant BiometricOnboarding
-        // déclenché par le changement de session dans App
+        // Pas de redirection manuelle ici, on laisse le useEffect d'App.tsx gérer le changement d'état "SIGNED_IN"
       }
     } catch (err: any) {
-      // ⛔️ Message d'erreur strict demandé
       setError("Email ou mot de passe incorrect.");
     } finally {
       if (!successMsg) setLoading(false);
@@ -693,21 +679,24 @@ const BiometricOnboarding = ({ profile, onComplete }: { profile: Profile | null,
   useEffect(() => {
     // Transition from Message to Modal after short delay for readability
     if (step === 'message') {
-      const timer = setTimeout(() => setStep('modal'), 2000);
+      const timer = setTimeout(() => setStep('modal'), 2500); // 2.5s pour lire le message
       return () => clearTimeout(timer);
     }
   }, [step]);
 
   const handleEnableBiometrics = () => {
-    // Check Native Capability (Mocked here for PWA context, would use navigator.credentials.create in real impl)
+    // Check Native Capability
     if (window.PublicKeyCredential) {
       localStorage.setItem('ebf_biometric_active', 'true');
+      localStorage.setItem('ebf_biometric_choice', 'true'); // Flag to not show again
       alert("Biométrie configurée avec succès !");
+      onComplete();
     } else {
       alert("Votre appareil ne supporte pas la biométrie via le navigateur.");
+      // Even if failed, mark as asked so we don't spam
+      localStorage.setItem('ebf_biometric_choice', 'skipped');
+      onComplete();
     }
-    localStorage.setItem('ebf_biometric_choice', 'true'); // Flag to not show again
-    onComplete();
   };
 
   const handleSkip = () => {
@@ -719,11 +708,18 @@ const BiometricOnboarding = ({ profile, onComplete }: { profile: Profile | null,
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-green-900/90 backdrop-blur-md transition-all duration-500">
       
       {/* 1. Success Message Toast */}
-      <div className={`transition-all duration-700 transform ${step === 'message' ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'} bg-white p-6 rounded-xl shadow-2xl max-w-md text-center border-l-8 border-ebf-green mb-8`}>
-        <CheckCircle className="mx-auto text-ebf-green mb-3 h-12 w-12" />
-        <h3 className="text-xl font-bold text-green-900 mb-1">Connexion réussie</h3>
-        <p className="text-gray-600 font-medium">Vous allez vous connecter en tant que <span className="text-ebf-orange font-bold uppercase">{profile?.role || '...'}</span>.</p>
-      </div>
+      {step === 'message' && (
+        <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md text-center border-l-8 border-ebf-green animate-fade-in">
+            <div className="mx-auto bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="text-ebf-green h-8 w-8" />
+            </div>
+            <h3 className="text-2xl font-bold text-green-900 mb-2">Connexion réussie</h3>
+            <p className="text-gray-600 font-medium text-lg">
+                Vous allez vous connecter en tant que <br/>
+                <span className="text-ebf-orange font-bold uppercase text-xl mt-2 inline-block">{profile?.role || '...'}</span>
+            </p>
+        </div>
+      )}
 
       {/* 2. Biometric Modal */}
       {step === 'modal' && (
@@ -755,6 +751,13 @@ const BiometricOnboarding = ({ profile, onComplete }: { profile: Profile | null,
   );
 };
 
+// --- Loading Screen ---
+const LoadingScreen = () => (
+    <div className="h-screen w-screen flex flex-col items-center justify-center bg-green-50">
+        <Loader2 size={48} className="text-ebf-green animate-spin mb-4"/>
+        <p className="text-green-900 font-bold animate-pulse">Chargement EBF Manager...</p>
+    </div>
+);
 
 // --- Module Placeholder (Lists) ---
 const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, color, currentSite, currentPeriod, readOnly }: any) => {
@@ -1077,14 +1080,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
       if (notifData) setNotifications(notifData);
       
-      // Fetch manual ticker messages (mocking table if not exists, or implementing logic)
-      // Assuming table 'ticker_messages' exists
+      // Fetch manual ticker messages
       const { data: tickerData } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
       if (tickerData) {
           const manual = tickerData.map((m: any) => ({ ...m, isManual: true }));
           setManualTickerMessages(manual);
       } else {
-          // If no table, use default manual ones from constants as fallback? No, strict manual requirement.
           setManualTickerMessages([]); 
       }
     };
@@ -1223,9 +1224,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   // Combine Manual (First) + Auto (Second)
   const combinedTickerMessages = useMemo(() => {
-     // If no messages at all, we return empty array (no fake fallback)
      if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
-     
      return [...manualTickerMessages, ...autoTickerMessages];
   }, [manualTickerMessages, autoTickerMessages]);
 
@@ -1271,7 +1270,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       // Auto-inject Site if missing and relevant
       if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
       
-      // CONVERSION DES TYPES (Important pour les inputs HTML qui renvoient des strings)
+      // CONVERSION DES TYPES
       const config = FORM_CONFIGS[crudTarget];
       const processedData = { ...formData };
       
@@ -1294,7 +1293,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   // --- Flash Info Manual Management ---
   const saveManualTickerMessage = async (text: string, type: string) => {
-      // Assuming 'ticker_messages' table exists
       const { error } = await supabase.from('ticker_messages').insert([{
           text,
           type,
@@ -1530,43 +1528,35 @@ function App() {
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
   const [showBiometricFlow, setShowBiometricFlow] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // New Global Loading State
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        if (session) handleSessionInit(session);
-    });
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-            setIsPasswordResetOpen(true);
-        }
-        
-        // On Login Success, check for Biometric flow
-        if (event === 'SIGNED_IN' && session) {
-           const bioChoice = localStorage.getItem('ebf_biometric_choice');
-           if (!bioChoice) {
-             setShowBiometricFlow(true);
-           }
-        }
-
-        setSession(session);
-        if (session) handleSessionInit(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
+  // Centralized Session Initialization Logic
   const handleSessionInit = async (session: any) => {
-      await fetchUserProfile(session.user.id);
+      setIsLoading(true);
+      try {
+        const profile = await fetchUserProfile(session.user.id);
+        
+        // Determine Biometric Flow
+        const bioChoice = localStorage.getItem('ebf_biometric_choice');
+        if (!bioChoice) {
+           setShowBiometricFlow(true);
+        } else {
+           setShowBiometricFlow(false);
+        }
+      } catch (e) {
+        console.error("Initialization error", e);
+      } finally {
+        setIsLoading(false);
+      }
   };
 
   const fetchUserProfile = async (userId: string) => {
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       
+      // Auto-create profile if missing (Fallback)
       if (!data) {
           const { data: userData } = await supabase.auth.getUser();
           const meta = userData.user?.user_metadata;
-          
           if (meta) {
               const newProfile = {
                   id: userId,
@@ -1583,16 +1573,43 @@ function App() {
       if (data) {
           setUserRole(data.role);
           setUserProfile(data);
+          return data;
       }
+      return null;
   };
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        if (session) handleSessionInit(session);
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') setIsPasswordResetOpen(true);
+        if (event === 'SIGNED_IN' && session) {
+            setSession(session);
+            handleSessionInit(session); // Re-trigger init on fresh login
+        } else if (event === 'SIGNED_OUT') {
+            setSession(null);
+            setUserProfile(null);
+            setShowBiometricFlow(false);
+        }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 1. Loading State (Priority)
+  if (isLoading) return <LoadingScreen />;
+
+  // 2. Not Logged In
   if (!session) return <LoginScreen onLogin={() => {}} />;
 
-  // Si on est connecté mais qu'on doit montrer l'onboarding biométrique
+  // 3. Biometric Flow (After Login + Profile Loaded)
   if (showBiometricFlow) {
     return <BiometricOnboarding profile={userProfile} onComplete={() => setShowBiometricFlow(false)} />;
   }
 
+  // 4. Main App
   return (
     <>
       <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userRole} userProfile={userProfile} />
