@@ -1106,7 +1106,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const renderContent = () => {
-     if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={combinedTickerMessages} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
+     if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
      if (currentPath === '/synthesis') return <DetailedSynthesis data={stats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
      const section = currentPath.substring(1);
      if (MODULE_ACTIONS[section]) return (

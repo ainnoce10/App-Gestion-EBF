@@ -4,18 +4,19 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X } from 'lucide-react';
-import { StatData, Site, Period, TickerMessage, DailyReport } from '../types';
+import { StatData, Site, Period, TickerMessage, DailyReport, StockItem } from '../types';
 
 interface DashboardProps {
   data: StatData[];
   reports: DailyReport[];
   tickerMessages: TickerMessage[];
+  stock: StockItem[]; // Ajout de la prop Stock
   currentSite: Site;
   currentPeriod: Period;
   onSiteChange: (site: Site) => void;
   onPeriodChange: (period: Period) => void;
   onNavigate: (path: string) => void;
-  onDeleteReport: (id: string) => void; // Added prop for deletion
+  onDeleteReport: (id: string) => void;
 }
 
 const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass, bgClass, borderClass }: any) => (
@@ -40,9 +41,32 @@ const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass, bgClass
 );
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-  data, reports, tickerMessages, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate, onDeleteReport 
+  data, reports, tickerMessages, stock, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate, onDeleteReport 
 }) => {
   const [reportToDelete, setReportToDelete] = useState<DailyReport | null>(null);
+
+  // --- LOGIC: SCAN STOCK FOR ALERTS ---
+  const combinedTickerMessages = useMemo(() => {
+    // 1. Identifier les stocks critiques
+    const stockAlerts: TickerMessage[] = stock
+      .filter(item => {
+        // Filtre par site si nécessaire (optionnel, ici on scanne tout ou on respecte le filtre global)
+        const isSiteRelevant = currentSite === Site.GLOBAL || item.site === currentSite;
+        return isSiteRelevant && item.quantity <= item.threshold;
+      })
+      .map(item => ({
+        id: `stock-alert-${item.id}`,
+        text: `⚠️ STOCK CRITIQUE : ${item.name} (${item.quantity} ${item.unit} restants) à ${item.site}`,
+        type: 'alert',
+        display_order: 0, // Priorité haute
+        isManual: false
+      }));
+
+    // 2. Fusionner avec les messages existants (Flash Info Auto & Manuel)
+    // On met les alertes de stock en premier
+    return [...stockAlerts, ...tickerMessages];
+  }, [stock, tickerMessages, currentSite]);
+
 
   // Filter Data Logic
   const filteredData = useMemo(() => {
@@ -141,7 +165,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-6 animate-fade-in pb-10">
       
       {/* Ticker Tape - BOUCLE INFINIE */}
-      {tickerMessages.length > 0 && (
+      {combinedTickerMessages.length > 0 && (
         <div className="bg-green-950 text-ebf-white p-2 overflow-hidden shadow-md rounded-lg border-b-4 border-ebf-orange relative h-12 flex items-center group">
           <div className="absolute left-0 top-0 bottom-0 z-20 bg-green-950 px-2 flex items-center shadow-lg border-r border-green-800">
             <Clock size={16} className="text-ebf-orange animate-pulse" />
@@ -152,7 +176,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="animate-ticker flex items-center pl-4 group-hover:pause">
             {/* Séquence 1 avec Marge Droite pour la Pause */}
             <div className="flex space-x-12 items-center pr-96 min-w-max">
-              {tickerMessages.map((msg) => (
+              {combinedTickerMessages.map((msg) => (
                 <div key={msg.id} className="flex items-center space-x-2 whitespace-nowrap">
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     msg.type === 'alert' ? 'bg-red-500' : 
@@ -170,7 +194,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Séquence 2 (Copie exacte pour la boucle) */}
             <div className="flex space-x-12 items-center pr-96 min-w-max">
-              {tickerMessages.map((msg) => (
+              {combinedTickerMessages.map((msg) => (
                 <div key={`dup-${msg.id}`} className="flex items-center space-x-2 whitespace-nowrap">
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     msg.type === 'alert' ? 'bg-red-500' : 
