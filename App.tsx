@@ -201,7 +201,8 @@ const getPermission = (path: string, role: Role): { canWrite: boolean } => {
   if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
   if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
   
-  // Par défaut, lecture seule pour les autres sections
+  // TOUT LE RESTE (y compris /equipe, /comptabilite) est Lecture Seule pour les non-Admins
+  // Cela empêche les autres rôles de modifier les sections critiques
   return { canWrite: false };
 };
 
@@ -253,7 +254,6 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
 };
 
 // --- EBF Logo ---
-// Extrait du changement :
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
   const [imgError, setImgError] = useState(false); // Nouvel état pour gérer l'erreur
   
@@ -273,6 +273,7 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
     </div>
   );
 };
+
 // --- Login Screen (Redesigned - Light Theme) ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
@@ -296,7 +297,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     setLoading(true); setError(''); setSuccessMsg('');
 
     // --- IMPORTANT: Nettoyage des entrées (Trim) ---
-    // Les espaces à la fin sont la cause n°1 des erreurs "Invalid login credentials" après inscription.
     const cleanIdentifier = identifier.trim();
     const cleanPassword = password.trim();
     const cleanName = fullName.trim();
@@ -313,7 +313,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         // --- INSCRIPTION ---
         const metadata = { full_name: cleanName, role: role, site: site };
         
-        // Tentative d'inscription
         let signUpResp;
         if (authMethod === 'email') {
           signUpResp = await supabase.auth.signUp({ email: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
@@ -323,10 +322,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
         if (signUpResp.error) throw signUpResp.error;
 
-        // --- GESTION POST-INSCRIPTION ---
-        // Si Supabase renvoie une session, l'email confirmation est OFF (ou non requis) -> On connecte direct
         if (signUpResp.data.session) {
-             // Création immédiate du profil car on est connecté
              const userId = signUpResp.data.user?.id;
              if (userId) {
                  await supabase.from('profiles').upsert([{
@@ -338,7 +334,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      site: site
                  }]);
                  
-                 // Ajout technique si nécessaire
                  if (role !== 'Visiteur') {
                      let specialty = role as string;
                      if (role === 'Admin') specialty = 'Administration';
@@ -351,11 +346,9 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      }]);
                  }
              }
-             // TRIGGER AUTO-LOGIN SUCCESS
              onLoginSuccess();
              return;
         } else if (signUpResp.data.user && !signUpResp.data.session) {
-            // Si user créé mais pas de session -> Email confirmation requis
             setSuccessMsg("Compte créé ! Veuillez vérifier vos emails pour valider l'inscription avant de vous connecter.");
             setIsSignUp(false);
         } else {
@@ -371,7 +364,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         
         if (err) {
             console.error("Login Error Full:", err);
-            // Gestion explicite des erreurs pour guider l'utilisateur
             if (err.message.includes("Email not confirmed")) {
                 throw new Error("Votre email n'est pas confirmé. Vérifiez votre boîte de réception (et spams).");
             } else if (err.message.includes("Invalid login credentials")) {
@@ -381,14 +373,12 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
             }
         }
         
-        // Success -> Callback to parent to trigger onboarding flow
         onLoginSuccess();
       }
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
     } finally {
       if (!successMsg && !isSignUp) setLoading(false);
-      // Note: On laisse le loading true si auto-login pour éviter le flash
     }
   };
 
@@ -1273,7 +1263,13 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     return (
         <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                <div><h2 className={`text-2xl font-bold text-gray-800`}>{title}</h2><p className="text-sm text-gray-500">{subtitle}</p></div>
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h2 className={`text-2xl font-bold text-gray-800`}>{title}</h2>
+                        {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200"><Lock size={12}/> Lecture Seule</span>}
+                    </div>
+                    <p className="text-sm text-gray-500">{subtitle}</p>
+                </div>
                 <div className="flex gap-2"><button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 font-bold hover:bg-gray-50">Retour</button>{!readOnly && onAdd && <button onClick={onAdd} className="bg-ebf-orange text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow hover:bg-orange-600"><Plus size={18}/> Ajouter</button>}</div>
             </div>
             <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100"><div className="overflow-x-auto"><table className="w-full min-w-[600px]"><thead className={`bg-gray-50 border-b border-gray-100`}><tr>{columns.length > 0 ? columns.map(col => (<th key={col} className="p-4 text-left text-xs font-bold uppercase text-gray-500">{COLUMN_LABELS[col] || col}</th>)) : <th className="p-4 text-left font-bold text-gray-500">Info</th>}{!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500">Actions</th>}</tr></thead><tbody className="divide-y divide-gray-100">{filteredItems.length === 0 ? <tr><td colSpan={columns.length + 1} className="p-8 text-center text-gray-400">Aucune donnée.</td></tr> : filteredItems.map((item: any, i: number) => (<tr key={i} className="hover:bg-gray-50 transition">{columns.map(col => (<td key={col} className="p-4 text-sm text-gray-800">{renderCell(col, item[col])}</td>))}{!readOnly && onDelete && (<td className="p-4 text-right flex justify-end gap-2"><button onClick={() => onDelete(item)} className="p-1.5 text-red-500 bg-red-50 rounded hover:bg-red-100"><Trash2 size={16}/></button></td>)}</tr>))}</tbody></table></div></div>
@@ -1284,6 +1280,10 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
 const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
   return (
     <div className="space-y-8 animate-fade-in">
+       <div className="flex items-center justify-between">
+           {!readOnly && <h2 className="text-lg font-bold">Nouveau Rapport</h2>}
+           {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200"><Lock size={12}/> Lecture Seule</span>}
+       </div>
        {!readOnly && (
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <button onClick={() => onSelectMode('voice')} className="bg-white border border-gray-100 p-8 rounded-2xl shadow-lg hover:shadow-xl hover:border-indigo-200 transform hover:-translate-y-1 transition text-left relative overflow-hidden group">
@@ -1297,7 +1297,10 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
          </div>
        )}
        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-           <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><ClipboardList className="text-ebf-orange"/> Historique des Derniers Rapports</h3>
+           <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><ClipboardList className="text-ebf-orange"/> Historique des Derniers Rapports</h3>
+                <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 font-bold hover:bg-gray-50">Retour</button>
+           </div>
            <div className="overflow-x-auto"><table className="w-full"><thead className="bg-gray-50 border-b border-gray-100"><tr><th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Date</th><th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Technicien</th><th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Type</th><th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Aperçu</th><th className="p-3 text-right text-xs font-bold uppercase text-gray-500">Actions</th></tr></thead><tbody className="divide-y divide-gray-50">{reports.map((r: any) => (<tr key={r.id} className="hover:bg-gray-50"><td className="p-3 text-sm font-bold text-gray-700">{r.date}</td><td className="p-3 text-sm text-gray-700">{r.technicianName}</td><td className="p-3 text-sm">{r.method === 'Voice' ? <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold flex items-center w-fit gap-1"><Mic size={10}/> Vocal</span> : <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs font-bold flex items-center w-fit gap-1"><FileText size={10}/> Form</span>}</td><td className="p-3 text-sm text-gray-600 truncate max-w-xs">{r.content || '...'}</td><td className="p-3 text-right"><button onClick={() => onViewReport(r)} className="text-ebf-orange hover:text-white hover:bg-ebf-orange transition font-bold text-xs border border-orange-200 px-3 py-1 rounded-md flex items-center gap-1 ml-auto">VOIR</button></td></tr>))}</tbody></table></div>
        </div>
     </div>
