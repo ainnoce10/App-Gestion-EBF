@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -30,7 +29,7 @@ interface MenuItem {
   icon: React.ElementType;
   path: string;
   description?: string;
-  colorClass: string;
+  colorClass?: string;
 }
 
 interface FormField {
@@ -96,12 +95,12 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
 
 // --- Menu Configuration ---
 const MAIN_MENU: MenuItem[] = [
-  { id: 'accueil', label: 'Accueil', icon: LayoutDashboard, path: '/', description: 'Vue d\'ensemble', colorClass: 'text-orange-500' },
-  { id: 'techniciens', label: 'Techniciens', icon: HardHat, path: '/techniciens', description: 'Gestion opérationnelle', colorClass: 'text-gray-600' },
-  { id: 'comptabilite', label: 'Comptabilité', icon: Calculator, path: '/comptabilite', description: 'Finance & RH', colorClass: 'text-gray-600' },
-  { id: 'secretariat', label: 'Secrétariat', icon: FolderOpen, path: '/secretariat', description: 'Administration', colorClass: 'text-gray-600' },
-  { id: 'quincaillerie', label: 'Quincaillerie', icon: ShoppingCart, path: '/quincaillerie', description: 'Logistique & Stocks', colorClass: 'text-gray-600' },
-  { id: 'equipe', label: 'Notre Équipe', icon: Users, path: '/equipe', description: 'Membres & Rôles', colorClass: 'text-gray-600' },
+  { id: 'accueil', label: 'Accueil', icon: LayoutDashboard, path: '/', description: 'Vue d\'ensemble' },
+  { id: 'techniciens', label: 'Techniciens', icon: HardHat, path: '/techniciens', description: 'Gestion opérationnelle' },
+  { id: 'comptabilite', label: 'Comptabilité', icon: Calculator, path: '/comptabilite', description: 'Finance & RH' },
+  { id: 'secretariat', label: 'Secrétariat', icon: FolderOpen, path: '/secretariat', description: 'Administration' },
+  { id: 'quincaillerie', label: 'Quincaillerie', icon: ShoppingCart, path: '/quincaillerie', description: 'Logistique & Stocks' },
+  { id: 'equipe', label: 'Notre Équipe', icon: Users, path: '/equipe', description: 'Membres & Rôles' },
 ];
 
 // --- Sub-Menu Configurations ---
@@ -193,20 +192,17 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
 
 // --- Helper: Permission Check (STRICT) ---
 const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  if (role === 'Admin') return { canWrite: true }; // Admin a tous les droits
-  if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
+  if (role === 'Admin') return { canWrite: true }; 
+  if (role === 'Visiteur') return { canWrite: false }; 
 
-  // Rôles internes spécifiques
   if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
   if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
   if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
   
-  // TOUT LE RESTE est strictement Lecture Seule
   return { canWrite: false };
 };
 
-// --- COMPONENTS ---
-
+// --- EBF Vector Logo ---
 const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
     const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
     const width = 200 * scale;
@@ -255,9 +251,8 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
   );
 };
 
-// --- Module Placeholder (Generic List/Table) ---
+// --- Module Placeholder ---
 const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
-    // Basic Filtering
     const filteredItems = items.filter((item: any) => {
         if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
         if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
@@ -268,7 +263,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
         <div className="space-y-6 animate-fade-in">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-gray-100 shadow-sm transition"><ArrowLeft size={20} className="text-gray-600"/></button>
+                    <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm transition border border-gray-100"><ArrowLeft size={20} className="text-gray-600 hover:text-ebf-orange"/></button>
                     <div>
                         <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                             {title}
@@ -278,7 +273,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                     </div>
                 </div>
                 {!readOnly && onAdd && (
-                    <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow-md hover:opacity-90 transition flex items-center gap-2`}>
+                    <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow-md hover:opacity-90 transition flex items-center gap-2 transform hover:-translate-y-0.5`}>
                         <Plus size={18}/> Ajouter
                     </button>
                 )}
@@ -287,7 +282,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-600">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-100 dark:border-gray-600">
                             <tr>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">ID</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Nom / Client</th>
@@ -302,7 +297,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                 <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucune donnée trouvée.</td></tr>
                             ) : (
                                 filteredItems.map((item: any) => (
-                                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition">
+                                    <tr key={item.id} className="hover:bg-orange-50/30 dark:hover:bg-gray-750 transition">
                                         <td className="p-4 text-sm font-mono text-gray-400">#{item.id.substring(0, 4)}</td>
                                         <td className="p-4">
                                             <p className="font-bold text-gray-800 dark:text-white">{item.name || item.client || item.full_name}</p>
@@ -313,7 +308,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                             {item.date && <span className="block text-xs text-gray-400">{item.date}</span>}
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.site === 'Abidjan' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.site === 'Abidjan' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
                                                 {item.site || 'Global'}
                                             </span>
                                         </td>
@@ -349,7 +344,7 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex items-center gap-3">
-                <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-gray-100 shadow-sm transition"><ArrowLeft size={20} className="text-gray-600"/></button>
+                <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm transition border border-gray-100"><ArrowLeft size={20} className="text-gray-600 hover:text-ebf-orange"/></button>
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                     Rapports Journaliers
                     {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 ml-2"><Lock size={12}/> Lecture Seule</span>}
@@ -358,13 +353,15 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
 
             {!readOnly ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-blue-400">
-                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition"><Mic size={40} /></div>
+                    <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-blue-400 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><Mic size={100} /></div>
+                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition backdrop-blur-sm"><Mic size={40} /></div>
                         <h3 className="text-2xl font-bold mb-2">Rapport Vocal</h3>
                         <p className="text-blue-100">Dictez votre rapport, l'IA le rédige pour vous.</p>
                     </button>
-                    <button onClick={() => onSelectMode('form')} className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-orange-400">
-                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition"><FileText size={40} /></div>
+                    <button onClick={() => onSelectMode('form')} className="bg-gradient-to-br from-ebf-orange to-orange-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-orange-400 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><FileText size={100} /></div>
+                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition backdrop-blur-sm"><FileText size={40} /></div>
                         <h3 className="text-2xl font-bold mb-2">Formulaire Détaillé</h3>
                         <p className="text-orange-100">Saisie manuelle des travaux et finances.</p>
                     </button>
@@ -380,9 +377,9 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Historique Récent</h3>
                 <div className="space-y-3">
                     {reports.slice(0, 5).map((r: any) => (
-                        <div key={r.id} onClick={() => onViewReport(r)} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-orange-50 cursor-pointer transition border border-gray-100 dark:border-gray-600">
+                        <div key={r.id} onClick={() => onViewReport(r)} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-orange-50 cursor-pointer transition border border-gray-100 dark:border-gray-600 group">
                             <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${r.method === 'Voice' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition ${r.method === 'Voice' ? 'bg-blue-100 text-blue-600 group-hover:bg-blue-200' : 'bg-orange-100 text-orange-600 group-hover:bg-orange-200'}`}>
                                     {r.method === 'Voice' ? <Mic size={18} /> : <FileText size={18} />}
                                 </div>
                                 <div>
@@ -390,7 +387,7 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
                                     <p className="text-xs text-gray-500">{r.date}</p>
                                 </div>
                             </div>
-                            <ChevronRight size={18} className="text-gray-400"/>
+                            <ChevronRight size={18} className="text-gray-400 group-hover:text-ebf-orange"/>
                         </div>
                     ))}
                     {reports.length === 0 && <p className="text-gray-400 text-center italic">Aucun rapport.</p>}
@@ -405,24 +402,24 @@ const HelpModal = ({ isOpen, onClose }: any) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border border-gray-100">
+            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border-t-4 border-green-500">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><HelpCircle className="text-green-500"/> Aide & Support</h3>
-                    <button onClick={onClose}><X className="text-gray-400"/></button>
+                    <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
                 </div>
                 <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
                     <p><strong>Flash Info :</strong> Les messages automatiques sont générés par l'IA en fonction de la rentabilité.</p>
                     <p><strong>Mode Sombre :</strong> Activez-le dans les paramètres pour réduire la fatigue visuelle.</p>
                     <p><strong>Export PDF :</strong> Disponible dans le tableau de bord pour imprimer les rapports.</p>
-                    <p><strong>Support Technique :</strong> Contactez l'admin au 07 07 00 00 00.</p>
+                    <p className="bg-orange-50 p-2 rounded border border-orange-100 text-orange-800"><strong>Support Technique :</strong> Contactez l'admin au 07 07 00 00 00.</p>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Login Screen (Redesigned - Light Theme) ---
+// --- Login Screen (Redesigned - Rich & Vibrant) ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
@@ -494,7 +491,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
              onLoginSuccess();
              return;
         } else {
-            // Fallback error if session is null but no explicit error (rare with auto-confirm)
              setError("Compte créé mais connexion bloquée. ALERTE CONFIG : Veuillez DÉSACTIVER 'Confirm Email' dans votre dashboard Supabase > Auth > Providers.");
         }
 
@@ -525,27 +521,31 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ebf-pattern p-4 font-sans">
-       <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 relative overflow-hidden animate-fade-in">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-orange-600"></div>
+    <div className="min-h-screen flex items-center justify-center bg-ebf-pattern p-4 font-sans relative">
+       {/* Background accent overlay */}
+       <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-orange-500/10 pointer-events-none"></div>
+
+       <div className="glass-panel p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md relative overflow-hidden animate-fade-in border-t-4 border-ebf-orange">
           
           <div className="flex flex-col items-center mb-8">
-             <EbfLogo size="large" />
-             <h2 className="text-2xl font-bold text-gray-800 mt-6 tracking-tight">
-                 {isResetMode ? "Récupération" : (isSignUp ? "Créer un Compte" : "Connexion")}
+             <div className="bg-white p-4 rounded-full shadow-lg mb-4">
+                 <EbfLogo size="normal" />
+             </div>
+             <h2 className="text-2xl font-extrabold text-gray-800 mt-2 tracking-tight">
+                 {isResetMode ? "Récupération" : (isSignUp ? "Rejoindre l'équipe" : "Espace Connexion")}
              </h2>
-             <p className="text-gray-400 text-sm mt-1">Gérez vos activités en temps réel</p>
+             <p className="text-gray-500 text-sm mt-1 font-medium">Gérez vos activités en temps réel</p>
           </div>
           
           {error && (
-             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in">
+             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in shadow-sm">
                 <AlertCircle size={18} className="flex-shrink-0"/> 
                 <span>{error}</span>
              </div>
           )}
           
           {successMsg && (
-             <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in">
+             <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in shadow-sm">
                 <CheckCircle size={18} className="flex-shrink-0"/> <span>{successMsg}</span>
              </div>
           )}
@@ -564,13 +564,13 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Nom Complet</label>
                             <div className="relative">
                                 <User className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium" placeholder="Ex: Jean Kouassi" />
+                                <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="Ex: Jean Kouassi" />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Rôle</label>
-                                <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer">
+                                <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
                                     <option value="Visiteur">Visiteur</option>
                                     <option value="Technicien">Technicien</option>
                                     <option value="Secretaire">Secretaire</option>
@@ -580,7 +580,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Site</label>
-                                <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer">
+                                <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
                                     <option value="Abidjan">Abidjan</option>
                                     <option value="Bouaké">Bouaké</option>
                                 </select>
@@ -593,7 +593,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">{authMethod === 'email' ? 'Adresse Email' : 'Numéro de Téléphone'}</label>
                     <div className="relative">
                         {authMethod === 'email' ? <Mail className="absolute left-3 top-3 text-gray-400" size={18}/> : <Phone className="absolute left-3 top-3 text-gray-400" size={18}/>}
-                        <input required value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium" placeholder={authMethod === 'email' ? 'exemple@ebf.ci' : '0707070707'} />
+                        <input required value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder={authMethod === 'email' ? 'exemple@ebf.ci' : '0707070707'} />
                     </div>
                 </div>
                 
@@ -605,7 +605,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                     </div>
                     <div className="relative">
                         <Lock className="absolute left-3 top-3 text-gray-400" size={18}/>
-                        <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium" placeholder="••••••••" />
+                        <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="••••••••" />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
@@ -613,7 +613,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                 </div>
                 )}
                 
-                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2">
+                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2 shadow-orange-200">
                     {loading ? <Loader2 className="animate-spin" size={20}/> : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter"))}
                 </button>
             </form>
@@ -639,7 +639,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   );
 };
 
-// --- Onboarding Flow: Message -> Biometric Prompt ---
+// --- Onboarding Flow ---
 const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => void }) => {
   const [step, setStep] = useState<'message' | 'biometric'>('message');
 
@@ -671,8 +671,7 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
   return (
      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-900/50 backdrop-blur-md transition-all duration-700">
         {step === 'message' && (
-           <div className="bg-white p-10 rounded-3xl shadow-2xl max-w-lg w-full text-center border border-white/40 animate-fade-in relative overflow-hidden mx-4">
-              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-orange-600"></div>
+           <div className="bg-white p-10 rounded-3xl shadow-2xl max-w-lg w-full text-center border-t-4 border-ebf-green animate-fade-in relative overflow-hidden mx-4">
               <div className="mx-auto bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100">
                   <CheckCircle className="text-green-600 h-10 w-10" />
               </div>
@@ -687,7 +686,7 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
         )}
 
         {step === 'biometric' && (
-           <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full mx-4 border border-white/40 animate-slide-in relative overflow-hidden">
+           <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full mx-4 border-t-4 border-ebf-orange animate-slide-in relative overflow-hidden">
                <div className="absolute -top-10 -right-10 text-gray-50 opacity-50 pointer-events-none">
                   <ScanFace size={200} />
                </div>
@@ -731,8 +730,8 @@ const ConfirmationModal = ({
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border border-gray-100">
+      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-red-500">
         <div className="flex flex-col items-center text-center">
           <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600"><AlertTriangle size={28} /></div>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{title}</h3>
@@ -766,8 +765,8 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border border-gray-100">
+      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{config.title}</h3>
         <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
           {config.fields.map((field: FormField) => (
@@ -819,8 +818,8 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMess
 
     return (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl p-6 shadow-2xl animate-fade-in flex flex-col max-h-[85vh] border border-gray-100">
+            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl p-6 shadow-2xl animate-fade-in flex flex-col max-h-[85vh] border-t-4 border-blue-500">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <Megaphone className="text-ebf-orange"/> Configuration Flash Info
@@ -903,8 +902,8 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border border-gray-100">
+      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-purple-500">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Mon Profil</h3>
         <div className="space-y-4">
            <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
@@ -940,10 +939,10 @@ const HeaderWithNotif = ({
     const canEditFlashInfo = userRole === 'Admin';
 
     return (
-        <header className="bg-white border-b border-gray-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
+        <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
            <div className="flex items-center gap-4">
               <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-600"><Menu/></button>
-              <h2 className="text-lg font-bold text-gray-800 hidden md:block tracking-tight">{title}</h2>
+              <h2 className="text-lg font-extrabold text-green-950 hidden md:block tracking-tight">{title}</h2>
            </div>
            <div className="flex items-center gap-3">
                <div className="flex items-center gap-3 border-l pl-4 ml-2 border-gray-200">
@@ -951,7 +950,7 @@ const HeaderWithNotif = ({
                      <p className="text-sm font-bold text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
                      <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600 flex items-center justify-center font-bold text-lg shadow-inner border border-gray-200">
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg shadow-inner border border-green-200">
                       {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
                   </div>
                </div>
@@ -1025,7 +1024,7 @@ const HeaderWithNotif = ({
                          </button>
                          
                          <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-                         <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 text-sm font-bold text-red-600">
+                         <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 text-sm font-bold text-red-600 bg-red-50/50">
                              <LogOut size={18}/> Se déconnecter
                          </button>
                       </div>
@@ -1232,26 +1231,26 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   return (
     <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
-        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 text-gray-800 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto shadow-xl border-r border-gray-100 flex flex-col`}>
-            <div className="flex items-center justify-between h-16 px-6 bg-white dark:bg-gray-800 border-b border-gray-100"><div className="transform scale-75 origin-left"><EbfLogo /></div><button onClick={() => setIsMenuOpen(false)} className="lg:hidden text-gray-400"><X /></button></div>
+        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto shadow-2xl flex flex-col`}>
+            <div className="flex items-center justify-between h-20 px-6 bg-green-950/50"><div className="transform scale-75 origin-left bg-white rounded-full p-2"><EbfLogo size="small" /></div><button onClick={() => setIsMenuOpen(false)} className="lg:hidden text-gray-400 hover:text-white"><X /></button></div>
             <div className="p-4 flex-1 overflow-y-auto">
-                <nav className="space-y-1">
+                <nav className="space-y-2">
                     {MAIN_MENU.map(item => (
-                        <button key={item.id} onClick={() => handleNavigate(item.path)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'bg-orange-50 text-orange-600 font-bold border-r-4 border-ebf-orange' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
-                            <item.icon size={20} className={`${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'text-ebf-orange' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                        <button key={item.id} onClick={() => handleNavigate(item.path)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 group ${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'bg-ebf-orange text-white font-bold shadow-lg transform scale-105' : 'text-gray-300 hover:bg-green-900 hover:text-white'}`}>
+                            <item.icon size={20} className={`${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
                             <span>{item.label}</span>
                         </button>
                     ))}
                 </nav>
             </div>
-            <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+            <div className="p-4 bg-green-900/30">
                 <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-gray-600 text-sm border border-gray-200 shadow-sm">
+                    <div className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center font-bold text-white text-sm border border-green-700">
                         {userProfile?.full_name?.charAt(0) || 'U'}
                     </div>
                     <div className="overflow-hidden">
-                        <p className="text-sm font-bold truncate text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
-                        <p className="text-xs text-gray-400 truncate">{userRole}</p>
+                        <p className="text-sm font-bold truncate text-white">{userProfile?.full_name || 'Utilisateur'}</p>
+                        <p className="text-xs text-gray-300 truncate opacity-80">{userRole}</p>
                     </div>
                 </div>
             </div>
@@ -1272,7 +1271,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
                  onToggleTheme={toggleTheme} 
                  onResetBiometrics={handleResetBiometrics}
              />
-             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-gray-50 dark:bg-gray-900">{renderContent()}</main>
+             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-ebf-pattern dark:bg-gray-900">{renderContent()}</main>
         </div>
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
@@ -1345,12 +1344,10 @@ export default function App() {
          setSession(existingSession);
          const profile = await fetchUserProfile(existingSession.user.id);
          
-         // CHECK BIOMETRIC PREFERENCE for "Instant Login"
          const bioActive = localStorage.getItem('ebf_biometric_active');
          if (bioActive === 'true') {
              setAppState('APP');
          } else {
-             // Default to APP if session exists, Onboarding only on Explicit Login
              setAppState('APP');
          }
       } else {
@@ -1376,7 +1373,6 @@ export default function App() {
       if (session) {
           setSession(session);
           await fetchUserProfile(session.user.id);
-          // Go to Onboarding Flow
           setAppState('ONBOARDING');
       } else {
           setAppState('LOGIN');
