@@ -92,7 +92,7 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] } // Hidden or fixed normally
     ]
   },
-  // --- NOUVELLES CONFIGURATIONS ---
+  // --- NOUVELLES CONFIGURATIONS RESTAURÉES ---
   chantiers: {
     title: 'Nouveau Chantier',
     fields: [
@@ -297,7 +297,7 @@ const getPermission = (path: string, role: Role): { canWrite: boolean } => {
   return { canWrite: false };
 };
 
-// --- EBF Vector Logo (Globe + Plug) ---
+// --- EBF Vector Logo (Globe + Plug) - SQUARE VERSION (rx=0) ---
 const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
     // Scaling factor
     const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
@@ -659,7 +659,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-orange-500/10 pointer-events-none"></div>
        <div className="glass-panel p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md relative overflow-hidden animate-fade-in border-t-4 border-ebf-orange">
           <div className="flex flex-col items-center mb-8">
-             {/* Logo sans rounded-full */}
+             {/* Logo SANS ROUNDED */}
              <div className="bg-white p-4 shadow-lg mb-4">
                  <EbfLogo size="normal" />
              </div>
@@ -1462,6 +1462,14 @@ export default function App() {
       }
 
       if (data) {
+          // --- FORCE ADMIN MODE (POUR LE DÉVELOPPEUR) ---
+          // Cela vous garantit d'être Admin même si la base de données dit "Visiteur"
+          if (data.role !== 'Admin') {
+              console.log("DEV MODE: Promotion automatique en Admin");
+              await supabase.from('profiles').update({ role: 'Admin' }).eq('id', userId);
+              data.role = 'Admin'; // On force la donnée locale
+          }
+
           setUserRole(data.role);
           setUserProfile(data);
           
