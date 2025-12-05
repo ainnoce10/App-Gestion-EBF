@@ -841,8 +841,156 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   );
 };
 
+// --- Help Modal ---
+const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border border-gray-100 dark:border-gray-700">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Aide & Support</h3>
+        <p className="text-gray-600 dark:text-gray-300 mb-4 text-sm">
+          Bienvenue dans EBF Manager. <br/><br/>
+          Si vous rencontrez un problème technique ou avez besoin d'assistance, veuillez contacter le support IT.
+        </p>
+        <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg border border-gray-200 dark:border-gray-600 mb-4">
+           <p className="text-xs font-bold text-gray-500 uppercase">Contact Support</p>
+           <p className="font-bold text-ebf-orange">support@ebf.ci</p>
+           <p className="text-gray-700 dark:text-gray-300">+225 07 07 07 07 07</p>
+        </div>
+        <button onClick={onClose} className="w-full bg-gray-100 text-gray-700 font-bold py-2 rounded-lg hover:bg-gray-200">Fermer</button>
+      </div>
+    </div>
+  );
+};
+
+// --- Module Placeholder (Generic List) ---
+const ModulePlaceholder = ({ title, subtitle, items, onBack, color, onAdd, onDelete, readOnly }: any) => {
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                     <button onClick={onBack} className="p-2 bg-white border border-gray-200 rounded-full shadow hover:bg-gray-50 transition">
+                        <ArrowLeft className="text-gray-600" />
+                     </button>
+                     <div>
+                        <h2 className={`text-2xl font-bold text-gray-800 flex items-center gap-2`}>
+                            <span className={`w-3 h-8 rounded-full ${color}`}></span>
+                            {title}
+                        </h2>
+                        <p className="text-gray-500 text-sm">{subtitle}</p>
+                     </div>
+                </div>
+                {!readOnly && (
+                    <button onClick={onAdd} className="bg-ebf-orange text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-2 shadow-md">
+                        <Plus size={18} /> <span className="hidden md:inline">Ajouter</span>
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                {items.length === 0 ? (
+                    <div className="p-8 text-center text-gray-400">
+                        <Archive size={48} className="mx-auto mb-2 opacity-20" />
+                        <p>Aucun élément trouvé.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b border-gray-100">
+                                <tr>
+                                    {Object.keys(items[0]).filter(k => k !== 'id' && k !== 'created_at').slice(0, 5).map(k => (
+                                        <th key={k} className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{k}</th>
+                                    ))}
+                                    {!readOnly && <th className="px-6 py-3 text-right">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {items.map((item: any) => (
+                                    <tr key={item.id} className="hover:bg-gray-50/50">
+                                        {Object.keys(item).filter(k => k !== 'id' && k !== 'created_at').slice(0, 5).map(k => (
+                                            <td key={k} className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">
+                                                {typeof item[k] === 'object' ? JSON.stringify(item[k]) : item[k]}
+                                            </td>
+                                        ))}
+                                        {!readOnly && (
+                                            <td className="px-6 py-4 text-right">
+                                                <button onClick={() => onDelete(item)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Dummy Waveform Icon for visual
+const WaveformIcon = () => (
+    <svg width="100" height="50" viewBox="0 0 100 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 25L10 15L15 35L20 10L25 40L30 5L35 45L40 20L45 30L50 25L55 25L60 15L65 35L70 10L75 40L80 5L85 45L90 20L95 30" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+// --- Report Mode Selector ---
+const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
+    return (
+        <div className="space-y-6 animate-fade-in">
+             <div className="flex items-center space-x-4 mb-6">
+                <button onClick={onBack} className="p-2 bg-white border border-gray-200 rounded-full shadow hover:bg-gray-50 transition">
+                    <ArrowLeft className="text-gray-600" />
+                </button>
+                <h2 className="text-2xl font-bold text-gray-800">Rapports Journaliers</h2>
+             </div>
+
+             {!readOnly && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <button onClick={() => onSelectMode('voice')} className="p-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg text-white hover:scale-[1.02] transition transform text-left relative overflow-hidden group">
+                        <Mic size={48} className="mb-4 opacity-80" />
+                        <h3 className="text-xl font-bold mb-1">Rapport Vocal</h3>
+                        <p className="text-purple-100 text-sm">Dictez votre rapport, l'IA s'occupe du reste.</p>
+                        <div className="absolute right-0 bottom-0 p-4 opacity-10 group-hover:opacity-20 transition"><WaveformIcon /></div>
+                    </button>
+                    <button onClick={() => onSelectMode('form')} className="p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-ebf-orange hover:bg-orange-50 transition text-left group">
+                        <FileText size={48} className="mb-4 text-gray-400 group-hover:text-ebf-orange transition" />
+                        <h3 className="text-xl font-bold text-gray-700 group-hover:text-ebf-orange transition">Formulaire Standard</h3>
+                        <p className="text-gray-500 text-sm">Remplir les champs manuellement.</p>
+                    </button>
+                 </div>
+             )}
+
+             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                 <h3 className="font-bold text-gray-800 mb-4">Historique Récent</h3>
+                 <div className="space-y-3">
+                     {reports.slice(0, 5).map((r: any) => (
+                         <div key={r.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-gray-300 transition cursor-pointer" onClick={() => onViewReport(r)}>
+                             <div className="flex items-center gap-3">
+                                 <div className={`p-2 rounded-full ${r.method === 'Voice' ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
+                                     {r.method === 'Voice' ? <Mic size={16} /> : <FileText size={16} />}
+                                 </div>
+                                 <div>
+                                     <p className="text-sm font-bold text-gray-800">{r.technicianName}</p>
+                                     <p className="text-xs text-gray-500">{r.date}</p>
+                                 </div>
+                             </div>
+                             <p className="text-sm text-gray-600 truncate max-w-xs hidden md:block">{r.content}</p>
+                         </div>
+                     ))}
+                     {reports.length === 0 && <p className="text-gray-400 text-center italic">Aucun rapport.</p>}
+                 </div>
+             </div>
+        </div>
+    );
+};
+
 // --- App Wrapper with State Machine ---
-function App() {
+export default function App() {
   const [appState, setAppState] = useState<'LOADING' | 'LOGIN' | 'ONBOARDING' | 'APP'>('LOADING');
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<Role>('Visiteur');
