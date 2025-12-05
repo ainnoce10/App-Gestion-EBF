@@ -768,6 +768,25 @@ function App() {
       if (data) {
           setUserRole(data.role);
           setUserProfile(data);
+          
+          // --- FIX: Ensure user is in 'Notre Équipe' (technicians table) if not Visitor ---
+          if (data.role !== 'Visiteur') {
+               const { data: tech } = await supabase.from('technicians').select('id').eq('id', userId).single();
+               if (!tech) {
+                   let specialty = data.role;
+                   if (data.role === 'Admin') specialty = 'Administration';
+                   
+                   await supabase.from('technicians').insert([{
+                       id: userId,
+                       name: data.full_name,
+                       specialty: specialty,
+                       site: data.site,
+                       status: 'Available'
+                   }]);
+               }
+          }
+          // -------------------------------------------------------------------------------
+
           return data;
       }
       return null;
