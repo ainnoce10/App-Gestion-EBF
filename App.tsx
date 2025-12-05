@@ -1107,6 +1107,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
           if (payload.eventType === 'INSERT') setReports(prev => [...prev, payload.new as DailyReport]);
           else if (payload.eventType === 'UPDATE') setReports(prev => prev.map(r => r.id === payload.new.id ? payload.new as DailyReport : r));
+          else if (payload.eventType === 'DELETE') setReports(prev => prev.filter(r => r.id !== payload.old.id));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'technicians' }, (payload) => {
           if (payload.eventType === 'INSERT') setTechnicians(prev => [...prev, payload.new as Technician]);
@@ -1290,6 +1291,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
           setIsAddOpen(false);
       }
   };
+  
+  // Specific handler for Dashboard delete action which has its own modal
+  const handleDeleteDirectly = async (id: string, table: string) => {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) alert("Erreur suppression directe: " + error.message);
+  };
 
   // --- Flash Info Manual Management ---
   const saveManualTickerMessage = async (text: string, type: string) => {
@@ -1317,6 +1324,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
              onSiteChange={setCurrentSite} 
              onPeriodChange={setCurrentPeriod} 
              onNavigate={handleNavigate}
+             onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')}
          />;
      }
      

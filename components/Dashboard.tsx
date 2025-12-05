@@ -1,9 +1,9 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
+import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X } from 'lucide-react';
 import { StatData, Site, Period, TickerMessage, DailyReport } from '../types';
 
 interface DashboardProps {
@@ -15,6 +15,7 @@ interface DashboardProps {
   onSiteChange: (site: Site) => void;
   onPeriodChange: (period: Period) => void;
   onNavigate: (path: string) => void;
+  onDeleteReport: (id: string) => void; // Added prop for deletion
 }
 
 const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass, bgClass, borderClass }: any) => (
@@ -39,8 +40,10 @@ const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass, bgClass
 );
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-  data, reports, tickerMessages, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate 
+  data, reports, tickerMessages, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate, onDeleteReport 
 }) => {
+  const [reportToDelete, setReportToDelete] = useState<DailyReport | null>(null);
+
   // Filter Data Logic
   const filteredData = useMemo(() => {
     return data.filter(d => {
@@ -125,6 +128,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Calculate profit margin percentage
   const marginPercent = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(1) : "0";
+
+  // Handle Delete Confirmation
+  const confirmDelete = () => {
+    if (reportToDelete) {
+      onDeleteReport(reportToDelete.id);
+      setReportToDelete(null);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -294,7 +305,78 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </ResponsiveContainer>
           </div>
         </div>
+
+        {/* --- SECTION DERNIERS RAPPORTS AVEC SUPPRESSION --- */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-orange-100 dark:border-gray-700">
+          <h3 className="text-lg font-bold text-green-900 dark:text-white flex items-center mb-4">
+            <FileText className="mr-2 text-ebf-green" size={20} />
+            Derniers Rapports Journaliers
+          </h3>
+          <div className="overflow-x-auto">
+             <table className="w-full">
+               <thead className="bg-gray-50 border-b border-gray-100">
+                 <tr>
+                   <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Date</th>
+                   <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Technicien</th>
+                   <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Contenu</th>
+                   <th className="p-3 text-right text-xs font-bold uppercase text-gray-500">Actions</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-gray-50">
+                  {filteredReports.slice(0, 5).map((r: any) => (
+                    <tr key={r.id} className="hover:bg-orange-50/50">
+                      <td className="p-3 text-sm font-bold text-gray-700">{r.date}</td>
+                      <td className="p-3 text-sm text-gray-700">{r.technicianName}</td>
+                      <td className="p-3 text-sm text-gray-600 truncate max-w-xs">{r.content || '...'}</td>
+                      <td className="p-3 text-right">
+                         <button 
+                           onClick={() => setReportToDelete(r)}
+                           className="p-1.5 text-red-500 bg-red-50 rounded hover:bg-red-100 transition"
+                           title="Supprimer ce rapport"
+                         >
+                            <Trash2 size={16}/>
+                         </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredReports.length === 0 && (
+                     <tr><td colSpan={4} className="p-4 text-center text-gray-400">Aucun rapport récent.</td></tr>
+                  )}
+               </tbody>
+             </table>
+          </div>
+        </div>
       </div>
+
+      {/* --- CONFIRMATION MODAL (LOCAL TO DASHBOARD) --- */}
+      {reportToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={() => setReportToDelete(null)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border border-red-100">
+                <button onClick={() => setReportToDelete(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20}/></button>
+                <div className="flex flex-col items-center text-center">
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
+                        <AlertTriangle size={28} />
+                    </div>
+                    <h3 className="text-xl font-bold text-green-900 dark:text-white mb-2">Supprimer le rapport ?</h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">
+                        Êtes-vous sûr de vouloir supprimer le rapport de <span className="font-bold">{reportToDelete.technicianName}</span> du <span className="font-bold">{reportToDelete.date}</span> ?
+                        <br/><br/>
+                        <span className="text-red-500 font-bold">Cette action est irréversible.</span>
+                    </p>
+                    <div className="flex gap-4 w-full">
+                        <button onClick={() => setReportToDelete(null)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-bold">
+                            Annuler
+                        </button>
+                        <button onClick={confirmDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-md">
+                            Confirmer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
