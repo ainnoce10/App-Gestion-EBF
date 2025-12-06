@@ -428,7 +428,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                             {filteredItems.length === 0 ? (
-                                <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucune donnée trouvée.</td></tr>
+                                <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucun donnée trouvée.</td></tr>
                             ) : (
                                 filteredItems.map((item: any) => (
                                     <tr key={item.id} className="hover:bg-orange-50/30 dark:hover:bg-gray-750 transition">
@@ -575,7 +575,55 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [loginSuccessRole, setLoginSuccessRole] = useState<string | null>(null);
+  const [preCheckRole, setPreCheckRole] = useState<string | null>(null);
   
+  // --- REAL-TIME SILENT PRE-CHECK ---
+  useEffect(() => {
+    // Only run if not signup/reset mode
+    if (isSignUp || isResetMode) return;
+    
+    // Clear previous check if inputs empty
+    if (!identifier || !password) {
+        setPreCheckRole(null);
+        return;
+    }
+
+    const checkTimeout = setTimeout(async () => {
+        // Minimum length requirements before checking
+        if (password.length < 6) return;
+
+        // SILENT CHECK: Try to sign in. If success, we know credentials are valid.
+        // NOTE: This actually logs the user in the background.
+        // We will use this valid session to pre-fill the role.
+        const cleanIdentifier = identifier.trim();
+        const cleanPassword = password.trim();
+
+        try {
+             const { data, error } = await supabase.auth.signInWithPassword(
+                authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
+            );
+
+            if (data.session && !error) {
+                // SUCCESS! Credentials matched.
+                // Fetch Role for display message
+                const { data: p } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).single();
+                let roleName = p && p.role ? p.role : 'Utilisateur';
+                
+                setPreCheckRole(roleName); // Shows "Vous allez vous connecter..."
+                // We DO NOT call onLoginSuccess() here. We wait for user to click button.
+            } else {
+                setPreCheckRole(null); // Invalid credentials, stay silent
+            }
+        } catch (e) {
+            setPreCheckRole(null);
+        }
+
+    }, 800); // Debounce 800ms after typing stops
+
+    return () => clearTimeout(checkTimeout);
+  }, [identifier, password, authMethod, isSignUp, isResetMode]);
+
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError(''); setSuccessMsg(''); setLoginSuccessRole(null);
@@ -646,6 +694,10 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         }
 
       } else {
+        // LOGIN MODE
+        // Note: If preCheckRole is set, we are technically already signed in from the silent check.
+        // We can just proceed, or sign in again to be sure (safe).
+        
         const { data, error: err } = await supabase.auth.signInWithPassword(
             authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
@@ -768,12 +820,12 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                 </div>
                 )}
 
-                {/* LOGIN SUCCESS MESSAGE AREA */}
-                {loginSuccessRole && (
+                {/* LOGIN SUCCESS MESSAGE AREA (PRE-CHECK) */}
+                {(preCheckRole || loginSuccessRole) && !isSignUp && !isResetMode && (
                     <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center animate-fade-in mb-2">
                         <div className="flex justify-center mb-1"><CheckCircle className="text-green-600" size={24} /></div>
                         <p className="text-green-800 font-bold text-sm">Identité confirmée</p>
-                        <p className="text-green-900 text-xs">Vous allez vous connecter en tant que <span className="font-bold uppercase text-ebf-orange">{loginSuccessRole}</span></p>
+                        <p className="text-green-900 text-xs">Vous allez vous connecter en tant que <span className="font-bold uppercase text-ebf-orange">{loginSuccessRole || preCheckRole}</span></p>
                     </div>
                 )}
 
