@@ -14,14 +14,6 @@ import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, Stock
 import { supabase } from './services/supabaseClient';
 import { MOCK_STATS, MOCK_REPORTS, MOCK_TECHNICIANS, MOCK_STOCK, MOCK_INTERVENTIONS, DEFAULT_TICKER_MESSAGES } from './constants';
 
-// --- CONFIGURATION DEBUG / DEV ---
-// Mettre à FALSE pour réactiver l'écran de connexion
-const DEV_MODE_BYPASS_LOGIN = false; 
-
-// --- FORCE ADMIN (SUPER MODE) ---
-// Mettre à TRUE pour forcer TOUS les utilisateurs connectés à être ADMIN (Pour le développement)
-const FORCE_ADMIN_ON_LOGIN = true;
-
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
   id: string;
@@ -287,35 +279,6 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
   return true;
 };
 
-// --- Helper: Permission Check (DYNAMIC) ---
-const getPermission = (path: string, role: Role, userPermissions: UserPermissions | undefined): { canWrite: boolean } => {
-  // 1. Admin et DG ont TOUS les droits par défaut
-  if (role === 'Admin' || role === 'DG') return { canWrite: true };
-  if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
-
-  // 2. Pour les autres, on regarde la configuration précise définie par l'admin
-  // Par défaut (si undefined), c'est FALSE (Lecture seule à l'inscription)
-  if (!userPermissions) return { canWrite: false };
-
-  // Modules Techniques
-  if (path.startsWith('/techniciens') && userPermissions.technique) return { canWrite: true };
-  
-  // Modules Compta
-  if (path.startsWith('/comptabilite') && userPermissions.comptabilite) return { canWrite: true };
-  
-  // Modules Secrétariat
-  if (path.startsWith('/secretariat') && userPermissions.secretariat) return { canWrite: true };
-  
-  // Modules Stocks
-  if (path.startsWith('/quincaillerie') && userPermissions.quincaillerie) return { canWrite: true };
-  
-  // Modules RH / Equipe
-  if (path.startsWith('/equipe') && userPermissions.rh) return { canWrite: true };
-
-  // Si non explicitement autorisé, c'est lecture seule
-  return { canWrite: false };
-};
-
 // --- EBF Vector Logo (Globe + Plug) - SQUARE VERSION (rx=0) ---
 const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
     // Scaling factor
@@ -366,7 +329,6 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
   const [imgError, setImgError] = useState(false);
   
-  // Fallback to SVG if image fails
   if (imgError) {
       return <EbfSvgLogo size={size} />;
   }
@@ -383,13 +345,10 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
   );
 };
 
-// --- Module Placeholder (Generic List View) ---
+// --- Module Placeholder ---
 const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
-    // Basic filtering based on Site and Date if available in items
     const filteredItems = items.filter((item: any) => {
-        // Site filter
         if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
-        // Period filter (only if item has a date)
         if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
         return true;
     });
@@ -511,7 +470,7 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
             ) : (
                 <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg text-orange-800 text-center">
                     <p className="font-bold flex items-center justify-center gap-2"><Lock size={16}/> Création de rapports désactivée</p>
-                    <p className="text-sm">Vous n'avez pas les droits pour créer de nouveaux rapports.</p>
+                    <p className="text-sm">Activez le "Mode Administrateur" dans les paramètres pour modifier.</p>
                 </div>
             )}
 
@@ -551,95 +510,32 @@ const HelpModal = ({ isOpen, onClose }: any) => {
                     <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
                 </div>
                 <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                    <p><strong>Mode Administrateur :</strong> Pour modifier ou ajouter des données, allez dans les paramètres et cliquez sur "Mode Administrateur".</p>
                     <p><strong>Flash Info :</strong> Les messages automatiques sont générés par l'IA en fonction de la rentabilité.</p>
-                    <p><strong>Mode Sombre :</strong> Activez-le dans les paramètres pour réduire la fatigue visuelle.</p>
-                    <p><strong>Export PDF :</strong> Disponible dans le tableau de bord pour imprimer les rapports.</p>
-                    <p className="bg-orange-50 p-2 rounded border border-orange-100 text-orange-800"><strong>Support Technique :</strong> Contactez l'admin au 07 07 00 00 00.</p>
+                    <p><strong>Export PDF :</strong> Disponible dans le tableau de bord.</p>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Login Screen (Redesigned - Rich & Vibrant) ---
+// --- Login Screen (SIMPLIFIED: No Roles) ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<Role>('Admin'); // DEFAULT ADMIN FOR CONVENIENCE
   const [site, setSite] = useState<Site>(Site.ABIDJAN);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [loginSuccessRole, setLoginSuccessRole] = useState<string | null>(null);
-  const [preCheckRole, setPreCheckRole] = useState<string | null>(null);
   
-  // --- REAL-TIME SILENT PRE-CHECK ---
-  useEffect(() => {
-    // Only run if not signup/reset mode
-    if (isSignUp || isResetMode) return;
-    
-    // Clear previous check if inputs empty
-    if (!identifier || !password) {
-        setPreCheckRole(null);
-        return;
-    }
-
-    const checkTimeout = setTimeout(async () => {
-        // Minimum length requirements before checking
-        if (password.length < 6) return;
-
-        // SILENT CHECK: Try to sign in. If success, we know credentials are valid.
-        // NOTE: This actually logs the user in the background.
-        // We will use this valid session to pre-fill the role.
-        const cleanIdentifier = identifier.trim();
-        const cleanPassword = password.trim();
-
-        try {
-             const { data, error } = await supabase.auth.signInWithPassword(
-                authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
-            );
-
-            if (data.session && !error) {
-                // SUCCESS! Credentials matched.
-                const role = await getDisplayRole(data.session);
-                setPreCheckRole(role); // Shows "Vous allez vous connecter..."
-                // We DO NOT call onLoginSuccess() here. We wait for user to click button.
-            } else {
-                setPreCheckRole(null); // Invalid credentials, stay silent
-            }
-        } catch (e) {
-            setPreCheckRole(null);
-        }
-
-    }, 800); // Debounce 800ms after typing stops
-
-    return () => clearTimeout(checkTimeout);
-  }, [identifier, password, authMethod, isSignUp, isResetMode]);
-
-  // Helper to determine display role
-  const getDisplayRole = async (session: any) => {
-      // 1. Force Admin Flag Override
-      if (FORCE_ADMIN_ON_LOGIN) return 'Admin';
-
-      // 2. Check Metadata (First intent during signup - Most accurate if DB is lagging)
-      const metaRole = session.user?.user_metadata?.role;
-      if (metaRole) return metaRole;
-
-      // 3. Check Profile from DB
-      const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-      if (p && p.role) return p.role;
-
-      return 'Utilisateur'; // Fallback
-  }
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError(''); setSuccessMsg(''); setLoginSuccessRole(null);
+    setLoading(true); setError(''); setSuccessMsg('');
 
     const cleanIdentifier = identifier.trim();
     const cleanPassword = password.trim();
@@ -654,7 +550,8 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
       }
 
       if (isSignUp) {
-        const metadata = { full_name: cleanName, role: role, site: site };
+        // SIMPLIFIED SIGNUP: No Role selection. Default role is 'Technicien' or 'Member'.
+        const metadata = { full_name: cleanName, role: 'Technicien', site: site }; // Default metadata
         let signUpResp;
         if (authMethod === 'email') {
           signUpResp = await supabase.auth.signUp({ email: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
@@ -673,85 +570,53 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      email: authMethod === 'email' ? cleanIdentifier : '',
                      phone: authMethod === 'phone' ? cleanIdentifier : '',
                      full_name: cleanName,
-                     role: role,
+                     role: 'Technicien', // Default Role
                      site: site,
-                     permissions: {} // Default empty = Read Only
+                     permissions: {} 
                  }]);
                  
-                 // Ajout automatique dans 'Notre Équipe' si pas visiteur
-                 if (role !== 'Visiteur') {
-                     let specialty = role as string;
-                     if (role === 'Admin') specialty = 'Administration';
-                     if (role === 'DG') specialty = 'Direction Générale';
-                     
-                     await supabase.from('technicians').upsert([{
-                         id: userId,
-                         name: cleanName,
-                         specialty: specialty,
-                         site: site,
-                         status: 'Available'
-                     }]);
-                 }
+                 // Auto-add to team
+                 await supabase.from('technicians').upsert([{
+                     id: userId,
+                     name: cleanName,
+                     specialty: 'Nouveau Membre',
+                     site: site,
+                     status: 'Available'
+                 }]);
              }
-             // DIRECT SUCCESS LOGIN
-             setLoginSuccessRole(role);
-             setTimeout(() => {
-                 onLoginSuccess();
-             }, 1500);
+             onLoginSuccess();
              return; 
         } else {
-             // NO SESSION = CONFIRMATION REQUIRED BY SERVER
-             // But user asked to assume success and auto-add to team logic is triggered on login if missing
              setIsSignUp(false);
              setSuccessMsg("Inscription réussie ! Si la connexion échoue, vérifiez vos emails pour valider le compte.");
         }
 
       } else {
         // LOGIN MODE
-        // Note: If preCheckRole is set, we are technically already signed in from the silent check.
-        // We can just proceed, or sign in again to be sure (safe).
-        
         const { data, error: err } = await supabase.auth.signInWithPassword(
             authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
         
         if (err) throw err;
-
-        // Fetch Role for display message using the robust helper
-        let roleName = 'Utilisateur';
-        if (data.session) {
-             roleName = await getDisplayRole(data.session);
-        }
-
-        setLoginSuccessRole(roleName);
-        setTimeout(() => {
-            onLoginSuccess();
-        }, 1500);
+        onLoginSuccess();
       }
     } catch (err: any) {
         console.error("Auth Error:", err);
         let userMsg = "Une erreur technique est survenue.";
-        // Normalize error message
         const msg = err.message || err.error_description || JSON.stringify(err);
 
         if (msg.includes("Invalid login credentials") || msg.includes("invalid_grant")) {
-            userMsg = "Email ou mot de passe incorrect (ou email non confirmé par le serveur).";
-        } else if (msg.includes("Email not confirmed")) {
-            userMsg = "Votre email n'est pas encore confirmé. Vérifiez votre boîte mail (et les spams).";
+            userMsg = "Email ou mot de passe incorrect.";
         } else if (msg.includes("User already registered")) {
             userMsg = "Un compte existe déjà avec cet email/téléphone. Connectez-vous.";
         } else if (msg.includes("Password should be at least")) {
             userMsg = "Le mot de passe doit contenir au moins 6 caractères.";
         } else if (msg.includes("Phone signups are disabled")) {
             userMsg = "L'inscription par téléphone est désactivée. Utilisez l'email.";
-        } else if (msg.includes("Failed to fetch") || msg.includes("Network request failed")) {
-            userMsg = "Problème de connexion internet. Vérifiez votre réseau.";
-        } else if (msg.includes("Too many requests") || msg.includes("rate_limit")) {
-            userMsg = "Trop de tentatives. Veuillez patienter quelques minutes.";
         }
 
         setError(userMsg);
-        setLoading(false); // Only stop loading on error (on success we wait for timeout)
+        setLoading(false); 
     }
   };
 
@@ -760,12 +625,11 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-orange-500/10 pointer-events-none"></div>
        <div className="glass-panel p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md relative overflow-hidden animate-fade-in border-t-4 border-ebf-orange">
           <div className="flex flex-col items-center mb-8">
-             {/* Logo SANS ROUNDED */}
              <div className="bg-white p-4 shadow-lg mb-4">
                  <EbfLogo size="normal" />
              </div>
              <h2 className="text-2xl font-extrabold text-gray-800 mt-2 tracking-tight">
-                 {isResetMode ? "Récupération" : (isSignUp ? "Rejoindre l'équipe" : "Espace Connexion")}
+                 {isResetMode ? "Récupération" : (isSignUp ? "Créer un compte" : "Connexion EBF")}
              </h2>
              <p className="text-gray-500 text-sm mt-1 font-medium">Gérez vos activités en temps réel</p>
           </div>
@@ -787,25 +651,12 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                                 <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="Ex: Jean Kouassi" />
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Rôle</label>
-                                <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
-                                    <option value="Admin">Admin</option>
-                                    <option value="DG">Directeur Général (DG)</option>
-                                    <option value="Visiteur">Visiteur</option>
-                                    <option value="Technicien">Technicien</option>
-                                    <option value="Secretaire">Secretaire</option>
-                                    <option value="Magasinier">Magasinier</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Site</label>
-                                <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
-                                    <option value="Abidjan">Abidjan</option>
-                                    <option value="Bouaké">Bouaké</option>
-                                </select>
-                            </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Site Principal</label>
+                            <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
+                                <option value="Abidjan">Abidjan</option>
+                                <option value="Bouaké">Bouaké</option>
+                            </select>
                         </div>
                     </div>
                 )}
@@ -832,17 +683,8 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                 </div>
                 )}
 
-                {/* LOGIN SUCCESS MESSAGE AREA (PRE-CHECK) */}
-                {(preCheckRole || loginSuccessRole) && !isSignUp && !isResetMode && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center animate-fade-in mb-2">
-                        <div className="flex justify-center mb-1"><CheckCircle className="text-green-600" size={24} /></div>
-                        <p className="text-green-800 font-bold text-sm">Identité confirmée</p>
-                        <p className="text-green-900 text-xs">Vous allez vous connecter en tant que <span className="font-bold uppercase text-ebf-orange">{loginSuccessRole || preCheckRole === 'Admin' ? 'Administrateur' : (loginSuccessRole || preCheckRole)}</span></p>
-                    </div>
-                )}
-
-                <button type="submit" disabled={loading || !!loginSuccessRole} className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2 shadow-orange-200 disabled:opacity-70 disabled:cursor-not-allowed">
-                    {loading ? <Loader2 className="animate-spin" size={20}/> : (loginSuccessRole ? "Connexion en cours..." : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter")))}
+                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2 shadow-orange-200 disabled:opacity-70 disabled:cursor-not-allowed">
+                    {loading ? <Loader2 className="animate-spin" size={20}/> : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter"))}
                 </button>
             </form>
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
@@ -871,13 +713,22 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
 const App = () => {
     const [session, setSession] = useState<any>(null);
-    const [role, setRole] = useState<Role>('Visiteur');
     const [currentPath, setCurrentPath] = useState('/');
     const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
     const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.DAY);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     
-    // Data State (Initialisé avec les Mocks, pourrait venir de Supabase)
+    // --- ADMIN MODE STATE ---
+    // Par défaut, tout le monde est en lecture seule (false).
+    // Le code PIN débloque ce mode à true.
+    const [isAdminMode, setIsAdminMode] = useState(false);
+    const [showAdminLogin, setShowAdminLogin] = useState(false);
+    const [showChangePin, setShowChangePin] = useState(false);
+    const [adminPinInput, setAdminPinInput] = useState('');
+    const [newPinInput, setNewPinInput] = useState('');
+    const [adminError, setAdminError] = useState('');
+
+    // --- DATA STATE ---
     const [stats, setStats] = useState<StatData[]>(MOCK_STATS);
     const [reports, setReports] = useState<DailyReport[]>(MOCK_REPORTS);
     const [technicians, setTechnicians] = useState<Technician[]>(MOCK_TECHNICIANS);
@@ -886,61 +737,66 @@ const App = () => {
     const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
     const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
 
-    const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
-
     // Fetch session
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
-            if(session) fetchUserRole(session);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
-            if(session) fetchUserRole(session);
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    const fetchUserRole = async (session: any) => {
-        // Logic similar to LoginScreen helper but for app state
-        if (FORCE_ADMIN_ON_LOGIN) {
-            setRole('Admin');
-            setUserPermissions({ technique: true, comptabilite: true, secretariat: true, quincaillerie: true, rh: true });
-            return;
-        }
-        
-        const { data } = await supabase.from('profiles').select('role, permissions').eq('id', session.user.id).single();
-        if (data) {
-            setRole(data.role as Role);
-            setUserPermissions(data.permissions || {});
+    // Helper: Load Admin PIN from storage or default
+    const getStoredPin = () => localStorage.getItem('ebf_admin_pin') || 'ebf2026';
+
+    const handleAdminUnlock = (e: React.FormEvent) => {
+        e.preventDefault();
+        const correctPin = getStoredPin();
+        if (adminPinInput === correctPin) {
+            setIsAdminMode(true);
+            setShowAdminLogin(false);
+            setAdminPinInput('');
+            setAdminError('');
+        } else {
+            setAdminError('Code incorrect.');
         }
     };
 
-    const handleLoginSuccess = () => {
-        // Triggered by LoginScreen, usually session update handles state, but we can force refresh if needed
-        supabase.auth.getSession().then(({ data: { session } }) => {
-             if(session) fetchUserRole(session);
-        });
+    const handleChangePin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPinInput.length < 4) {
+            setAdminError('Le code doit avoir au moins 4 caractères.');
+            return;
+        }
+        localStorage.setItem('ebf_admin_pin', newPinInput);
+        setNewPinInput('');
+        setShowChangePin(false);
+        alert("Nouveau code administrateur enregistré !");
     };
     
     const handleLogout = async () => {
         await supabase.auth.signOut();
         setSession(null);
-        setRole('Visiteur');
+        setIsAdminMode(false); // Reset admin mode on logout
     };
 
     const handleDeleteReport = (id: string) => {
         setReports(prev => prev.filter(r => r.id !== id));
     };
 
-    if (!session && !DEV_MODE_BYPASS_LOGIN) {
-        return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    if (!session) {
+        return <LoginScreen onLoginSuccess={() => supabase.auth.getSession().then(({ data: { session } }) => setSession(session))} />;
     }
 
     // Router Logic
     const renderContent = () => {
+        // ReadOnly is TRUE if NOT in Admin Mode
+        const isReadOnly = !isAdminMode;
+
         if (currentPath === '/') {
             return <Dashboard 
                      data={stats} 
@@ -969,15 +825,19 @@ const App = () => {
         }
 
         // Module Handling
-        // Technicians
-        if (currentPath === '/technicians') return <ModulePlaceholder title="Techniciens" subtitle="Gestion des équipes" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} />;
-        if (currentPath === '/technicians/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => setCurrentPath('/technicians')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} />;
-        if (currentPath === '/technicians/rapports') return <ReportModeSelector reports={reports} onSelectMode={() => {}} onBack={() => setCurrentPath('/technicians')} onViewReport={setSelectedReport} readOnly={false} />;
+        if (currentPath === '/technicians') return <ModulePlaceholder title="Techniciens" subtitle="Gestion des équipes" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/technicians/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => setCurrentPath('/technicians')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/technicians/rapports') return <ReportModeSelector reports={reports} onSelectMode={() => {}} onBack={() => setCurrentPath('/technicians')} onViewReport={setSelectedReport} readOnly={isReadOnly} />;
 
         // Quincaillerie
-        if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks" subtitle="Inventaire matériel" items={stock} onBack={() => setCurrentPath('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} currentPeriod={currentPeriod} />;
+        if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks" subtitle="Inventaire matériel" items={stock} onBack={() => setCurrentPath('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
 
-        // Default
+        // Generic Fallback for other modules
+        const activeModule = Object.values(MODULE_ACTIONS).flat().find(m => m.path === currentPath);
+        if (activeModule) {
+             return <ModulePlaceholder title={activeModule.label} subtitle={activeModule.description} items={[]} onBack={() => setCurrentPath('/')} color={activeModule.color.replace('bg-', 'bg-')} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        }
+
         return (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                 <Wrench size={48} className="mb-4 opacity-20" />
@@ -994,9 +854,11 @@ const App = () => {
             {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
             
             {/* Sidebar */}
-            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-2xl transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col border-r border-gray-100 dark:border-gray-700`}>
-                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col items-center">
-                    <EbfLogo size="small" />
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-green-950 shadow-2xl transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col border-r border-gray-800`}>
+                <div className="p-6 border-b border-gray-800 flex flex-col items-center">
+                    <div className="bg-white p-2 mb-2">
+                         <EbfLogo size="small" />
+                    </div>
                     <p className="text-xs font-bold text-gray-400 mt-2 tracking-widest uppercase">Manager Pro</p>
                 </div>
                 
@@ -1007,27 +869,26 @@ const App = () => {
                                 onClick={() => {
                                     if (item.path !== currentPath) {
                                         setCurrentPath(item.path);
-                                        // Auto-expand submenus logic could be here
                                     }
                                     if (window.innerWidth < 768) setIsSidebarOpen(false);
                                 }}
-                                className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group ${currentPath.startsWith(item.path) && item.path !== '/' ? 'bg-orange-50 text-orange-700 font-bold' : (currentPath === item.path ? 'bg-orange-50 text-orange-700 font-bold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}`}
+                                className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group ${currentPath.startsWith(item.path) && item.path !== '/' ? 'bg-ebf-orange text-white font-bold shadow-lg' : (currentPath === item.path ? 'bg-ebf-orange text-white font-bold shadow-lg' : 'text-gray-300 hover:bg-gray-800')}`}
                             >
-                                <item.icon size={20} className={`mr-3 transition-colors ${currentPath === item.path ? 'text-ebf-orange' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                                <item.icon size={20} className={`mr-3 transition-colors ${currentPath === item.path || currentPath.startsWith(item.path) ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
                                 <span className="flex-1 text-left">{item.label}</span>
-                                {currentPath.startsWith(item.path) && item.path !== '/' && <ChevronRight size={16} className="text-orange-400" />}
+                                {currentPath.startsWith(item.path) && item.path !== '/' && <ChevronRight size={16} className="text-white" />}
                             </button>
                             
                             {/* Submenu rendering if active */}
                             {currentPath.startsWith(item.path) && item.path !== '/' && MODULE_ACTIONS[item.id] && (
-                                <div className="ml-9 mt-1 space-y-1 border-l-2 border-orange-100 pl-2 animate-fade-in">
+                                <div className="ml-9 mt-1 space-y-1 border-l-2 border-gray-700 pl-2 animate-fade-in">
                                     {MODULE_ACTIONS[item.id].map(sub => (
                                         <button 
                                             key={sub.id}
                                             onClick={() => { setCurrentPath(sub.path); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                                            className={`w-full text-left p-2 rounded-md text-sm transition flex items-center ${currentPath === sub.path ? 'text-ebf-orange font-bold bg-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}
+                                            className={`w-full text-left p-2 rounded-md text-sm transition flex items-center ${currentPath === sub.path ? 'text-ebf-orange font-bold bg-gray-800 shadow-sm' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                                         >
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-2 ${currentPath === sub.path ? 'bg-ebf-orange' : 'bg-gray-300'}`}></span>
+                                            <span className={`w-1.5 h-1.5 rounded-full mr-2 ${currentPath === sub.path ? 'bg-ebf-orange' : 'bg-gray-500'}`}></span>
                                             {sub.label}
                                         </button>
                                     ))}
@@ -1037,17 +898,37 @@ const App = () => {
                     ))}
                 </nav>
 
-                <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                <div className="p-4 border-t border-gray-800 bg-black/20">
+                     {/* SETTINGS / ADMIN TOGGLE */}
+                     <div className="mb-4">
+                        <button 
+                            onClick={() => setShowAdminLogin(true)}
+                            className={`w-full flex items-center justify-between p-2 rounded-lg text-sm font-bold transition ${isAdminMode ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                        >
+                            <span className="flex items-center gap-2">
+                                {isAdminMode ? <Unlock size={16}/> : <Lock size={16}/>}
+                                {isAdminMode ? 'Mode Admin Actif' : 'Mode Administrateur'}
+                            </span>
+                            {isAdminMode && <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>}
+                        </button>
+                        
+                        {isAdminMode && (
+                            <button onClick={() => setShowChangePin(true)} className="w-full text-xs text-center text-gray-400 hover:text-white mt-2 underline">
+                                Changer le code PIN
+                            </button>
+                        )}
+                     </div>
+
                     <div className="flex items-center mb-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-ebf-orange to-red-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
-                            {role.substring(0, 2).toUpperCase()}
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-600 to-gray-700 flex items-center justify-center text-white font-bold text-xs shadow-md border border-gray-500">
+                            <User size={14}/>
                         </div>
                         <div className="ml-3">
-                            <p className="text-sm font-bold text-gray-800 dark:text-white">{role}</p>
-                            <p className="text-xs text-green-600 font-medium">En ligne</p>
+                            <p className="text-sm font-bold text-white">Utilisateur</p>
+                            <p className="text-xs text-green-500 font-medium">Connecté</p>
                         </div>
                     </div>
-                    <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition border border-red-100">
+                    <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 text-xs font-bold text-red-400 hover:bg-red-900/30 rounded-lg transition border border-red-900/50">
                         <LogOut size={14} className="mr-2" /> Déconnexion
                     </button>
                 </div>
@@ -1075,6 +956,66 @@ const App = () => {
                 </main>
             </div>
             
+            {/* ADMIN LOGIN MODAL */}
+            {showAdminLogin && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowAdminLogin(false)} />
+                    <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-red-600">
+                        <button onClick={() => setShowAdminLogin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+                                <Shield size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Accès Administrateur</h3>
+                            <p className="text-sm text-gray-500 mt-1">Entrez le code PIN pour déverrouiller l'édition.</p>
+                        </div>
+                        <form onSubmit={handleAdminUnlock}>
+                            <div className="mb-4">
+                                <input 
+                                    type="password" 
+                                    value={adminPinInput}
+                                    onChange={e => setAdminPinInput(e.target.value)}
+                                    placeholder="Code PIN"
+                                    className="w-full text-center text-2xl tracking-widest p-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                                    autoFocus
+                                />
+                                {adminError && <p className="text-red-500 text-xs text-center mt-2 font-bold">{adminError}</p>}
+                            </div>
+                            <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition shadow-lg">
+                                Déverrouiller
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CHANGE PIN MODAL */}
+            {showChangePin && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowChangePin(false)} />
+                    <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-gray-600">
+                        <button onClick={() => setShowChangePin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Changer le Code PIN</h3>
+                        <form onSubmit={handleChangePin}>
+                            <div className="mb-4">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Nouveau Code</label>
+                                <input 
+                                    type="text" 
+                                    value={newPinInput}
+                                    onChange={e => setNewPinInput(e.target.value)}
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-gray-500 outline-none"
+                                    placeholder="Ex: 1234"
+                                />
+                                {adminError && <p className="text-red-500 text-xs mt-2">{adminError}</p>}
+                            </div>
+                            <button type="submit" className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-900 transition">
+                                Enregistrer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Modals placed at root level */}
             {selectedReport && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
