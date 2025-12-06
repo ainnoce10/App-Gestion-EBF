@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -851,6 +850,9 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
 
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
+      // TEMPORAIRE : ACCÈS TOTAL POUR TOUS
+      return true;
+      /*
       if (role === 'Admin') return true;
       if (role === 'Visiteur') return false;
       
@@ -864,6 +866,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
       if (role === 'Magasinier' && (path.startsWith('/quincaillerie') || path.includes('/techniciens/materiel'))) return true;
       
       return false;
+      */
   };
   
   // Determine if current view is Read-Only based on Role
