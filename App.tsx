@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -14,8 +13,12 @@ import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, Stock
 import { supabase } from './services/supabaseClient';
 
 // --- CONFIGURATION DEBUG / DEV ---
-// Mettre à FALSE pour réactiver l'écran de connexion et tester l'inscription
+// Mettre à FALSE pour réactiver l'écran de connexion
 const DEV_MODE_BYPASS_LOGIN = false; 
+
+// --- FORCE ADMIN (SUPER MODE) ---
+// Mettre à TRUE pour forcer TOUS les utilisateurs connectés à être ADMIN (Pour le développement)
+const FORCE_ADMIN_ON_LOGIN = true;
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -1715,13 +1718,15 @@ export default function App() {
       let { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
       
       // 3. FORCE ADMIN: Si le rôle est Visiteur (par défaut ou erreur), on FORCE Admin pour débloquer
-      if (profile && profile.role === 'Visiteur') {
-          console.warn("DEV MODE: Rôle Visiteur détecté. Promotion forcée en ADMIN pour la session.");
-          profile.role = 'Admin'; 
-          // Tentative de persistance en arrière-plan (non bloquante)
-          supabase.from('profiles').update({ role: 'Admin' }).eq('id', userId).then(({ error }) => {
-              if (error) console.log("Note: Impossible de mettre à jour le rôle en DB (RLS), mais le mode Admin local est actif.");
-          });
+      if (profile) {
+          if (FORCE_ADMIN_ON_LOGIN || profile.role === 'Visiteur') {
+              console.warn("DEV MODE: FORCE ADMIN ACTIVE. Role local forcé à ADMIN.");
+              profile.role = 'Admin';
+              // Tentative de persistance en arrière-plan (non bloquante)
+              supabase.from('profiles').update({ role: 'Admin' }).eq('id', userId).then(({ error }) => {
+                 if (error) console.log("DB Update (RLS blocked) ignored, local Admin active.");
+              });
+          }
       }
 
       // 4. Fallback: Create profile if it doesn't exist (using Metadata)
@@ -1731,7 +1736,7 @@ export default function App() {
               const newProfile = {
                   id: userId,
                   full_name: meta.full_name || 'Utilisateur',
-                  role: meta.role || 'Visiteur',
+                  role: FORCE_ADMIN_ON_LOGIN ? 'Admin' : (meta.role || 'Visiteur'),
                   site: meta.site || 'Global',
                   email: user?.email,
                   permissions: {} // Default empty = Read Only
