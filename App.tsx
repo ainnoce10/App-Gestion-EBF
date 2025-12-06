@@ -10,8 +10,9 @@ import {
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
-import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification } from './types';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
+import { MOCK_STATS, MOCK_TECHNICIANS, MOCK_STOCK, MOCK_INTERVENTIONS, MOCK_REPORTS, DEFAULT_TICKER_MESSAGES } from './constants';
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -306,6 +307,39 @@ const HelpModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }
   );
 };
 
+// --- Flash Info Modal ---
+const FlashInfoModal = ({ isOpen, onClose, onSave }: any) => {
+    const [text, setText] = useState('');
+    const [type, setType] = useState<'info'|'alert'|'success'>('info');
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose}/>
+            <div className="relative bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
+                <h3 className="text-xl font-bold text-green-900 mb-4">Nouveau Flash Info</h3>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700">Message</label>
+                        <input value={text} onChange={e => setText(e.target.value)} className="w-full border border-orange-200 p-2 rounded" placeholder="Message court..." maxLength={60} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700">Type</label>
+                        <select value={type} onChange={e => setType(e.target.value as any)} className="w-full border border-orange-200 p-2 rounded">
+                            <option value="info">Info (Bleu)</option>
+                            <option value="success">Succès (Vert)</option>
+                            <option value="alert">Alerte (Rouge)</option>
+                        </select>
+                    </div>
+                    <button onClick={() => { onSave({ id: Date.now().toString(), text, type, display_order: 1, isManual: true }); setText(''); }} className="w-full bg-ebf-green text-white font-bold py-2 rounded">Publier</button>
+                </div>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X/></button>
+            </div>
+        </div>
+    );
+};
+
 // --- Password Update Modal ---
 const PasswordUpdateModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const [newPassword, setNewPassword] = useState('');
@@ -411,14 +445,14 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
 
         if (signUpResp.error) throw signUpResp.error;
 
-        // Création explicite du profil
+        // Création explicite du profil avec upsert pour éviter les doublons/erreurs
         if (signUpResp.data.user) {
-             const { error: profileError } = await supabase.from('profiles').insert([{
+             const { error: profileError } = await supabase.from('profiles').upsert([{
                  id: signUpResp.data.user.id,
                  email: authMethod === 'email' ? identifier : '',
                  phone: authMethod === 'phone' ? identifier : '',
                  full_name: fullName,
-                 role: role,
+                 role: role, // FORCE LE ROLE CHOISI
                  site: site
              }]);
              if (profileError) console.error("Erreur création profil DB:", profileError);
@@ -436,15 +470,15 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         
         // --- FEEDBACK DE RÔLE ---
         if (data.user) {
+            // Tentative immédiate de récupération du profil
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            if (profile) {
-                setSuccessMsg(`Bienvenue ${profile.full_name || 'Utilisateur'}, connexion en tant que ${profile.role}...`);
-                setTimeout(() => {
-                    localStorage.setItem('ebf_has_logged_in', 'true');
-                }, 1500);
-            } else {
+            const roleToShow = profile ? profile.role : (data.user.user_metadata.role || 'Inconnu');
+            const nameToShow = profile ? profile.full_name : (data.user.user_metadata.full_name || 'Utilisateur');
+
+            setSuccessMsg(`Bienvenue ${nameToShow}, connexion en tant que ${roleToShow}...`);
+            setTimeout(() => {
                 localStorage.setItem('ebf_has_logged_in', 'true');
-            }
+            }, 1500);
         }
       }
     } catch (err: any) {
@@ -688,96 +722,6 @@ const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void 
    );
 };
 
-const Sidebar = ({ isOpen, setIsOpen, currentPath, onNavigate }: any) => {
-  return (
-    <>
-      <div className={`fixed inset-0 bg-black/50 z-40 lg:hidden ${isOpen ? 'block' : 'hidden'}`} onClick={() => setIsOpen(false)} />
-      <aside className={`fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 z-50 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r border-orange-100`}>
-        <div className="h-20 flex items-center justify-center border-b border-orange-100 bg-gradient-to-r from-white to-green-50"><EbfLogo /><button onClick={() => setIsOpen(false)} className="absolute right-4 lg:hidden text-gray-500"><X /></button></div>
-        <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100%-5rem)]">
-           <div className="mb-4 px-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Menu Principal</div>
-           {MAIN_MENU.map(item => {
-             const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/');
-             return (
-               <button key={item.id} onClick={() => { onNavigate(item.path); setIsOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive ? 'bg-gradient-to-r from-ebf-green to-emerald-700 text-white shadow-lg shadow-green-200' : 'text-gray-600 hover:bg-orange-50 hover:text-green-900'}`}>
-                 <item.icon className={`${isActive ? 'text-white' : item.colorClass} group-hover:scale-110 transition`} size={20} />
-                 <div className="text-left"><span className={`block font-bold ${isActive ? 'text-white' : ''}`}>{item.label}</span><span className={`text-[10px] ${isActive ? 'text-green-100' : 'text-gray-400'}`}>{item.description}</span></div>
-                 {isActive && <ChevronRight className="ml-auto text-white" size={16} />}
-               </button>
-             );
-           })}
-        </nav>
-      </aside>
-    </>
-  );
-};
-
-const ModuleMenu = ({ title, actions, onNavigate }: any) => (
-  <div className="animate-fade-in">
-    <h2 className="text-2xl font-bold text-green-900 mb-6 flex items-center"><ChevronRight className="text-ebf-orange mr-2"/> Module {title}</h2>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-       {actions.map((action: any) => (
-         <button key={action.id} onClick={() => onNavigate(action.path)} className="bg-white p-6 rounded-xl shadow-md border border-orange-100 hover:shadow-xl hover:border-ebf-orange transition group text-left relative overflow-hidden">
-           <div className={`absolute top-0 right-0 p-3 rounded-bl-2xl ${action.color} opacity-10 group-hover:opacity-20 transition`}><action.icon size={48} /></div>
-           <div className={`w-12 h-12 rounded-lg ${action.color} text-white flex items-center justify-center mb-4 shadow-md group-hover:scale-110 transition`}><action.icon size={24} /></div>
-           <h3 className="text-lg font-bold text-green-900 mb-1 group-hover:text-ebf-orange transition">{action.label}</h3>
-           <p className="text-sm text-gray-500 mb-4">{action.description}</p>
-           {action.managedBy && <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded border border-gray-100">{action.managedBy}</span>}
-         </button>
-       ))}
-    </div>
-  </div>
-);
-
-const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
-  if (!isOpen || !config) return null;
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); const formData = new FormData(e.target as HTMLFormElement); const data: any = {}; formData.forEach((value, key) => data[key] = value); onSubmit(data); };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-green-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-6 border-b border-orange-100 bg-gray-50 rounded-t-2xl"><h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><FileText className="text-ebf-orange"/> {config.title}</h3><button onClick={onClose} className="text-gray-400 hover:text-red-500 transition"><X /></button></div>
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto custom-scrollbar space-y-4">
-           {config.fields.map((field: FormField) => (
-             <div key={field.name}><label className="block text-sm font-bold text-green-900 mb-1">{field.label}</label>{field.type === 'select' ? (<select name={field.name} className="w-full border border-orange-200 rounded-lg p-3 bg-white text-gray-700 focus:ring-2 focus:ring-ebf-green outline-none transition" required>{field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>) : (<input type={field.type} name={field.name} placeholder={field.placeholder} className="w-full border border-orange-200 rounded-lg p-3 text-gray-700 focus:ring-2 focus:ring-ebf-green outline-none transition" required />)}</div>
-           ))}
-           <div className="pt-4 flex gap-3"><button type="button" onClick={onClose} className="flex-1 py-3 border border-gray-300 text-gray-600 font-bold rounded-lg hover:bg-gray-50 transition">Annuler</button><button type="submit" className="flex-1 py-3 bg-ebf-green text-white font-bold rounded-lg hover:bg-green-800 transition shadow-lg shadow-green-200">Enregistrer</button></div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-const FlashInfoModal = ({ isOpen, onClose, messages, onUpdate }: any) => {
-  const [localMsgs, setLocalMsgs] = useState<TickerMessage[]>([]); const [newMessage, setNewMessage] = useState(''); const [newType, setNewType] = useState<'info'|'alert'|'success'>('info');
-  useEffect(() => { if (isOpen) setLocalMsgs(messages); }, [isOpen, messages]);
-  const addMsg = () => { if (!newMessage) return; const newM: TickerMessage = { id: Date.now().toString(), text: newMessage, type: newType, display_order: localMsgs.length + 1 }; setLocalMsgs([...localMsgs, newM]); setNewMessage(''); };
-  const removeMsg = (id: string) => { setLocalMsgs(localMsgs.filter(m => m.id !== id)); };
-  const moveMessage = (index: number, direction: 'up' | 'down') => { const newMsgs = [...localMsgs]; if (direction === 'up' && index > 0) { [newMsgs[index], newMsgs[index-1]] = [newMsgs[index-1], newMsgs[index]]; } else if (direction === 'down' && index < newMsgs.length - 1) { [newMsgs[index], newMsgs[index+1]] = [newMsgs[index+1], newMsgs[index]]; } setLocalMsgs(newMsgs); };
-  const handleSave = () => { onUpdate(localMsgs); onClose(); };
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-green-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in">
-         <div className="p-6 border-b border-orange-100 flex justify-between items-center"><h3 className="text-xl font-bold text-green-900 flex items-center gap-2"><Megaphone className="text-ebf-orange"/> Gestion Flash Info</h3><button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button></div>
-         <div className="p-6 space-y-4">
-            <div className="flex gap-2"><input value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Nouveau message..." className="flex-1 border border-orange-200 rounded-lg p-2 text-sm focus:ring-ebf-green outline-none" /><select value={newType} onChange={(e:any) => setNewType(e.target.value)} className="border border-orange-200 rounded-lg p-2 text-sm bg-white"><option value="info">Info</option><option value="success">Succès</option><option value="alert">Alerte</option></select><button onClick={addMsg} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Plus size={20}/></button></div>
-            <div className="max-h-60 overflow-y-auto space-y-2">
-               {localMsgs.map((msg, idx) => (
-                  <div key={msg.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                     <div className="flex items-center gap-2 overflow-hidden"><span className="text-xs font-bold text-gray-400">#{idx+1}</span><span className={`w-2 h-2 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></span><span className="text-sm truncate text-gray-700">{msg.text}</span></div>
-                     <div className="flex gap-1"><button onClick={() => moveMessage(idx, 'up')} className="text-gray-400 hover:text-gray-600"><ArrowUp size={14}/></button><button onClick={() => moveMessage(idx, 'down')} className="text-gray-400 hover:text-gray-600"><ArrowDown size={14}/></button><button onClick={() => removeMsg(msg.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button></div>
-                  </div>
-               ))}
-            </div>
-            <button onClick={handleSave} className="w-full bg-ebf-green text-white font-bold py-3 rounded-lg hover:bg-green-800 transition shadow-lg">Enregistrer & Diffuser</button>
-         </div>
-      </div>
-    </div>
-  );
-};
-
 // --- Header Component ---
 const HeaderWithNotif = ({ 
   title, 
@@ -798,7 +742,6 @@ const HeaderWithNotif = ({
     const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
     const unreadCount = notifications.filter((n: Notification) => !n.read).length;
     
-    // Refs for clicking outside
     const notifRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
 
@@ -909,187 +852,220 @@ const HeaderWithNotif = ({
     )
 };
 
-// --- App Content with Role Management ---
-const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any, onLogout: () => void, userRole: Role, userProfile: Profile | null }) => {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [currentPath, setCurrentPath] = useState('/');
   const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
-  const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalConfig, setModalConfig] = useState<FormConfig | null>(null);
-  const [showToast, setShowToast] = useState(false);
+  const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.DAY);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Modals state
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  
-  // Settings Modals State
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [viewReport, setViewReport] = useState<DailyReport | null>(null);
 
-  // Data
-  const [loadingData, setLoadingData] = useState(false);
-  const [interventions, setInterventions] = useState<Intervention[]>([]);
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]); 
-  const [reports, setReports] = useState<DailyReport[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>([]);
-  const [dashboardStats, setDashboardStats] = useState<StatData[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
-  const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
-  const [viewReport, setViewReport] = useState<any | null>(null);
+  // Data state
+  const [stats, setStats] = useState(MOCK_STATS);
+  const [reports, setReports] = useState(MOCK_REPORTS);
+  const [tickerMessages, setTickerMessages] = useState(DEFAULT_TICKER_MESSAGES);
+  const [stock, setStock] = useState(MOCK_STOCK);
+  const [interventions, setInterventions] = useState(MOCK_INTERVENTIONS);
+  const [technicians, setTechnicians] = useState(MOCK_TECHNICIANS);
+  const [notifications, setNotifications] = useState<Notification[]>([]); // Empty for now
 
-  // --- PERMISSION CHECKER ---
-  const canUserWrite = (role: Role, path: string): boolean => {
-      if (role === 'Admin') return true;
-      if (role === 'Visiteur') return false;
-      
-      // Technicien: Edit only techniciens modules
-      if (role === 'Technicien' && path.startsWith('/techniciens')) return true;
-      
-      // Secretaire: Edit only secretariat modules
-      if (role === 'Secretaire' && path.startsWith('/secretariat')) return true;
-      
-      // Magasinier: Edit only quincaillerie and materiel
-      if (role === 'Magasinier' && (path.startsWith('/quincaillerie') || path.includes('/techniciens/materiel'))) return true;
-      
-      return false;
-  };
-  
-  // Determine if current view is Read-Only based on Role
-  const isReadOnly = useMemo(() => !canUserWrite(userRole, currentPath), [userRole, currentPath]);
-
-  // --- FORM CONFIG ---
-  const technicianOptions = useMemo(() => profiles.filter(p => p.role === 'Technicien').map(p => p.full_name), [profiles]);
-  const formConfigs = useMemo<Record<string, FormConfig>>(() => ({
-      '/techniciens/interventions': {
-        title: 'Nouvelle Intervention',
-        fields: [
-          { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
-          { name: 'client', label: 'Nom du Client', type: 'text', placeholder: 'Ex: Hôtel Ivoire' },
-          { name: 'clientPhone', label: 'Numéro du Client', type: 'text', placeholder: 'Ex: 0707...' },
-          { name: 'lieu', label: 'Lieu d\'intervention', type: 'text', placeholder: 'Ex: Cocody Riviera' },
-          { name: 'description', label: 'Description', type: 'text', placeholder: 'Ex: Panne Clim R410' },
-          { name: 'technician', label: 'Technicien', type: 'select', options: technicianOptions }, 
-          { name: 'date', label: 'Date Prévue', type: 'date' },
-          { name: 'status', label: 'Statut Initial', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
-        ]
-      },
-      '/quincaillerie/stocks': {
-        title: 'Article Stock',
-        fields: [{ name: 'name', label: 'Nom Article', type: 'text' }, { name: 'quantity', label: 'Quantité Initiale', type: 'number' }, { name: 'unit', label: 'Unité', type: 'text', placeholder: 'm, kg, pcs...' }, { name: 'threshold', label: 'Seuil Alerte', type: 'number' }, { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }]
-      },
-      '/comptabilite/bilan': {
-        title: 'Nouvelle Transaction',
-        fields: [{ name: 'type', label: 'Type', type: 'select', options: ['Recette', 'Dépense'] }, { name: 'amount', label: 'Montant (FCFA)', type: 'number' }, { name: 'label', label: 'Libellé', type: 'text' }, { name: 'category', label: 'Catégorie', type: 'select', options: ['Facture Client', 'Achat Matériel', 'Salaire', 'Transport', 'Autre'] }, { name: 'date', label: 'Date', type: 'date' }, { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }]
-      }
-  }), [technicianOptions]);
-
-  // --- FETCH DATA ---
-  const fetchData = async () => {
-    setLoadingData(true);
-    try {
-      const { data: inters } = await supabase.from('interventions').select('*').order('scheduled_date', { ascending: false });
-      if (inters) setInterventions(inters.map(i => ({ id: i.id, site: i.site, client: i.client_name, clientPhone: i.client_phone, location: i.location, description: i.description, technicianId: i.technician_id, technician: 'Technicien', date: i.scheduled_date, status: i.status })));
-      const { data: stocks } = await supabase.from('stocks').select('*'); if (stocks) setStock(stocks);
-      const { data: reps } = await supabase.from('daily_reports').select('*').order('date', { ascending: false }); if (reps) setReports(reps.map(r => ({ id: r.id, technicianName: 'Technicien', date: r.date, method: r.method, site: r.site, content: r.content, audioUrl: r.audio_url, domain: r.domain, interventionType: r.intervention_type, location: r.location, expenses: r.expenses, revenue: r.revenue, clientName: r.client_name, clientPhone: r.client_phone })));
-      const { data: msgs } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true }); if (msgs) setTickerMessages(msgs);
-      const { data: profs } = await supabase.from('profiles').select('*'); if (profs) setProfiles(profs);
-      const { data: trans } = await supabase.from('transactions').select('*').order('date', { ascending: false }); if (trans) setTransactions(trans);
-      const { data: notifs } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }); if (notifs) setNotifications(notifs);
-    } catch (err) { console.error(err); } 
-    finally { setLoadingData(false); }
-  };
-  
-  useEffect(() => { fetchData(); const channels = supabase.channel('public:db-changes').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe(); return () => { supabase.removeChannel(channels); }; }, []);
-  
-  useEffect(() => {
-    const statsMap = new Map<string, StatData>();
-    reports.forEach(r => { if (!r.date) return; if (!statsMap.has(r.date)) statsMap.set(r.date, { date: r.date, site: r.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(r.date)!; const rev = Number(r.revenue || 0); const exp = Number(r.expenses || 0); s.revenue += rev; s.expenses += exp; s.profit += (rev - exp); s.interventions += 1; });
-    transactions.forEach(t => { if (!t.date) return; if (!statsMap.has(t.date)) statsMap.set(t.date, { date: t.date, site: t.site as Site, revenue: 0, expenses: 0, profit: 0, interventions: 0 }); const s = statsMap.get(t.date)!; if (t.type === 'Recette') { s.revenue += Number(t.amount); s.profit += Number(t.amount); } else { s.expenses += Number(t.amount); s.profit -= Number(t.amount); } });
-    setDashboardStats(Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date)));
-  }, [reports, transactions]);
-
-  // --- NOTIFICATION HELPERS ---
-  const createNotification = async (title: string, message: string, type: 'info' | 'success' | 'alert', path: string) => {
-      await supabase.from('notifications').insert([{ title, message, type, path, read: false }]);
+  // Handlers
+  const handleNavigate = (path: string) => {
+    setCurrentPath(path);
+    setSidebarOpen(false); // Close mobile sidebar on nav
   };
 
-  const markNotificationAsRead = async (notif: Notification) => {
-      await supabase.from('notifications').update({ read: true }).eq('id', notif.id);
-      if (notif.path) navigate(notif.path);
+  const handleDeleteReport = (id: string) => {
+     setReports(reports.filter(r => r.id !== id));
   };
 
-  // --- HANDLERS ---
-  const handleTickerUpdate = async (msgs: TickerMessage[]) => {
-    const currentIds = tickerMessages.map(m => m.id); const newIds = msgs.map(m => m.id); const toDelete = currentIds.filter(id => !newIds.includes(id));
-    for (const id of toDelete) await supabase.from('ticker_messages').delete().eq('id', id);
-    for (let i = 0; i < msgs.length; i++) { const msg = msgs[i]; const payload: any = { text: msg.text, type: msg.type, display_order: i }; if (msg.id.length > 15) payload.id = msg.id; await supabase.from('ticker_messages').upsert(payload); }
-    fetchData();
+  const handleFlashInfoSave = (msg: TickerMessage) => {
+     setTickerMessages([...tickerMessages, msg]);
+     setIsFlashInfoOpen(false);
   };
 
-  const navigate = (path: string) => { setCurrentPath(path); setReportMode('select'); };
-  
-  const handleFormSubmit = async (data: any) => {
-    setIsModalOpen(false);
-    try {
-      if (currentPath.includes('interventions')) { 
-          const techProfile = profiles.find(p => p.full_name === data.technician); 
-          await supabase.from('interventions').insert([{ site: data.site, client_name: data.client, client_phone: data.clientPhone, location: data.lieu, description: data.description, scheduled_date: data.date, status: data.status, technician_id: techProfile?.id }]); 
-          // TRIGGER NOTIFICATION
-          await createNotification('Nouvelle Intervention', `Nouvelle intervention créée pour ${data.client} à ${data.lieu}`, 'info', '/techniciens/interventions');
-      } 
-      // Add other module inserts here
-      setShowToast(true); setTimeout(() => setShowToast(false), 3000); fetchData();
-    } catch (e) { console.error("Insert error", e); }
-  };
-
+  // Render logic based on path
   const renderContent = () => {
-    if (loadingData && currentPath !== '/') return <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-ebf-green" size={48}/></div>;
-    if (currentPath === '/') return <Dashboard data={dashboardStats} tickerMessages={tickerMessages} stock={stock} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={navigate} onDeleteReport={() => {}} />;
-    if (currentPath === '/equipe') return <TeamGrid members={profiles} onBack={() => navigate('/')} />;
-    const moduleName = currentPath.split('/')[1];
-    if (currentPath === `/${moduleName}` && MODULE_ACTIONS[moduleName]) return <ModuleMenu title={MAIN_MENU.find(m => m.id === moduleName)?.label} actions={MODULE_ACTIONS[moduleName]} onNavigate={navigate} />;
-    
-    // Lists & Forms with Permissions
-    if (currentPath === '/techniciens/rapports') { if (reportMode === 'select') return <ReportModeSelector reports={reports} onSelectMode={setReportMode} onBack={() => setCurrentPath('/techniciens')} onViewReport={setViewReport} readOnly={isReadOnly} />; }
-    
-    let items: any[] = []; let title = 'Liste'; let color = 'bg-gray-500';
-    if (currentPath === '/techniciens/interventions') { items = interventions; title = 'Interventions'; color = 'bg-orange-500'; }
-    else if (currentPath === '/quincaillerie/stocks') { items = stock; title = 'Stocks'; color = 'bg-blue-500'; }
-    
-    return <ModulePlaceholder title={title} items={items} onBack={() => navigate(`/${moduleName}`)} onAdd={!isReadOnly ? () => { setModalConfig(formConfigs[currentPath]); setIsModalOpen(true); } : undefined} onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: '...'}) : undefined} color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+    if (currentPath === '/') {
+      return (
+        <Dashboard 
+          data={stats} 
+          reports={reports} 
+          tickerMessages={tickerMessages} 
+          stock={stock}
+          currentSite={currentSite} 
+          currentPeriod={currentPeriod} 
+          onSiteChange={setCurrentSite} 
+          onPeriodChange={setCurrentPeriod} 
+          onNavigate={handleNavigate}
+          onDeleteReport={handleDeleteReport}
+        />
+      );
+    }
+    if (currentPath === '/synthesis') {
+      return (
+        <DetailedSynthesis 
+          data={stats} 
+          reports={reports} 
+          currentSite={currentSite} 
+          currentPeriod={currentPeriod} 
+          onSiteChange={setCurrentSite} 
+          onPeriodChange={setCurrentPeriod} 
+          onNavigate={handleNavigate}
+          onViewReport={setViewReport}
+        />
+      );
+    }
+    if (currentPath === '/techniciens') {
+        // Module placeholder or specific list
+        return <ModulePlaceholder title="Techniciens" subtitle="Gestion des techniciens" items={technicians} onBack={() => handleNavigate('/')} color="bg-orange-600" currentSite={currentSite} />;
+    }
+    if (currentPath === '/equipe') {
+        // We need to fetch profiles for team grid. 
+        // For now, pass empty or mock. UserProfile is single.
+        // Let's use a mock team list or fetch from Supabase if possible.
+        // We'll reuse the logic from AdminPanelModal to fetch users?
+        // Let's just use a simple list for now or reuse AdminPanelModal logic inside TeamGrid if we passed it.
+        // But TeamGrid takes `members`. We'll pass `[userProfile]` if available or empty.
+        return <TeamGrid members={userProfile ? [userProfile] : []} onBack={() => handleNavigate('/')} />;
+    }
+
+    // Generic fallback for sub-routes
+    return (
+        <div className="p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-400">Page en construction</h2>
+            <p className="text-gray-500">{currentPath}</p>
+            <button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-green font-bold">Retour Accueil</button>
+        </div>
+    );
   };
 
   return (
-     <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900 text-white' : 'bg-gradient-to-br from-orange-50 via-white to-green-50'}`}>
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setSidebarOpen} currentPath={currentPath} onNavigate={navigate} />
-        <div className="lg:ml-72 min-h-screen flex flex-col transition-all duration-300">
-           <HeaderWithNotif 
-              title="EBF Manager" 
-              onMenuClick={() => setSidebarOpen(true)} 
-              onLogout={onLogout} 
-              onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
-              onOpenAdmin={() => setIsAdminOpen(true)}
-              notifications={notifications}
-              userProfile={userProfile}
-              userRole={userRole}
-              markNotificationAsRead={markNotificationAsRead}
-              onOpenProfile={() => setIsProfileOpen(true)}
-              onOpenHelp={() => setIsHelpOpen(true)}
-              darkMode={darkMode}
-              onToggleTheme={() => setDarkMode(!darkMode)}
-           />
-           <main className="flex-1 p-4 lg:p-8 overflow-x-hidden">{renderContent()}</main>
-        </div>
-        <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
-        <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={tickerMessages} onUpdate={handleTickerUpdate} />
-        <AdminPanelModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
-        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
-        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-     </div>
+    <div className={`min-h-screen ${darkMode ? 'dark' : ''} bg-gray-50 dark:bg-gray-900 flex transition-colors duration-300`}>
+       {/* Sidebar Desktop */}
+       <aside className="hidden lg:flex w-64 flex-col bg-green-900 text-white fixed h-full z-20 shadow-xl">
+          <div className="p-6 flex items-center justify-center border-b border-green-800">
+             <EbfLogo />
+          </div>
+          <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-2">
+             {MAIN_MENU.map(item => (
+                <button 
+                  key={item.id} 
+                  onClick={() => handleNavigate(item.path)}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${currentPath === item.path ? 'bg-white text-green-900 shadow-lg font-bold' : 'text-green-100 hover:bg-green-800'}`}
+                >
+                   <item.icon size={20} className={currentPath === item.path ? 'text-ebf-orange' : 'text-green-300 group-hover:text-white'} />
+                   <span>{item.label}</span>
+                </button>
+             ))}
+          </nav>
+          <div className="p-4 border-t border-green-800 bg-green-950">
+             <div className="text-xs text-green-400 text-center">© 2024 EBF Manager v1.0</div>
+          </div>
+       </aside>
+
+       {/* Mobile Sidebar Overlay */}
+       {sidebarOpen && (
+         <div className="fixed inset-0 z-40 lg:hidden">
+            <div className="absolute inset-0 bg-green-900/80 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+            <div className="absolute left-0 top-0 bottom-0 w-3/4 max-w-xs bg-green-900 text-white shadow-2xl animate-slide-in">
+               <div className="p-4 flex justify-between items-center border-b border-green-800">
+                  <EbfLogo />
+                  <button onClick={() => setSidebarOpen(false)}><X/></button>
+               </div>
+               <nav className="p-4 space-y-2">
+                 {MAIN_MENU.map(item => (
+                    <button 
+                      key={item.id} 
+                      onClick={() => handleNavigate(item.path)}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl ${currentPath === item.path ? 'bg-white text-green-900 font-bold' : 'text-green-100'}`}
+                    >
+                       <item.icon size={20} className={currentPath === item.path ? 'text-ebf-orange' : ''} />
+                       <span>{item.label}</span>
+                    </button>
+                 ))}
+               </nav>
+            </div>
+         </div>
+       )}
+
+       {/* Main Content */}
+       <div className="flex-1 flex flex-col lg:ml-64 min-h-screen relative">
+          <HeaderWithNotif 
+             title={MAIN_MENU.find(m => m.path === currentPath)?.label || 'EBF Manager'}
+             onMenuClick={() => setSidebarOpen(true)}
+             onLogout={onLogout}
+             onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
+             onOpenAdmin={() => setIsAdminOpen(true)}
+             onOpenProfile={() => setIsProfileOpen(true)}
+             onOpenHelp={() => setIsHelpOpen(true)}
+             notifications={notifications}
+             userProfile={userProfile}
+             userRole={userRole}
+             markNotificationAsRead={() => {}}
+             darkMode={darkMode}
+             onToggleTheme={() => setDarkMode(!darkMode)}
+          />
+          
+          <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
+             {renderContent()}
+          </main>
+       </div>
+
+       {/* Modals */}
+       <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} onSave={handleFlashInfoSave} />
+       <AdminPanelModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
+       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
+       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+       
+       {/* Report Detail Modal (Read Only) */}
+        {viewReport && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={() => setViewReport(null)} />
+                <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-bold text-green-900 dark:text-white flex items-center gap-2">
+                            <FileText size={20} className="text-ebf-orange"/> Rapport Détail
+                        </h3>
+                        <button onClick={() => setViewReport(null)} className="text-gray-400 hover:text-red-500"><X/></button>
+                    </div>
+                    <div className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Technicien</span>
+                                <p className="font-bold text-green-900 dark:text-white">{viewReport.technicianName}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Date</span>
+                                <p className="font-bold text-green-900 dark:text-white">{viewReport.date}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Contenu</span>
+                            <p className="text-sm text-gray-800 dark:text-gray-300 whitespace-pre-line mt-1">{viewReport.content}</p>
+                        </div>
+                        {viewReport.method === 'Form' && (
+                             <div className="grid grid-cols-2 gap-4 border-t border-gray-200 dark:border-gray-600 pt-3">
+                                <div><span className="text-xs text-gray-500">Recettes</span><p className="font-bold text-green-600">{viewReport.revenue?.toLocaleString()} F</p></div>
+                                <div><span className="text-xs text-gray-500">Dépenses</span><p className="font-bold text-red-500">{viewReport.expenses?.toLocaleString()} F</p></div>
+                             </div>
+                        )}
+                        {viewReport.method === 'Voice' && viewReport.audioUrl && (
+                            <div className="pt-2">
+                                <audio controls src={viewReport.audioUrl} className="w-full h-8" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+    </div>
   );
 };
 
