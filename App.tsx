@@ -22,7 +22,6 @@ interface ModuleAction {
   icon: React.ElementType;
   path: string;
   color: string;
-  managedBy?: string;
 }
 
 interface MenuItem {
@@ -90,10 +89,9 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'revenue', label: 'Recette (FCFA)', type: 'number' },
       { name: 'expenses', label: 'Dépenses (FCFA)', type: 'number' },
       { name: 'rating', label: 'Note Satisfaction (1-5)', type: 'number' },
-      { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] } // Hidden or fixed normally
+      { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] }
     ]
   },
-  // --- NOUVELLES CONFIGURATIONS RESTAURÉES ---
   chantiers: {
     title: 'Nouveau Chantier',
     fields: [
@@ -195,33 +193,9 @@ const MAIN_MENU: MenuItem[] = [
 // --- Sub-Menu Configurations ---
 const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
   techniciens: [
-    { 
-      id: 'interventions', 
-      label: 'Interventions', 
-      description: 'Planning des interventions', 
-      managedBy: 'Géré par le Superviseur',
-      icon: Wrench, 
-      path: '/techniciens/interventions', 
-      color: 'bg-orange-500' 
-    },
-    { 
-      id: 'rapports', 
-      label: 'Rapports Journaliers', 
-      description: 'Vocal ou Formulaire détaillé', 
-      managedBy: 'Géré par les Techniciens',
-      icon: FileText, 
-      path: '/techniciens/rapports', 
-      color: 'bg-gray-700' 
-    },
-    { 
-      id: 'chantiers', 
-      label: 'Chantiers', 
-      description: 'Suivi & Exécution', 
-      managedBy: 'Géré par le Chef de Chantier',
-      icon: ShieldCheck, 
-      path: '/techniciens/chantiers', 
-      color: 'bg-green-600' 
-    },
+    { id: 'interventions', label: 'Interventions', description: 'Planning des interventions', icon: Wrench, path: '/techniciens/interventions', color: 'bg-orange-500' },
+    { id: 'rapports', label: 'Rapports Journaliers', description: 'Vocal ou Formulaire détaillé', icon: FileText, path: '/techniciens/rapports', color: 'bg-gray-700' },
+    { id: 'chantiers', label: 'Chantiers', description: 'Suivi & Exécution', icon: ShieldCheck, path: '/techniciens/chantiers', color: 'bg-green-600' },
   ],
   comptabilite: [
     { id: 'bilan', label: 'Bilan Financier', description: 'Journal des transactions', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600' },
@@ -323,8 +297,8 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
   );
 };
 
-// --- Module Placeholder ---
-const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
+// --- Module Placeholder (SANS RESTRICTION) ---
+const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete }: any) => {
     const filteredItems = items.filter((item: any) => {
         if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
         if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
@@ -339,12 +313,11 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                     <div>
                         <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                             {title}
-                            {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 ml-2"><Lock size={12}/> Lecture Seule</span>}
                         </h2>
                         <p className="text-gray-500">{subtitle}</p>
                     </div>
                 </div>
-                {!readOnly && onAdd && (
+                {onAdd && (
                     <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow-md hover:opacity-90 transition flex items-center gap-2 transform hover:-translate-y-0.5`}>
                         <Plus size={18}/> Ajouter
                     </button>
@@ -361,7 +334,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Détails</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Site</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Statut / Montant</th>
-                                {!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
+                                {onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -402,7 +375,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                                 </span>
                                             )}
                                         </td>
-                                        {!readOnly && onDelete && (
+                                        {onDelete && (
                                             <td className="p-4 text-right">
                                                 <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>
                                             </td>
@@ -418,39 +391,31 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
     );
 };
 
-// --- Report Mode Selector ---
-const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
+// --- Report Mode Selector (SANS RESTRICTION) ---
+const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport }: any) => {
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex items-center gap-3">
                 <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm transition border border-gray-100"><ArrowLeft size={20} className="text-gray-600 hover:text-ebf-orange"/></button>
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                     Rapports Journaliers
-                    {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 ml-2"><Lock size={12}/> Lecture Seule</span>}
                 </h2>
             </div>
 
-            {!readOnly ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-blue-400 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10"><Mic size={100} /></div>
-                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition backdrop-blur-sm"><Mic size={40} /></div>
-                        <h3 className="text-2xl font-bold mb-2">Rapport Vocal</h3>
-                        <p className="text-blue-100">Dictez votre rapport, l'IA le rédige pour vous.</p>
-                    </button>
-                    <button onClick={() => onSelectMode('form')} className="bg-gradient-to-br from-ebf-orange to-orange-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-orange-400 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10"><FileText size={100} /></div>
-                        <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition backdrop-blur-sm"><FileText size={40} /></div>
-                        <h3 className="text-2xl font-bold mb-2">Formulaire Détaillé</h3>
-                        <p className="text-orange-100">Saisie manuelle des travaux et finances.</p>
-                    </button>
-                </div>
-            ) : (
-                <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg text-orange-800 text-center">
-                    <p className="font-bold flex items-center justify-center gap-2"><Lock size={16}/> Création de rapports désactivée</p>
-                    <p className="text-sm">Activez le "Mode Administrateur" dans les paramètres pour modifier.</p>
-                </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-blue-400 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10"><Mic size={100} /></div>
+                    <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition backdrop-blur-sm"><Mic size={40} /></div>
+                    <h3 className="text-2xl font-bold mb-2">Rapport Vocal</h3>
+                    <p className="text-blue-100">Dictez votre rapport, l'IA le rédige pour vous.</p>
+                </button>
+                <button onClick={() => onSelectMode('form')} className="bg-gradient-to-br from-ebf-orange to-orange-600 text-white p-8 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition flex flex-col items-center text-center group border border-orange-400 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10"><FileText size={100} /></div>
+                    <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition backdrop-blur-sm"><FileText size={40} /></div>
+                    <h3 className="text-2xl font-bold mb-2">Formulaire Détaillé</h3>
+                    <p className="text-orange-100">Saisie manuelle des travaux et finances.</p>
+                </button>
+            </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-6">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Historique Récent</h3>
@@ -476,9 +441,8 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     );
 };
 
-// --- SETTINGS MODAL (Accessible to ALL) ---
-const SettingsModal = ({ isOpen, onClose, userProfile, onUpdateProfile, isAdminMode, onToggleAdmin, onLogout }: any) => {
-    const [activeTab, setActiveTab] = useState<'profile' | 'admin' | 'app'>('profile');
+// --- SETTINGS MODAL (SIMPLE) ---
+const SettingsModal = ({ isOpen, onClose, userProfile, onUpdateProfile, onLogout }: any) => {
     const [editName, setEditName] = useState(userProfile?.full_name || '');
     const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
     const [loading, setLoading] = useState(false);
@@ -509,125 +473,39 @@ const SettingsModal = ({ isOpen, onClose, userProfile, onUpdateProfile, isAdminM
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl shadow-2xl animate-fade-in flex flex-col md:flex-row overflow-hidden h-[500px]">
-                {/* Sidebar Settings */}
-                <div className="w-full md:w-1/3 bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-700 p-4">
-                    <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-800 dark:text-white"><Settings className="text-ebf-orange"/> Paramètres</h3>
-                    <nav className="space-y-2">
-                        <button onClick={() => setActiveTab('profile')} className={`w-full text-left p-3 rounded-lg text-sm font-medium flex items-center gap-2 transition ${activeTab === 'profile' ? 'bg-white shadow text-ebf-orange font-bold' : 'text-gray-500 hover:bg-gray-200'}`}>
-                            <User size={16}/> Mon Profil
-                        </button>
-                        <button onClick={() => setActiveTab('admin')} className={`w-full text-left p-3 rounded-lg text-sm font-medium flex items-center gap-2 transition ${activeTab === 'admin' ? 'bg-white shadow text-red-500 font-bold' : 'text-gray-500 hover:bg-gray-200'}`}>
-                            <Shield size={16}/> Administration
-                        </button>
-                        <button onClick={() => setActiveTab('app')} className={`w-full text-left p-3 rounded-lg text-sm font-medium flex items-center gap-2 transition ${activeTab === 'app' ? 'bg-white shadow text-blue-500 font-bold' : 'text-gray-500 hover:bg-gray-200'}`}>
-                            <Smartphone size={16}/> Application
-                        </button>
-                    </nav>
-                    <div className="mt-auto pt-8">
-                         <button onClick={onLogout} className="w-full p-2 text-red-500 hover:bg-red-50 rounded text-sm font-bold flex items-center gap-2 justify-center border border-red-100"><LogOut size={14}/> Déconnexion</button>
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md shadow-2xl animate-fade-in flex flex-col p-6">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
+                <h3 className="font-bold text-xl mb-6 flex items-center gap-2 text-gray-800 dark:text-white"><Settings className="text-ebf-orange"/> Paramètres</h3>
+                
+                <div className="space-y-4 mb-6">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nom Complet</label>
+                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded-lg" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Téléphone</label>
+                        <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-2 border rounded-lg" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                        <input type="text" value={userProfile?.email} disabled className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" />
                     </div>
                 </div>
 
-                {/* Content Settings */}
-                <div className="flex-1 p-6 overflow-y-auto">
-                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
-                    
-                    {activeTab === 'profile' && (
-                        <div className="space-y-6 animate-fade-in">
-                            <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Mon Profil</h4>
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
-                                    <Camera size={24}/>
-                                </div>
-                                <div>
-                                    <button className="text-sm text-ebf-orange font-bold hover:underline">Changer la photo</button>
-                                    <p className="text-xs text-gray-400">JPG, PNG max 2Mo</p>
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nom Complet</label>
-                                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded-lg" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Téléphone</label>
-                                    <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-2 border rounded-lg" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
-                                    <input type="text" value={userProfile?.email} disabled className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" />
-                                </div>
-                            </div>
-                            <button onClick={handleSaveProfile} disabled={loading} className="px-6 py-2 bg-ebf-orange text-white rounded-lg font-bold shadow hover:bg-orange-600 transition disabled:opacity-50">
-                                {loading ? 'Enregistrement...' : 'Enregistrer les modifications'}
-                            </button>
-                        </div>
-                    )}
-
-                    {activeTab === 'admin' && (
-                        <div className="space-y-6 animate-fade-in">
-                            <h4 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2"><Lock size={20}/> Zone Sécurisée</h4>
-                            <p className="text-sm text-gray-600">Activez le mode administrateur pour effectuer des modifications (Ajout, Suppression, Édition).</p>
-                            
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-bold text-gray-800">Mode Administrateur</p>
-                                        <p className="text-xs text-gray-500">{isAdminMode ? 'Actif - Vous pouvez modifier les données' : 'Inactif - Lecture seule'}</p>
-                                    </div>
-                                    <button 
-                                        onClick={onToggleAdmin}
-                                        className={`px-4 py-2 rounded-lg font-bold text-sm transition ${isAdminMode ? 'bg-red-100 text-red-600 border border-red-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-                                    >
-                                        {isAdminMode ? 'Désactiver' : 'Activer'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {isAdminMode && (
-                                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                                    <p className="text-xs font-bold text-red-800 uppercase mb-2">Danger Zone</p>
-                                    <button className="text-red-600 text-sm hover:underline flex items-center gap-1"><Key size={14}/> Changer le code PIN Administrateur</button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'app' && (
-                        <div className="space-y-6 animate-fade-in">
-                            <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Préférences Application</h4>
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <Moon size={20} className="text-gray-600"/>
-                                    <span>Mode Sombre</span>
-                                </div>
-                                <div className="w-10 h-5 bg-gray-300 rounded-full relative cursor-pointer">
-                                    <div className="w-5 h-5 bg-white rounded-full shadow absolute left-0 top-0 transform transition"></div>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <Bell size={20} className="text-gray-600"/>
-                                    <span>Notifications</span>
-                                </div>
-                                <div className="w-10 h-5 bg-green-500 rounded-full relative cursor-pointer">
-                                    <div className="w-5 h-5 bg-white rounded-full shadow absolute right-0 top-0 transform transition"></div>
-                                </div>
-                            </div>
-                             <div className="text-center pt-8 text-xs text-gray-400">
-                                <p>EBF Manager v1.2.0</p>
-                                <p>© 2024 EBF Côte d'Ivoire</p>
-                            </div>
-                        </div>
-                    )}
+                <div className="flex gap-4">
+                     <button onClick={handleSaveProfile} disabled={loading} className="flex-1 py-2 bg-ebf-orange text-white rounded-lg font-bold shadow hover:bg-orange-600 transition disabled:opacity-50">
+                        {loading ? 'Enregistrement...' : 'Enregistrer'}
+                    </button>
+                    <button onClick={onLogout} className="flex-1 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg font-bold">
+                        Déconnexion
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Login Screen ---
+// --- Login Screen (SIMPLE) ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
@@ -639,7 +517,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isResetMode, setIsResetMode] = useState(false);
   
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -650,15 +527,9 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     const cleanName = fullName.trim();
 
     try {
-      if (isResetMode) {
-        if (authMethod !== 'email') throw new Error("La réinitialisation n'est disponible que par Email.");
-        const { error } = await supabase.auth.resetPasswordForEmail(cleanIdentifier, { redirectTo: window.location.origin });
-        if (error) throw error;
-        setSuccessMsg("Lien envoyé ! Vérifiez vos emails."); setLoading(false); return;
-      }
-
       if (isSignUp) {
-        const metadata = { full_name: cleanName, role: 'Technicien', site: site }; 
+        // Inscription Simple
+        const metadata = { full_name: cleanName, role: 'Membre', site: site }; 
         let signUpResp;
         if (authMethod === 'email') {
           signUpResp = await supabase.auth.signUp({ email: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
@@ -676,51 +547,30 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      email: authMethod === 'email' ? cleanIdentifier : '',
                      phone: authMethod === 'phone' ? cleanIdentifier : '',
                      full_name: cleanName,
-                     role: 'Technicien',
-                     site: site,
-                     permissions: {} 
-                 }]);
-                 
-                 await supabase.from('technicians').upsert([{
-                     id: userId,
-                     name: cleanName,
-                     specialty: 'Nouveau Membre',
-                     site: site,
-                     status: 'Available'
+                     role: 'Membre',
+                     site: site
                  }]);
              }
              onLoginSuccess();
-             return; 
         } else {
+             // Fallback si pas de session auto (rare si config ok)
+             setSuccessMsg("Inscription réussie ! Connectez-vous.");
              setIsSignUp(false);
-             setSuccessMsg("Inscription réussie ! Si la connexion échoue, vérifiez vos emails pour valider le compte.");
         }
 
       } else {
-        const { data, error: err } = await supabase.auth.signInWithPassword(
+        // Connexion Simple
+        const { error: err } = await supabase.auth.signInWithPassword(
             authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
-        
         if (err) throw err;
         onLoginSuccess();
       }
     } catch (err: any) {
         console.error("Auth Error:", err);
-        let userMsg = "Une erreur technique est survenue.";
-        const msg = err.message || err.error_description || JSON.stringify(err);
-
-        if (msg.includes("Invalid login credentials") || msg.includes("invalid_grant")) {
-            userMsg = "Email ou mot de passe incorrect.";
-        } else if (msg.includes("User already registered")) {
-            userMsg = "Un compte existe déjà avec cet email/téléphone. Connectez-vous.";
-        } else if (msg.includes("Password should be at least")) {
-            userMsg = "Le mot de passe doit contenir au moins 6 caractères.";
-        } else if (msg.includes("Phone signups are disabled")) {
-            userMsg = "L'inscription par téléphone est désactivée. Utilisez l'email.";
-        }
-
-        setError(userMsg);
-        setLoading(false); 
+        setError(err.message || "Erreur de connexion/inscription");
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -733,30 +583,27 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                  <EbfLogo size="normal" />
              </div>
              <h2 className="text-2xl font-extrabold text-gray-800 mt-2 tracking-tight">
-                 {isResetMode ? "Récupération" : (isSignUp ? "Créer un compte" : "Connexion EBF")}
+                 {isSignUp ? "Créer un compte" : "Connexion EBF"}
              </h2>
              <p className="text-gray-500 text-sm mt-1 font-medium">Gérez vos activités en temps réel</p>
           </div>
           {error && (<div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in shadow-sm"><AlertCircle size={18} className="flex-shrink-0"/> <span>{error}</span></div>)}
           {successMsg && (<div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-3 rounded-r mb-6 text-sm font-medium flex items-center gap-2 animate-slide-in shadow-sm"><CheckCircle size={18} className="flex-shrink-0"/> <span>{successMsg}</span></div>)}
-          {!isResetMode && (
+          
             <div className="flex p-1 bg-gray-100 rounded-lg mb-6 shadow-inner">
                <button onClick={() => setAuthMethod('email')} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all duration-300 ${authMethod === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Email</button>
                <button onClick={() => setAuthMethod('phone')} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all duration-300 ${authMethod === 'phone' ? 'bg-white text-ebf-orange shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Téléphone</button>
             </div>
-          )}
+          
           <form onSubmit={handleAuth} className="space-y-4">
                 {isSignUp && (
                     <div className="space-y-4 animate-fade-in">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Nom Complet</label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="Ex: Jean Kouassi" />
-                            </div>
+                            <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="Ex: Jean Kouassi" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Site Principal</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Site</label>
                             <select value={site} onChange={e => setSite(e.target.value as Site)} className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange outline-none text-gray-900 font-medium appearance-none cursor-pointer shadow-sm">
                                 <option value="Abidjan">Abidjan</option>
                                 <option value="Bouaké">Bouaké</option>
@@ -766,48 +613,25 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                 )}
                 <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">{authMethod === 'email' ? 'Adresse Email' : 'Numéro de Téléphone'}</label>
-                    <div className="relative">
-                        {authMethod === 'email' ? <Mail className="absolute left-3 top-3 text-gray-400" size={18}/> : <Phone className="absolute left-3 top-3 text-gray-400" size={18}/>}
-                        <input required value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder={authMethod === 'email' ? 'exemple@ebf.ci' : '0707070707'} />
-                    </div>
+                    <input required value={identifier} onChange={e => setIdentifier(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder={authMethod === 'email' ? 'exemple@ebf.ci' : '0707070707'} />
                 </div>
-                {!isResetMode && (
                 <div>
-                    <div className="flex justify-between items-center mb-1.5 ml-1">
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Mot de passe</label>
-                        {!isSignUp && <button type="button" onClick={() => setIsResetMode(true)} className="text-xs text-ebf-orange font-bold hover:underline">Oublié ?</button>}
-                    </div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 ml-1">Mot de passe</label>
                     <div className="relative">
-                        <Lock className="absolute left-3 top-3 text-gray-400" size={18}/>
-                        <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="••••••••" />
+                        <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-ebf-orange focus:border-transparent outline-none transition text-gray-900 font-medium shadow-sm" placeholder="••••••••" />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                     </div>
                 </div>
-                )}
 
                 <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2 shadow-orange-200 disabled:opacity-70 disabled:cursor-not-allowed">
-                    {loading ? <Loader2 className="animate-spin" size={20}/> : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter"))}
+                    {loading ? <Loader2 className="animate-spin" size={20}/> : (isSignUp ? "Créer mon compte" : "Se Connecter")}
                 </button>
             </form>
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-             <button onClick={() => { 
-                 if (successMsg && !successMsg.includes("Inscription réussie")) {
-                     setSuccessMsg('');
-                     setIsSignUp(false);
-                 } else if (successMsg && successMsg.includes("Inscription réussie")) {
-                     setSuccessMsg('');
-                     // Keep on login screen
-                 } else {
-                     setIsSignUp(!isSignUp); 
-                     setIsResetMode(false); 
-                     setError('');
-                 }
-             }} className="text-sm font-semibold text-gray-500 hover:text-orange-600 transition">
-                {successMsg && !successMsg.includes("Inscription réussie") ? (
-                    <span className="flex items-center justify-center gap-2 font-bold text-orange-600"><ArrowLeft size={16}/> Retour à la connexion</span>
-                ) : (isSignUp ? "Déjà un compte ? Se connecter" : "Pas encore de compte ? S'inscrire")}
+             <button onClick={() => { setIsSignUp(!isSignUp); setError(''); setSuccessMsg(''); }} className="text-sm font-semibold text-gray-500 hover:text-orange-600 transition">
+                {isSignUp ? "Déjà un compte ? Se connecter" : "Pas encore de compte ? S'inscrire"}
              </button>
           </div>
        </div>
@@ -822,13 +646,7 @@ const App = () => {
     const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
     const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.DAY);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    
-    // --- ADMIN & SETTINGS STATE ---
-    const [isAdminMode, setIsAdminMode] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [showAdminLogin, setShowAdminLogin] = useState(false);
-    const [adminPinInput, setAdminPinInput] = useState('');
-    const [adminError, setAdminError] = useState('');
 
     // --- REAL-TIME DATA STATE FOR ALL MODULES ---
     const [stats, setStats] = useState<StatData[]>(MOCK_STATS);
@@ -934,7 +752,6 @@ const App = () => {
              supabase.channel('public:construction_sites').on('postgres_changes', { event: '*', schema: 'public', table: 'construction_sites' }, payload => {
                 if(payload.eventType === 'INSERT') setChantiers(prev => [payload.new, ...prev]);
             }).subscribe()
-            // (Subscriptions for others can be added similarly)
         ];
 
         return () => { channels.forEach(c => c.unsubscribe()); };
@@ -943,14 +760,9 @@ const App = () => {
 
     // Calculate Real-time Stats based on Reports + Transactions + Interventions
     const calculatedStats = useMemo(() => {
-        // Group by Date and Site logic (Simplified for global view)
-        // Here we just merge transactions revenue and reports revenue
-        // In a real app, this would be a more complex aggregation map
         const tempStats: StatData[] = [];
         
-        // Use Transactions as base for financial history
         transactions.forEach(t => {
-            // Find existing stat for this day/site or create new
             let stat = tempStats.find(s => s.date === t.date && s.site === t.site);
             if (!stat) {
                 stat = { date: t.date, site: t.site, revenue: 0, expenses: 0, profit: 0, interventions: 0 };
@@ -960,7 +772,6 @@ const App = () => {
             if (t.type === 'Dépense') stat.expenses += t.amount;
         });
 
-        // Add Reports financial data
         reports.forEach(r => {
             if(!r.date) return;
             let stat = tempStats.find(s => s.date === r.date && s.site === r.site);
@@ -972,63 +783,97 @@ const App = () => {
             if(r.expenses) stat.expenses += r.expenses;
         });
         
-        // Count interventions
         interventions.forEach(i => {
              let stat = tempStats.find(s => s.date === i.date && s.site === i.site);
              if (!stat) {
-                 // Note: intervention doesn't have revenue directly here, just count
                  stat = { date: i.date, site: i.site, revenue: 0, expenses: 0, profit: 0, interventions: 0 };
                  tempStats.push(stat);
              }
              stat.interventions += 1;
         });
 
-        // Calculate Profit
         tempStats.forEach(s => s.profit = s.revenue - s.expenses);
-
-        // Sort by date
         return tempStats.sort((a,b) => b.date.localeCompare(a.date));
 
     }, [transactions, reports, interventions]);
 
-    // Use calculated stats if available, else Mock
     const displayStats = calculatedStats.length > 0 ? calculatedStats : stats;
-
-
-    // Helper: Load Admin PIN
-    const getStoredPin = () => localStorage.getItem('ebf_admin_pin') || 'ebf2026';
-
-    const handleAdminUnlock = (e: React.FormEvent) => {
-        e.preventDefault();
-        const correctPin = getStoredPin();
-        if (adminPinInput === correctPin) {
-            setIsAdminMode(true);
-            setShowAdminLogin(false);
-            setAdminPinInput('');
-            setAdminError('');
-        } else {
-            setAdminError('Code incorrect.');
-        }
-    };
     
+    // Auto Ticker Logic
+    const generateAutoTickerMessages = (data: StatData[]) => {
+      const messages: TickerMessage[] = [];
+      const totalRevenue = data.reduce((acc, curr) => acc + curr.revenue, 0);
+      const totalProfit = data.reduce((acc, curr) => acc + curr.profit, 0);
+      
+      if (totalRevenue > 0) {
+        const profitMargin = (totalProfit / totalRevenue) * 100;
+        if (profitMargin > 0) {
+          messages.push({
+            id: 'auto-profit',
+            text: `👏 Performance : Marge bénéficiaire de +${profitMargin.toFixed(1)}% enregistrée.`,
+            type: 'success',
+            display_order: 1,
+            isManual: false
+          });
+        } else {
+           messages.push({
+            id: 'auto-loss',
+            text: `⚠️ Attention : Marge négative de ${profitMargin.toFixed(1)}% sur la période.`,
+            type: 'alert',
+            display_order: 1,
+            isManual: false
+          });
+        }
+      }
+      setTickerMessages(prev => {
+        const manuals = prev.filter(m => m.isManual);
+        return [...manuals, ...messages];
+      });
+    };
+
+    useEffect(() => {
+      if (displayStats.length > 0) generateAutoTickerMessages(displayStats);
+      else {
+         setTickerMessages([{
+            id: 'welcome-default', 
+            text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', 
+            type: 'info', 
+            display_order: 0, 
+            isManual: false 
+        }]);
+      }
+    }, [displayStats]);
+
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         setSession(null);
-        setIsAdminMode(false); 
     };
 
     const handleDeleteReport = (id: string) => {
-        // In real app: await supabase.from('reports').delete().eq('id', id);
         setReports(prev => prev.filter(r => r.id !== id));
     };
+
+    // Generic Handlers for CRUD (Simulated for UI, needs Supabase wiring for real app)
+    const handleAdd = (path: string) => {
+        alert("Fonctionnalité d'ajout activée pour " + path);
+    };
+    const handleDelete = (item: any) => {
+        if(confirm("Supprimer cet élément ?")) {
+             alert("Élément supprimé");
+        }
+    };
+
 
     if (!session) {
         return <LoginScreen onLoginSuccess={() => supabase.auth.getSession().then(({ data: { session } }) => setSession(session))} />;
     }
 
-    // Router Logic - Updated with REAL DATA MAPPING
+    // Router Logic
     const renderContent = () => {
-        const isReadOnly = !isAdminMode;
+        // ACCES TOTAL PAR DÉFAUT
+        const canAdd = () => handleAdd(currentPath);
+        const canDelete = (item: any) => handleDelete(item);
 
         if (currentPath === '/') {
             return <Dashboard 
@@ -1057,34 +902,30 @@ const App = () => {
                    />;
         }
 
-        // --- TECHNICIENS ---
-        if (currentPath === '/technicians') return <ModulePlaceholder title="Techniciens" subtitle="Gestion des équipes" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/technicians/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => setCurrentPath('/technicians')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/technicians/rapports') return <ReportModeSelector reports={reports} onSelectMode={() => {}} onBack={() => setCurrentPath('/technicians')} onViewReport={setSelectedReport} readOnly={isReadOnly} />;
-        if (currentPath === '/technicians/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi des chantiers" items={chantiers} onBack={() => setCurrentPath('/technicians')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        // --- MODULES (Tous actifs et modifiables) ---
+        if (currentPath === '/technicians') return <ModulePlaceholder title="Techniciens" subtitle="Gestion des équipes" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/technicians/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => setCurrentPath('/technicians')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/technicians/rapports') return <ReportModeSelector reports={reports} onSelectMode={() => {}} onBack={() => setCurrentPath('/technicians')} onViewReport={setSelectedReport} />;
+        if (currentPath === '/technicians/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi des chantiers" items={chantiers} onBack={() => setCurrentPath('/technicians')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
 
-        // --- COMPTABILITÉ ---
-        if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Transactions" items={transactions} onBack={() => setCurrentPath('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés" items={employees} onBack={() => setCurrentPath('/comptabilite')} color="bg-purple-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Historique" items={payrolls} onBack={() => setCurrentPath('/comptabilite')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Transactions" items={transactions} onBack={() => setCurrentPath('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés" items={employees} onBack={() => setCurrentPath('/comptabilite')} color="bg-purple-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Historique" items={payrolls} onBack={() => setCurrentPath('/comptabilite')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
 
-        // --- SECRÉTARIAT ---
-        if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Clients" subtitle="Base de données" items={clients} onBack={() => setCurrentPath('/secretariat')} color="bg-blue-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Flux journaliers" items={caisse} onBack={() => setCurrentPath('/secretariat')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Global" subtitle="Vue Agenda" items={interventions} onBack={() => setCurrentPath('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />; // Re-use interventions for planning view
+        if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Clients" subtitle="Base de données" items={clients} onBack={() => setCurrentPath('/secretariat')} color="bg-blue-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Flux journaliers" items={caisse} onBack={() => setCurrentPath('/secretariat')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Global" subtitle="Vue Agenda" items={interventions} onBack={() => setCurrentPath('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
 
-        // --- QUINCAILLERIE ---
-        if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks" subtitle="Inventaire matériel" items={stock} onBack={() => setCurrentPath('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => setCurrentPath('/quincaillerie')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-        if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Achats" subtitle="Commandes" items={purchases} onBack={() => setCurrentPath('/quincaillerie')} color="bg-red-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks" subtitle="Inventaire matériel" items={stock} onBack={() => setCurrentPath('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => setCurrentPath('/quincaillerie')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
+        if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Achats" subtitle="Commandes" items={purchases} onBack={() => setCurrentPath('/quincaillerie')} color="bg-red-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
 
-        // --- ÉQUIPE ---
-        if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Liste des membres" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Liste des membres" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
 
         // Fallback
         const activeModule = Object.values(MODULE_ACTIONS).flat().find(m => m.path === currentPath);
         if (activeModule) {
-             return <ModulePlaceholder title={activeModule.label} subtitle={activeModule.description} items={[]} onBack={() => setCurrentPath('/')} color={activeModule.color.replace('bg-', 'bg-')} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+             return <ModulePlaceholder title={activeModule.label} subtitle={activeModule.description} items={[]} onBack={() => setCurrentPath('/')} color={activeModule.color.replace('bg-', 'bg-')} currentSite={currentSite} currentPeriod={currentPeriod} onAdd={canAdd} onDelete={canDelete} />;
         }
 
         return (
@@ -1147,7 +988,6 @@ const App = () => {
                 </nav>
 
                 <div className="p-4 border-t border-gray-800 bg-black/20">
-                     {/* BOUTON PARAMÈTRES (ACCESSIBLE À TOUS) */}
                      <div className="mb-4">
                         <button 
                             onClick={() => setShowSettings(true)}
@@ -1157,13 +997,6 @@ const App = () => {
                                 <Settings size={18}/> Paramètres
                             </span>
                         </button>
-                        
-                        {/* Indicateur mode admin discret */}
-                        {isAdminMode && (
-                             <div className="mt-2 text-center">
-                                 <span className="text-xs text-red-400 font-mono bg-red-900/30 px-2 py-1 rounded border border-red-900/50">MODE ADMIN ACTIF</span>
-                             </div>
-                        )}
                      </div>
 
                     <div className="flex items-center mb-3">
@@ -1206,46 +1039,8 @@ const App = () => {
                 onClose={() => setShowSettings(false)}
                 userProfile={userProfile}
                 onUpdateProfile={setUserProfile}
-                isAdminMode={isAdminMode}
-                onToggleAdmin={() => {
-                    if (isAdminMode) setIsAdminMode(false);
-                    else setShowAdminLogin(true);
-                }}
                 onLogout={handleLogout}
             />
-
-            {/* ADMIN LOGIN POPUP (Inside or triggered by Settings) */}
-            {showAdminLogin && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowAdminLogin(false)} />
-                    <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-red-600">
-                        <button onClick={() => setShowAdminLogin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
-                                <Shield size={32} />
-                            </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Accès Administrateur</h3>
-                            <p className="text-sm text-gray-500 mt-1">Entrez le code PIN pour déverrouiller l'édition.</p>
-                        </div>
-                        <form onSubmit={handleAdminUnlock}>
-                            <div className="mb-4">
-                                <input 
-                                    type="password" 
-                                    value={adminPinInput}
-                                    onChange={e => setAdminPinInput(e.target.value)}
-                                    placeholder="Code PIN"
-                                    className="w-full text-center text-2xl tracking-widest p-3 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-                                    autoFocus
-                                />
-                                {adminError && <p className="text-red-500 text-xs text-center mt-2 font-bold">{adminError}</p>}
-                            </div>
-                            <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition shadow-lg">
-                                Déverrouiller
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             {/* Modals placed at root level */}
             {selectedReport && (
