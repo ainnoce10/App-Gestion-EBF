@@ -6,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target, RefreshCcw, Shield, Camera, Award, Unlock
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, MoveUp, MoveDown, Eye, EyeOff, Sparkles, Target, RefreshCcw, Shield, Camera, Award, Unlock, Smartphone, Image
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -214,15 +214,6 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
       color: 'bg-gray-700' 
     },
     { 
-      id: 'materiel', 
-      label: 'Matériel', 
-      description: 'Inventaire & Affectation', 
-      managedBy: 'Géré par le Magasinier',
-      icon: Truck, 
-      path: '/techniciens/materiel', 
-      color: 'bg-blue-600' 
-    },
-    { 
       id: 'chantiers', 
       label: 'Chantiers', 
       description: 'Suivi & Exécution', 
@@ -279,9 +270,8 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
   return true;
 };
 
-// --- EBF Vector Logo (Globe + Plug) - SQUARE VERSION (rx=0) ---
+// --- EBF Vector Logo ---
 const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
-    // Scaling factor
     const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
     const width = 200 * scale;
     const height = 100 * scale;
@@ -294,30 +284,18 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
                     <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
                 </linearGradient>
             </defs>
-            {/* Globe */}
             <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
-            {/* Continents (Stylized) */}
             <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
             <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
-            
-            {/* Cord */}
             <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
-            
-            {/* Plug - SQUARE (rx=0) */}
             <rect x="70" y="20" width="20" height="25" rx="0" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
             <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
-            
-            {/* Cord Line */}
             <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
-            
-            {/* E.B.F Letters */}
             <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
             <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
             <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
             <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
             <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
-            
-            {/* Banner Text */}
             <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
             <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
                 Electricité - Bâtiment - Froid
@@ -388,7 +366,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                             {filteredItems.length === 0 ? (
-                                <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucun donnée trouvée.</td></tr>
+                                <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucune donnée trouvée.</td></tr>
                             ) : (
                                 filteredItems.map((item: any) => (
                                     <tr key={item.id} className="hover:bg-orange-50/30 dark:hover:bg-gray-750 transition">
@@ -401,7 +379,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                             {item.role && <p className="text-xs text-gray-500">{item.role}</p>}
                                         </td>
                                         <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
-                                            {item.description || item.specialty || item.unit || item.category || item.supplier || '-'}
+                                            {item.description || item.specialty || item.unit || item.category || item.supplier || item.location || '-'}
                                             {item.date && <span className="block text-xs text-gray-400">{item.date}</span>}
                                         </td>
                                         <td className="p-4">
@@ -420,7 +398,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                                 </span>
                                             ) : (
                                                 <span className={`font-bold ${item.quantity <= (item.threshold || 0) ? 'text-red-500' : 'text-gray-800'}`}>
-                                                    {item.quantity} {item.unit}
+                                                    {item.quantity || 0} {item.unit}
                                                 </span>
                                             )}
                                         </td>
@@ -498,28 +476,158 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     );
 };
 
-// --- Help Modal ---
-const HelpModal = ({ isOpen, onClose }: any) => {
+// --- SETTINGS MODAL (Accessible to ALL) ---
+const SettingsModal = ({ isOpen, onClose, userProfile, onUpdateProfile, isAdminMode, onToggleAdmin, onLogout }: any) => {
+    const [activeTab, setActiveTab] = useState<'profile' | 'admin' | 'app'>('profile');
+    const [editName, setEditName] = useState(userProfile?.full_name || '');
+    const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
+    const [loading, setLoading] = useState(false);
+
     if (!isOpen) return null;
+
+    const handleSaveProfile = async () => {
+        setLoading(true);
+        try {
+            const updates = { 
+                id: userProfile.id,
+                full_name: editName,
+                phone: editPhone,
+                updated_at: new Date()
+            };
+            const { error } = await supabase.from('profiles').upsert(updates);
+            if (error) throw error;
+            onUpdateProfile({ ...userProfile, full_name: editName, phone: editPhone });
+            alert('Profil mis à jour !');
+        } catch (error) {
+            alert('Erreur lors de la mise à jour.');
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border-t-4 border-green-500">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><HelpCircle className="text-green-500"/> Aide & Support</h3>
-                    <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl shadow-2xl animate-fade-in flex flex-col md:flex-row overflow-hidden h-[500px]">
+                {/* Sidebar Settings */}
+                <div className="w-full md:w-1/3 bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-700 p-4">
+                    <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-gray-800 dark:text-white"><Settings className="text-ebf-orange"/> Paramètres</h3>
+                    <nav className="space-y-2">
+                        <button onClick={() => setActiveTab('profile')} className={`w-full text-left p-3 rounded-lg text-sm font-medium flex items-center gap-2 transition ${activeTab === 'profile' ? 'bg-white shadow text-ebf-orange font-bold' : 'text-gray-500 hover:bg-gray-200'}`}>
+                            <User size={16}/> Mon Profil
+                        </button>
+                        <button onClick={() => setActiveTab('admin')} className={`w-full text-left p-3 rounded-lg text-sm font-medium flex items-center gap-2 transition ${activeTab === 'admin' ? 'bg-white shadow text-red-500 font-bold' : 'text-gray-500 hover:bg-gray-200'}`}>
+                            <Shield size={16}/> Administration
+                        </button>
+                        <button onClick={() => setActiveTab('app')} className={`w-full text-left p-3 rounded-lg text-sm font-medium flex items-center gap-2 transition ${activeTab === 'app' ? 'bg-white shadow text-blue-500 font-bold' : 'text-gray-500 hover:bg-gray-200'}`}>
+                            <Smartphone size={16}/> Application
+                        </button>
+                    </nav>
+                    <div className="mt-auto pt-8">
+                         <button onClick={onLogout} className="w-full p-2 text-red-500 hover:bg-red-50 rounded text-sm font-bold flex items-center gap-2 justify-center border border-red-100"><LogOut size={14}/> Déconnexion</button>
+                    </div>
                 </div>
-                <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
-                    <p><strong>Mode Administrateur :</strong> Pour modifier ou ajouter des données, allez dans les paramètres et cliquez sur "Mode Administrateur".</p>
-                    <p><strong>Flash Info :</strong> Les messages automatiques sont générés par l'IA en fonction de la rentabilité.</p>
-                    <p><strong>Export PDF :</strong> Disponible dans le tableau de bord.</p>
+
+                {/* Content Settings */}
+                <div className="flex-1 p-6 overflow-y-auto">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
+                    
+                    {activeTab === 'profile' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Mon Profil</h4>
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
+                                    <Camera size={24}/>
+                                </div>
+                                <div>
+                                    <button className="text-sm text-ebf-orange font-bold hover:underline">Changer la photo</button>
+                                    <p className="text-xs text-gray-400">JPG, PNG max 2Mo</p>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nom Complet</label>
+                                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-2 border rounded-lg" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Téléphone</label>
+                                    <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full p-2 border rounded-lg" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                                    <input type="text" value={userProfile?.email} disabled className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed" />
+                                </div>
+                            </div>
+                            <button onClick={handleSaveProfile} disabled={loading} className="px-6 py-2 bg-ebf-orange text-white rounded-lg font-bold shadow hover:bg-orange-600 transition disabled:opacity-50">
+                                {loading ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                            </button>
+                        </div>
+                    )}
+
+                    {activeTab === 'admin' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h4 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2"><Lock size={20}/> Zone Sécurisée</h4>
+                            <p className="text-sm text-gray-600">Activez le mode administrateur pour effectuer des modifications (Ajout, Suppression, Édition).</p>
+                            
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-bold text-gray-800">Mode Administrateur</p>
+                                        <p className="text-xs text-gray-500">{isAdminMode ? 'Actif - Vous pouvez modifier les données' : 'Inactif - Lecture seule'}</p>
+                                    </div>
+                                    <button 
+                                        onClick={onToggleAdmin}
+                                        className={`px-4 py-2 rounded-lg font-bold text-sm transition ${isAdminMode ? 'bg-red-100 text-red-600 border border-red-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                                    >
+                                        {isAdminMode ? 'Désactiver' : 'Activer'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {isAdminMode && (
+                                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                                    <p className="text-xs font-bold text-red-800 uppercase mb-2">Danger Zone</p>
+                                    <button className="text-red-600 text-sm hover:underline flex items-center gap-1"><Key size={14}/> Changer le code PIN Administrateur</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'app' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Préférences Application</h4>
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <Moon size={20} className="text-gray-600"/>
+                                    <span>Mode Sombre</span>
+                                </div>
+                                <div className="w-10 h-5 bg-gray-300 rounded-full relative cursor-pointer">
+                                    <div className="w-5 h-5 bg-white rounded-full shadow absolute left-0 top-0 transform transition"></div>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <Bell size={20} className="text-gray-600"/>
+                                    <span>Notifications</span>
+                                </div>
+                                <div className="w-10 h-5 bg-green-500 rounded-full relative cursor-pointer">
+                                    <div className="w-5 h-5 bg-white rounded-full shadow absolute right-0 top-0 transform transition"></div>
+                                </div>
+                            </div>
+                             <div className="text-center pt-8 text-xs text-gray-400">
+                                <p>EBF Manager v1.2.0</p>
+                                <p>© 2024 EBF Côte d'Ivoire</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Login Screen (SIMPLIFIED: No Roles) ---
+// --- Login Screen ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
@@ -550,8 +658,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
       }
 
       if (isSignUp) {
-        // SIMPLIFIED SIGNUP: No Role selection. Default role is 'Technicien' or 'Member'.
-        const metadata = { full_name: cleanName, role: 'Technicien', site: site }; // Default metadata
+        const metadata = { full_name: cleanName, role: 'Technicien', site: site }; 
         let signUpResp;
         if (authMethod === 'email') {
           signUpResp = await supabase.auth.signUp({ email: cleanIdentifier, password: cleanPassword, options: { data: metadata } });
@@ -561,7 +668,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
         if (signUpResp.error) throw signUpResp.error;
 
-        // CRITICAL: Check if we have a session immediately
         if (signUpResp.data.session) {
              const userId = signUpResp.data.user?.id;
              if (userId) {
@@ -570,12 +676,11 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      email: authMethod === 'email' ? cleanIdentifier : '',
                      phone: authMethod === 'phone' ? cleanIdentifier : '',
                      full_name: cleanName,
-                     role: 'Technicien', // Default Role
+                     role: 'Technicien',
                      site: site,
                      permissions: {} 
                  }]);
                  
-                 // Auto-add to team
                  await supabase.from('technicians').upsert([{
                      id: userId,
                      name: cleanName,
@@ -592,7 +697,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         }
 
       } else {
-        // LOGIN MODE
         const { data, error: err } = await supabase.auth.signInWithPassword(
             authMethod === 'email' ? { email: cleanIdentifier, password: cleanPassword } : { phone: cleanIdentifier, password: cleanPassword }
         );
@@ -713,44 +817,185 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
 const App = () => {
     const [session, setSession] = useState<any>(null);
+    const [userProfile, setUserProfile] = useState<any>(null);
     const [currentPath, setCurrentPath] = useState('/');
     const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
     const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.DAY);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     
-    // --- ADMIN MODE STATE ---
-    // Par défaut, tout le monde est en lecture seule (false).
-    // Le code PIN débloque ce mode à true.
+    // --- ADMIN & SETTINGS STATE ---
     const [isAdminMode, setIsAdminMode] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const [showAdminLogin, setShowAdminLogin] = useState(false);
-    const [showChangePin, setShowChangePin] = useState(false);
     const [adminPinInput, setAdminPinInput] = useState('');
-    const [newPinInput, setNewPinInput] = useState('');
     const [adminError, setAdminError] = useState('');
 
-    // --- DATA STATE ---
+    // --- REAL-TIME DATA STATE FOR ALL MODULES ---
     const [stats, setStats] = useState<StatData[]>(MOCK_STATS);
     const [reports, setReports] = useState<DailyReport[]>(MOCK_REPORTS);
     const [technicians, setTechnicians] = useState<Technician[]>(MOCK_TECHNICIANS);
     const [stock, setStock] = useState<StockItem[]>(MOCK_STOCK);
     const [interventions, setInterventions] = useState<Intervention[]>(MOCK_INTERVENTIONS);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    
+    // NOUVEAUX ÉTATS POUR LES AUTRES MODULES
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [payrolls, setPayrolls] = useState<any[]>([]);
+    const [clients, setClients] = useState<any[]>([]);
+    const [suppliers, setSuppliers] = useState<any[]>([]);
+    const [purchases, setPurchases] = useState<any[]>([]);
+    const [chantiers, setChantiers] = useState<any[]>([]);
+    const [caisse, setCaisse] = useState<any[]>([]);
+
     const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
     const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
 
-    // Fetch session
+    // Fetch session & Profile
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const initSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
             setSession(session);
-        });
+            if (session?.user) {
+                const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+                if (data) setUserProfile(data);
+            }
+        };
+        initSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setSession(session);
+            if (session?.user) {
+                const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+                if (data) setUserProfile(data);
+            }
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    // Helper: Load Admin PIN from storage or default
+    // --- FETCH DATA FOR ALL TABLES ---
+    useEffect(() => {
+        if (!session) return;
+
+        const fetchData = async () => {
+             // 1. Basic Data
+             const { data: r } = await supabase.from('reports').select('*');
+             if(r) setReports(r);
+             
+             const { data: t } = await supabase.from('technicians').select('*');
+             if(t) setTechnicians(t);
+
+             const { data: s } = await supabase.from('stocks').select('*');
+             if(s) setStock(s);
+
+             const { data: i } = await supabase.from('interventions').select('*');
+             if(i) setInterventions(i);
+
+             const { data: trans } = await supabase.from('transactions').select('*');
+             if(trans) setTransactions(trans);
+
+             // 2. Extended Modules
+             const { data: emp } = await supabase.from('employees').select('*');
+             if(emp) setEmployees(emp);
+
+             const { data: pay } = await supabase.from('payrolls').select('*');
+             if(pay) setPayrolls(pay);
+
+             const { data: cli } = await supabase.from('clients').select('*');
+             if(cli) setClients(cli);
+
+             const { data: sup } = await supabase.from('suppliers').select('*');
+             if(sup) setSuppliers(sup);
+
+             const { data: pur } = await supabase.from('purchases').select('*');
+             if(pur) setPurchases(pur);
+
+             const { data: chan } = await supabase.from('construction_sites').select('*');
+             if(chan) setChantiers(chan);
+             
+             const { data: cai } = await supabase.from('caisse').select('*');
+             if(cai) setCaisse(cai);
+        };
+
+        fetchData();
+
+        // REALTIME SUBSCRIPTIONS FOR ALL
+        const channels = [
+            supabase.channel('public:reports').on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, payload => {
+                if(payload.eventType === 'INSERT') setReports(prev => [payload.new as DailyReport, ...prev]);
+                if(payload.eventType === 'DELETE') setReports(prev => prev.filter(i => i.id !== payload.old.id));
+            }).subscribe(),
+            supabase.channel('public:interventions').on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, payload => {
+                if(payload.eventType === 'INSERT') setInterventions(prev => [payload.new as Intervention, ...prev]);
+            }).subscribe(),
+            supabase.channel('public:employees').on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, payload => {
+                if(payload.eventType === 'INSERT') setEmployees(prev => [payload.new, ...prev]);
+            }).subscribe(),
+             supabase.channel('public:construction_sites').on('postgres_changes', { event: '*', schema: 'public', table: 'construction_sites' }, payload => {
+                if(payload.eventType === 'INSERT') setChantiers(prev => [payload.new, ...prev]);
+            }).subscribe()
+            // (Subscriptions for others can be added similarly)
+        ];
+
+        return () => { channels.forEach(c => c.unsubscribe()); };
+
+    }, [session]);
+
+    // Calculate Real-time Stats based on Reports + Transactions + Interventions
+    const calculatedStats = useMemo(() => {
+        // Group by Date and Site logic (Simplified for global view)
+        // Here we just merge transactions revenue and reports revenue
+        // In a real app, this would be a more complex aggregation map
+        const tempStats: StatData[] = [];
+        
+        // Use Transactions as base for financial history
+        transactions.forEach(t => {
+            // Find existing stat for this day/site or create new
+            let stat = tempStats.find(s => s.date === t.date && s.site === t.site);
+            if (!stat) {
+                stat = { date: t.date, site: t.site, revenue: 0, expenses: 0, profit: 0, interventions: 0 };
+                tempStats.push(stat);
+            }
+            if (t.type === 'Recette') stat.revenue += t.amount;
+            if (t.type === 'Dépense') stat.expenses += t.amount;
+        });
+
+        // Add Reports financial data
+        reports.forEach(r => {
+            if(!r.date) return;
+            let stat = tempStats.find(s => s.date === r.date && s.site === r.site);
+            if (!stat) {
+                 stat = { date: r.date, site: r.site, revenue: 0, expenses: 0, profit: 0, interventions: 0 };
+                 tempStats.push(stat);
+            }
+            if(r.revenue) stat.revenue += r.revenue;
+            if(r.expenses) stat.expenses += r.expenses;
+        });
+        
+        // Count interventions
+        interventions.forEach(i => {
+             let stat = tempStats.find(s => s.date === i.date && s.site === i.site);
+             if (!stat) {
+                 // Note: intervention doesn't have revenue directly here, just count
+                 stat = { date: i.date, site: i.site, revenue: 0, expenses: 0, profit: 0, interventions: 0 };
+                 tempStats.push(stat);
+             }
+             stat.interventions += 1;
+        });
+
+        // Calculate Profit
+        tempStats.forEach(s => s.profit = s.revenue - s.expenses);
+
+        // Sort by date
+        return tempStats.sort((a,b) => b.date.localeCompare(a.date));
+
+    }, [transactions, reports, interventions]);
+
+    // Use calculated stats if available, else Mock
+    const displayStats = calculatedStats.length > 0 ? calculatedStats : stats;
+
+
+    // Helper: Load Admin PIN
     const getStoredPin = () => localStorage.getItem('ebf_admin_pin') || 'ebf2026';
 
     const handleAdminUnlock = (e: React.FormEvent) => {
@@ -765,26 +1010,15 @@ const App = () => {
             setAdminError('Code incorrect.');
         }
     };
-
-    const handleChangePin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newPinInput.length < 4) {
-            setAdminError('Le code doit avoir au moins 4 caractères.');
-            return;
-        }
-        localStorage.setItem('ebf_admin_pin', newPinInput);
-        setNewPinInput('');
-        setShowChangePin(false);
-        alert("Nouveau code administrateur enregistré !");
-    };
     
     const handleLogout = async () => {
         await supabase.auth.signOut();
         setSession(null);
-        setIsAdminMode(false); // Reset admin mode on logout
+        setIsAdminMode(false); 
     };
 
     const handleDeleteReport = (id: string) => {
+        // In real app: await supabase.from('reports').delete().eq('id', id);
         setReports(prev => prev.filter(r => r.id !== id));
     };
 
@@ -792,14 +1026,13 @@ const App = () => {
         return <LoginScreen onLoginSuccess={() => supabase.auth.getSession().then(({ data: { session } }) => setSession(session))} />;
     }
 
-    // Router Logic
+    // Router Logic - Updated with REAL DATA MAPPING
     const renderContent = () => {
-        // ReadOnly is TRUE if NOT in Admin Mode
         const isReadOnly = !isAdminMode;
 
         if (currentPath === '/') {
             return <Dashboard 
-                     data={stats} 
+                     data={displayStats} 
                      reports={reports} 
                      tickerMessages={tickerMessages} 
                      stock={stock}
@@ -813,7 +1046,7 @@ const App = () => {
         }
         if (currentPath === '/synthesis') {
             return <DetailedSynthesis 
-                     data={stats} 
+                     data={displayStats} 
                      reports={reports} 
                      currentSite={currentSite} 
                      currentPeriod={currentPeriod} 
@@ -824,15 +1057,31 @@ const App = () => {
                    />;
         }
 
-        // Module Handling
+        // --- TECHNICIENS ---
         if (currentPath === '/technicians') return <ModulePlaceholder title="Techniciens" subtitle="Gestion des équipes" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
         if (currentPath === '/technicians/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => setCurrentPath('/technicians')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
         if (currentPath === '/technicians/rapports') return <ReportModeSelector reports={reports} onSelectMode={() => {}} onBack={() => setCurrentPath('/technicians')} onViewReport={setSelectedReport} readOnly={isReadOnly} />;
+        if (currentPath === '/technicians/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi des chantiers" items={chantiers} onBack={() => setCurrentPath('/technicians')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
 
-        // Quincaillerie
+        // --- COMPTABILITÉ ---
+        if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Transactions" items={transactions} onBack={() => setCurrentPath('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés" items={employees} onBack={() => setCurrentPath('/comptabilite')} color="bg-purple-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Historique" items={payrolls} onBack={() => setCurrentPath('/comptabilite')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+
+        // --- SECRÉTARIAT ---
+        if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Clients" subtitle="Base de données" items={clients} onBack={() => setCurrentPath('/secretariat')} color="bg-blue-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Flux journaliers" items={caisse} onBack={() => setCurrentPath('/secretariat')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Global" subtitle="Vue Agenda" items={interventions} onBack={() => setCurrentPath('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />; // Re-use interventions for planning view
+
+        // --- QUINCAILLERIE ---
         if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks" subtitle="Inventaire matériel" items={stock} onBack={() => setCurrentPath('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => setCurrentPath('/quincaillerie')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+        if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Achats" subtitle="Commandes" items={purchases} onBack={() => setCurrentPath('/quincaillerie')} color="bg-red-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
 
-        // Generic Fallback for other modules
+        // --- ÉQUIPE ---
+        if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Liste des membres" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+
+        // Fallback
         const activeModule = Object.values(MODULE_ACTIONS).flat().find(m => m.path === currentPath);
         if (activeModule) {
              return <ModulePlaceholder title={activeModule.label} subtitle={activeModule.description} items={[]} onBack={() => setCurrentPath('/')} color={activeModule.color.replace('bg-', 'bg-')} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
@@ -841,8 +1090,7 @@ const App = () => {
         return (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                 <Wrench size={48} className="mb-4 opacity-20" />
-                <h3 className="text-lg font-bold">Module en construction</h3>
-                <p>La section {currentPath} sera bientôt disponible.</p>
+                <h3 className="text-lg font-bold">Module inconnu</h3>
                 <button onClick={() => setCurrentPath('/')} className="mt-4 text-ebf-orange hover:underline">Retour Accueil</button>
             </div>
         );
@@ -899,23 +1147,22 @@ const App = () => {
                 </nav>
 
                 <div className="p-4 border-t border-gray-800 bg-black/20">
-                     {/* SETTINGS / ADMIN TOGGLE */}
+                     {/* BOUTON PARAMÈTRES (ACCESSIBLE À TOUS) */}
                      <div className="mb-4">
                         <button 
-                            onClick={() => setShowAdminLogin(true)}
-                            className={`w-full flex items-center justify-between p-2 rounded-lg text-sm font-bold transition ${isAdminMode ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                            onClick={() => setShowSettings(true)}
+                            className={`w-full flex items-center justify-between p-3 rounded-lg text-sm font-bold transition bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white`}
                         >
                             <span className="flex items-center gap-2">
-                                {isAdminMode ? <Unlock size={16}/> : <Lock size={16}/>}
-                                {isAdminMode ? 'Mode Admin Actif' : 'Mode Administrateur'}
+                                <Settings size={18}/> Paramètres
                             </span>
-                            {isAdminMode && <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>}
                         </button>
                         
+                        {/* Indicateur mode admin discret */}
                         {isAdminMode && (
-                            <button onClick={() => setShowChangePin(true)} className="w-full text-xs text-center text-gray-400 hover:text-white mt-2 underline">
-                                Changer le code PIN
-                            </button>
+                             <div className="mt-2 text-center">
+                                 <span className="text-xs text-red-400 font-mono bg-red-900/30 px-2 py-1 rounded border border-red-900/50">MODE ADMIN ACTIF</span>
+                             </div>
                         )}
                      </div>
 
@@ -923,14 +1170,11 @@ const App = () => {
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-600 to-gray-700 flex items-center justify-center text-white font-bold text-xs shadow-md border border-gray-500">
                             <User size={14}/>
                         </div>
-                        <div className="ml-3">
-                            <p className="text-sm font-bold text-white">Utilisateur</p>
-                            <p className="text-xs text-green-500 font-medium">Connecté</p>
+                        <div className="ml-3 truncate">
+                            <p className="text-sm font-bold text-white truncate w-32">{userProfile?.full_name || 'Utilisateur'}</p>
+                            <p className="text-xs text-green-500 font-medium">En ligne</p>
                         </div>
                     </div>
-                    <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 text-xs font-bold text-red-400 hover:bg-red-900/30 rounded-lg transition border border-red-900/50">
-                        <LogOut size={14} className="mr-2" /> Déconnexion
-                    </button>
                 </div>
             </div>
 
@@ -956,9 +1200,23 @@ const App = () => {
                 </main>
             </div>
             
-            {/* ADMIN LOGIN MODAL */}
+            {/* SETTINGS MODAL */}
+            <SettingsModal 
+                isOpen={showSettings} 
+                onClose={() => setShowSettings(false)}
+                userProfile={userProfile}
+                onUpdateProfile={setUserProfile}
+                isAdminMode={isAdminMode}
+                onToggleAdmin={() => {
+                    if (isAdminMode) setIsAdminMode(false);
+                    else setShowAdminLogin(true);
+                }}
+                onLogout={handleLogout}
+            />
+
+            {/* ADMIN LOGIN POPUP (Inside or triggered by Settings) */}
             {showAdminLogin && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowAdminLogin(false)} />
                     <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-red-600">
                         <button onClick={() => setShowAdminLogin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
@@ -983,33 +1241,6 @@ const App = () => {
                             </div>
                             <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition shadow-lg">
                                 Déverrouiller
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* CHANGE PIN MODAL */}
-            {showChangePin && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowChangePin(false)} />
-                    <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-gray-600">
-                        <button onClick={() => setShowChangePin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Changer le Code PIN</h3>
-                        <form onSubmit={handleChangePin}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Nouveau Code</label>
-                                <input 
-                                    type="text" 
-                                    value={newPinInput}
-                                    onChange={e => setNewPinInput(e.target.value)}
-                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-gray-500 outline-none"
-                                    placeholder="Ex: 1234"
-                                />
-                                {adminError && <p className="text-red-500 text-xs mt-2">{adminError}</p>}
-                            </div>
-                            <button type="submit" className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-gray-900 transition">
-                                Enregistrer
                             </button>
                         </form>
                     </div>
