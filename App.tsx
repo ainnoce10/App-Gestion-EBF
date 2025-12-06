@@ -12,6 +12,7 @@ import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
 import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician, UserPermissions } from './types';
 import { supabase } from './services/supabaseClient';
+import { MOCK_STATS, MOCK_REPORTS, MOCK_TECHNICIANS, MOCK_STOCK, MOCK_INTERVENTIONS, DEFAULT_TICKER_MESSAGES } from './constants';
 
 // --- CONFIGURATION DEBUG / DEV ---
 // Mettre à FALSE pour réactiver l'écran de connexion
@@ -605,11 +606,8 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
             if (data.session && !error) {
                 // SUCCESS! Credentials matched.
-                // Fetch Role for display message
-                const { data: p } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).single();
-                let roleName = p && p.role ? p.role : 'Utilisateur';
-                
-                setPreCheckRole(roleName); // Shows "Vous allez vous connecter..."
+                const role = await getDisplayRole(data.session);
+                setPreCheckRole(role); // Shows "Vous allez vous connecter..."
                 // We DO NOT call onLoginSuccess() here. We wait for user to click button.
             } else {
                 setPreCheckRole(null); // Invalid credentials, stay silent
@@ -623,6 +621,21 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     return () => clearTimeout(checkTimeout);
   }, [identifier, password, authMethod, isSignUp, isResetMode]);
 
+  // Helper to determine display role
+  const getDisplayRole = async (session: any) => {
+      // 1. Force Admin Flag Override
+      if (FORCE_ADMIN_ON_LOGIN) return 'Admin';
+
+      // 2. Check Metadata (First intent during signup - Most accurate if DB is lagging)
+      const metaRole = session.user?.user_metadata?.role;
+      if (metaRole) return metaRole;
+
+      // 3. Check Profile from DB
+      const { data: p } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+      if (p && p.role) return p.role;
+
+      return 'Utilisateur'; // Fallback
+  }
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -704,11 +717,10 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         
         if (err) throw err;
 
-        // Fetch Role for display message
+        // Fetch Role for display message using the robust helper
         let roleName = 'Utilisateur';
         if (data.session) {
-             const { data: p } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).single();
-             if (p && p.role) roleName = p.role;
+             roleName = await getDisplayRole(data.session);
         }
 
         setLoginSuccessRole(roleName);
@@ -825,7 +837,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                     <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center animate-fade-in mb-2">
                         <div className="flex justify-center mb-1"><CheckCircle className="text-green-600" size={24} /></div>
                         <p className="text-green-800 font-bold text-sm">Identité confirmée</p>
-                        <p className="text-green-900 text-xs">Vous allez vous connecter en tant que <span className="font-bold uppercase text-ebf-orange">{loginSuccessRole || preCheckRole}</span></p>
+                        <p className="text-green-900 text-xs">Vous allez vous connecter en tant que <span className="font-bold uppercase text-ebf-orange">{loginSuccessRole || preCheckRole === 'Admin' ? 'Administrateur' : (loginSuccessRole || preCheckRole)}</span></p>
                     </div>
                 )}
 
@@ -857,1049 +869,248 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   );
 };
 
-// --- Onboarding Flow ---
-const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => void }) => {
-  const [error, setError] = useState('');
-
-  // Skipped 'message' step, directly to biometric prompt
-
-  const handleEnableBiometrics = () => {
-    if (window.PublicKeyCredential) {
-      localStorage.setItem('ebf_biometric_active', 'true');
-      onComplete();
-    } else {
-      setError("Votre appareil ne supporte pas l'authentification biométrique sécurisée.");
-    }
-  };
-
-  const handleSkip = () => {
-     localStorage.setItem('ebf_biometric_active', 'false');
-     onComplete();
-  };
-
-  return (
-     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-900/50 backdrop-blur-md transition-all duration-700">
-        <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full mx-4 border-t-4 border-ebf-orange animate-slide-in relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 text-gray-50 opacity-50 pointer-events-none">
-                <ScanFace size={200} />
-            </div>
-            <div className="flex justify-center mb-8 relative z-10">
-                <div className="p-5 bg-orange-50 rounded-full text-ebf-orange shadow-inner ring-1 ring-orange-100">
-                    <Fingerprint size={56} />
-                </div>
-            </div>
-            <h3 className="text-2xl font-bold text-center text-gray-800 mb-3 relative z-10">Connexion Rapide</h3>
-            {error && <p className="text-red-500 bg-red-50 p-3 rounded-lg text-sm text-center mb-4 font-bold relative z-10">{error}</p>}
-            <p className="text-gray-500 text-center mb-10 leading-relaxed relative z-10">
-                Souhaitez-vous activer la connexion par <strong className="text-gray-800">empreinte digitale</strong> ou <strong className="text-gray-800">reconnaissance faciale</strong> ?
-            </p>
-            <div className="space-y-3 relative z-10">
-                <button onClick={handleEnableBiometrics} className="w-full bg-ebf-orange text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3">
-                    <ScanFace size={22}/> Oui, activer
-                </button>
-                <button onClick={handleSkip} className="w-full bg-white text-gray-500 font-bold py-3.5 rounded-xl hover:bg-gray-50 border border-gray-200 transition-colors">
-                    Plus tard
-                </button>
-            </div>
-        </div>
-     </div>
-  );
-};
-
-// --- Loading Screen ---
-const LoadingScreen = () => (
-    <div className="h-screen w-screen flex flex-col items-center justify-center bg-ebf-pattern">
-        <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center backdrop-blur-sm border border-gray-100">
-            <Loader2 size={48} className="text-ebf-orange animate-spin mb-4"/>
-            <p className="text-gray-700 font-bold animate-pulse text-lg">Chargement EBF Manager...</p>
-        </div>
-    </div>
-);
-
-// --- Confirmation Modal ---
-const ConfirmationModal = ({ 
-  isOpen, onClose, onConfirm, title, message 
-}: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border-t-4 border-red-500">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600"><AlertTriangle size={28} /></div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{title}</h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">{message}</p>
-          <div className="flex gap-4 w-full">
-            <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-bold">Annuler</button>
-            <button onClick={() => { onConfirm(); onClose(); }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-md">Supprimer</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Add Item Modal (Generic) ---
-const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
-  const [formData, setFormData] = useState<any>({});
-
-  useEffect(() => {
-    if (isOpen) setFormData({}); 
-  }, [isOpen]);
-
-  const handleSubmit = () => {
-    if (config.title.includes('Rapport') && !formData.method) {
-        formData.method = 'Form';
-    }
-    onSubmit(formData);
-  };
-
-  if (!isOpen || !config) return null;
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{config.title}</h3>
-        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-          {config.fields.map((field: FormField) => (
-             <div key={field.name}>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
-                {field.type === 'select' ? (
-                   <select 
-                     className="w-full border border-gray-200 p-2.5 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none"
-                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
-                     value={formData[field.name] || ''}
-                   >
-                     <option value="">Sélectionner...</option>
-                     {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                   </select>
-                ) : (
-                   <input 
-                     type={field.type} 
-                     className="w-full border border-gray-200 p-2.5 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none"
-                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
-                     value={formData[field.name] || ''}
-                     placeholder={field.placeholder || ''}
-                   />
-                )}
-             </div>
-          ))}
-        </div>
-        <div className="mt-6 flex gap-3">
-           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
-           <button onClick={handleSubmit} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600 transition shadow-md">
-             {loading ? <Loader2 className="animate-spin mx-auto"/> : "Ajouter"}
-           </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Flash Info Configuration Modal ---
-const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMessage }: any) => {
-    const [newMessage, setNewMessage] = useState({ text: '', type: 'info' });
+const App = () => {
+    const [session, setSession] = useState<any>(null);
+    const [role, setRole] = useState<Role>('Visiteur');
+    const [currentPath, setCurrentPath] = useState('/');
+    const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
+    const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.DAY);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     
-    if (!isOpen) return null;
+    // Data State (Initialisé avec les Mocks, pourrait venir de Supabase)
+    const [stats, setStats] = useState<StatData[]>(MOCK_STATS);
+    const [reports, setReports] = useState<DailyReport[]>(MOCK_REPORTS);
+    const [technicians, setTechnicians] = useState<Technician[]>(MOCK_TECHNICIANS);
+    const [stock, setStock] = useState<StockItem[]>(MOCK_STOCK);
+    const [interventions, setInterventions] = useState<Intervention[]>(MOCK_INTERVENTIONS);
+    const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>(DEFAULT_TICKER_MESSAGES);
+    const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
 
-    const handleSubmit = () => {
-        if (!newMessage.text) return;
-        onSaveMessage(newMessage.text, newMessage.type);
-        setNewMessage({ text: '', type: 'info' });
+    const [userPermissions, setUserPermissions] = useState<UserPermissions>({});
+
+    // Fetch session
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if(session) fetchUserRole(session);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            if(session) fetchUserRole(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const fetchUserRole = async (session: any) => {
+        // Logic similar to LoginScreen helper but for app state
+        if (FORCE_ADMIN_ON_LOGIN) {
+            setRole('Admin');
+            setUserPermissions({ technique: true, comptabilite: true, secretariat: true, quincaillerie: true, rh: true });
+            return;
+        }
+        
+        const { data } = await supabase.from('profiles').select('role, permissions').eq('id', session.user.id).single();
+        if (data) {
+            setRole(data.role as Role);
+            setUserPermissions(data.permissions || {});
+        }
+    };
+
+    const handleLoginSuccess = () => {
+        // Triggered by LoginScreen, usually session update handles state, but we can force refresh if needed
+        supabase.auth.getSession().then(({ data: { session } }) => {
+             if(session) fetchUserRole(session);
+        });
+    };
+    
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setSession(null);
+        setRole('Visiteur');
+    };
+
+    const handleDeleteReport = (id: string) => {
+        setReports(prev => prev.filter(r => r.id !== id));
+    };
+
+    if (!session && !DEV_MODE_BYPASS_LOGIN) {
+        return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    }
+
+    // Router Logic
+    const renderContent = () => {
+        if (currentPath === '/') {
+            return <Dashboard 
+                     data={stats} 
+                     reports={reports} 
+                     tickerMessages={tickerMessages} 
+                     stock={stock}
+                     currentSite={currentSite} 
+                     currentPeriod={currentPeriod} 
+                     onSiteChange={setCurrentSite} 
+                     onPeriodChange={setCurrentPeriod}
+                     onNavigate={setCurrentPath}
+                     onDeleteReport={handleDeleteReport}
+                   />;
+        }
+        if (currentPath === '/synthesis') {
+            return <DetailedSynthesis 
+                     data={stats} 
+                     reports={reports} 
+                     currentSite={currentSite} 
+                     currentPeriod={currentPeriod} 
+                     onSiteChange={setCurrentSite} 
+                     onPeriodChange={setCurrentPeriod}
+                     onNavigate={setCurrentPath}
+                     onViewReport={setSelectedReport}
+                   />;
+        }
+
+        // Module Handling
+        // Technicians
+        if (currentPath === '/technicians') return <ModulePlaceholder title="Techniciens" subtitle="Gestion des équipes" items={technicians} onBack={() => setCurrentPath('/')} color="bg-gray-600" currentSite={currentSite} currentPeriod={currentPeriod} />;
+        if (currentPath === '/technicians/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => setCurrentPath('/technicians')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} />;
+        if (currentPath === '/technicians/rapports') return <ReportModeSelector reports={reports} onSelectMode={() => {}} onBack={() => setCurrentPath('/technicians')} onViewReport={setSelectedReport} readOnly={false} />;
+
+        // Quincaillerie
+        if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks" subtitle="Inventaire matériel" items={stock} onBack={() => setCurrentPath('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} currentPeriod={currentPeriod} />;
+
+        // Default
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <Wrench size={48} className="mb-4 opacity-20" />
+                <h3 className="text-lg font-bold">Module en construction</h3>
+                <p>La section {currentPath} sera bientôt disponible.</p>
+                <button onClick={() => setCurrentPath('/')} className="mt-4 text-ebf-orange hover:underline">Retour Accueil</button>
+            </div>
+        );
     };
 
     return (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl p-6 shadow-2xl animate-fade-in flex flex-col max-h-[85vh] border-t-4 border-blue-500">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Megaphone className="text-ebf-orange"/> Configuration Flash Info
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X /></button>
+        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden font-sans text-gray-900">
+            {/* Sidebar Mobile Overlay */}
+            {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
+            
+            {/* Sidebar */}
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-2xl transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col border-r border-gray-100 dark:border-gray-700`}>
+                <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col items-center">
+                    <EbfLogo size="small" />
+                    <p className="text-xs font-bold text-gray-400 mt-2 tracking-widest uppercase">Manager Pro</p>
                 </div>
-
-                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6 border border-gray-100">
-                    <label className="block text-sm font-bold text-gray-900 dark:text-gray-200 mb-2">Ajouter un message manuel</label>
-                    <div className="flex gap-2 mb-2">
-                        <input 
-                            value={newMessage.text}
-                            onChange={(e) => setNewMessage({...newMessage, text: e.target.value})}
-                            placeholder="Ex: Réunion générale demain à 10h"
-                            className="flex-1 border border-gray-200 p-2 rounded bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none"
-                        />
-                        <select 
-                            value={newMessage.type}
-                            onChange={(e) => setNewMessage({...newMessage, type: e.target.value})}
-                            className="border border-gray-200 p-2 rounded bg-white text-gray-900 outline-none cursor-pointer"
-                        >
-                            <option value="info">Info (Bleu)</option>
-                            <option value="success">Succès (Vert)</option>
-                            <option value="alert">Alerte (Rouge)</option>
-                        </select>
-                        <button onClick={handleSubmit} className="bg-ebf-orange text-white px-4 py-2 rounded font-bold hover:bg-orange-600">
-                            Ajouter
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <h4 className="text-sm font-bold text-gray-500 uppercase mb-2">Messages Actifs (Manuels)</h4>
-                    <div className="space-y-2">
-                        {messages.filter((m: TickerMessage) => m.isManual).length === 0 ? (
-                            <p className="text-gray-400 text-sm italic text-center py-4">Aucun message manuel configuré.</p>
-                        ) : (
-                            messages.filter((m: TickerMessage) => m.isManual).map((msg: TickerMessage, idx: number) => (
-                                <div key={msg.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded shadow-sm hover:shadow-md transition">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${msg.type === 'alert' ? 'bg-red-500' : msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'}`}></div>
-                                        <span className="text-sm font-medium text-gray-800">{msg.text}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500 font-mono">#{idx + 1}</span>
-                                        <button onClick={() => onDeleteMessage(msg.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition">
-                                            <Trash2 size={16}/>
+                
+                <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                    {MAIN_MENU.map(item => (
+                        <div key={item.id}>
+                            <button 
+                                onClick={() => {
+                                    if (item.path !== currentPath) {
+                                        setCurrentPath(item.path);
+                                        // Auto-expand submenus logic could be here
+                                    }
+                                    if (window.innerWidth < 768) setIsSidebarOpen(false);
+                                }}
+                                className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group ${currentPath.startsWith(item.path) && item.path !== '/' ? 'bg-orange-50 text-orange-700 font-bold' : (currentPath === item.path ? 'bg-orange-50 text-orange-700 font-bold' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}`}
+                            >
+                                <item.icon size={20} className={`mr-3 transition-colors ${currentPath === item.path ? 'text-ebf-orange' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                                <span className="flex-1 text-left">{item.label}</span>
+                                {currentPath.startsWith(item.path) && item.path !== '/' && <ChevronRight size={16} className="text-orange-400" />}
+                            </button>
+                            
+                            {/* Submenu rendering if active */}
+                            {currentPath.startsWith(item.path) && item.path !== '/' && MODULE_ACTIONS[item.id] && (
+                                <div className="ml-9 mt-1 space-y-1 border-l-2 border-orange-100 pl-2 animate-fade-in">
+                                    {MODULE_ACTIONS[item.id].map(sub => (
+                                        <button 
+                                            key={sub.id}
+                                            onClick={() => { setCurrentPath(sub.path); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+                                            className={`w-full text-left p-2 rounded-md text-sm transition flex items-center ${currentPath === sub.path ? 'text-ebf-orange font-bold bg-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full mr-2 ${currentPath === sub.path ? 'bg-ebf-orange' : 'bg-gray-300'}`}></span>
+                                            {sub.label}
                                         </button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))
-                        )}
+                            )}
+                        </div>
+                    ))}
+                </nav>
+
+                <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center mb-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-ebf-orange to-red-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
+                            {role.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm font-bold text-gray-800 dark:text-white">{role}</p>
+                            <p className="text-xs text-green-600 font-medium">En ligne</p>
+                        </div>
                     </div>
+                    <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition border border-red-100">
+                        <LogOut size={14} className="mr-2" /> Déconnexion
+                    </button>
                 </div>
             </div>
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-900 relative">
+                {/* Header Mobile */}
+                <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 py-3 px-4 flex items-center justify-between md:hidden z-30 sticky top-0">
+                    <div className="flex items-center">
+                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 mr-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+                            <Menu size={24} />
+                        </button>
+                        <span className="font-bold text-gray-800">EBF Manager</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-ebf-orange">
+                        <Bell size={18} />
+                    </div>
+                </header>
+
+                <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+                    <div className="max-w-7xl mx-auto">
+                        {renderContent()}
+                    </div>
+                </main>
+            </div>
+            
+            {/* Modals placed at root level */}
+            {selectedReport && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setSelectedReport(null)} />
+                    <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in">
+                        <button onClick={() => setSelectedReport(null)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
+                        <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4 flex items-center gap-2">
+                            <FileText size={20} className="text-ebf-orange"/> Détail Rapport
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 bg-gray-50 rounded-lg">
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Technicien</p>
+                                    <p className="font-bold text-gray-800">{selectedReport.technicianName}</p>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-lg">
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Date</p>
+                                    <p className="font-bold text-gray-800">{selectedReport.date}</p>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg">
+                                <p className="text-xs text-orange-800 uppercase font-bold mb-1">Contenu</p>
+                                <p className="text-gray-800 italic">"{selectedReport.content}"</p>
+                            </div>
+                            {selectedReport.revenue !== undefined && (
+                                <div className="flex justify-between items-center border-t border-gray-100 pt-3">
+                                    <span className="text-sm text-gray-500">Recette déclarée</span>
+                                    <span className="font-bold text-green-600 text-lg">{selectedReport.revenue.toLocaleString()} F</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-// --- Permissions Management Modal ---
-const PermissionsModal = ({ isOpen, onClose }: any) => {
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setLoading(true);
-      supabase.from('profiles').select('*').then(({ data, error }) => {
-        setLoading(false);
-        if (data) setUsers(data as Profile[]);
-        if (error) console.error(error);
-      });
-    }
-  }, [isOpen]);
-
-  const togglePermission = async (userId: string, module: keyof UserPermissions, currentValue: boolean) => {
-     // Optimistic update
-     setUsers(users.map(u => {
-        if (u.id === userId) {
-            const newPerms = { ...u.permissions, [module]: !currentValue };
-            return { ...u, permissions: newPerms };
-        }
-        return u;
-     }));
-
-     // DB Update
-     const user = users.find(u => u.id === userId);
-     if (user) {
-         const updatedPerms = { ...user.permissions, [module]: !currentValue };
-         await supabase.from('profiles').update({ permissions: updatedPerms }).eq('id', userId);
-     }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-4xl p-6 shadow-2xl animate-fade-in border-t-4 border-purple-600 flex flex-col max-h-[85vh]">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-             <Shield size={24} className="text-purple-600"/> Gestion des Permissions
-          </h3>
-          <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {loading ? <div className="text-center p-10"><Loader2 className="animate-spin mx-auto text-purple-600"/></div> : (
-                <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                        <tr>
-                            <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Utilisateur</th>
-                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Technique</th>
-                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Comptabilité</th>
-                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Secrétariat</th>
-                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">Stocks</th>
-                            <th className="p-3 text-center text-xs font-bold uppercase text-gray-500">RH / Équipe</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {users.map(user => {
-                            if (user.role === 'Admin' || user.role === 'DG') return null; // Admins have all rights implicitly
-                            return (
-                                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                    <td className="p-3">
-                                        <div className="font-bold text-sm text-gray-900 dark:text-white">{user.full_name}</div>
-                                        <div className="text-xs text-gray-500">{user.role} - {user.site}</div>
-                                    </td>
-                                    {['technique', 'comptabilite', 'secretariat', 'quincaillerie', 'rh'].map(mod => (
-                                        <td key={mod} className="p-3 text-center">
-                                            <button 
-                                                onClick={() => togglePermission(user.id, mod as keyof UserPermissions, !!user.permissions?.[mod as keyof UserPermissions])}
-                                                className={`w-10 h-6 rounded-full transition-colors relative ${user.permissions?.[mod as keyof UserPermissions] ? 'bg-green-500' : 'bg-gray-300'}`}
-                                            >
-                                                <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${user.permissions?.[mod as keyof UserPermissions] ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                                            </button>
-                                        </td>
-                                    ))}
-                                </tr>
-                            );
-                        })}
-                        {users.filter(u => u.role !== 'Admin' && u.role !== 'DG').length === 0 && (
-                            <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucun utilisateur à gérer (hors Admin/DG).</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Profile Modal (Enhanced) ---
-const ProfileModal = ({ isOpen, onClose, profile }: any) => {
-  const [formData, setFormData] = useState({ full_name: '', email: '', phone: '', photo_url: '', date_hired: '' });
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (profile) setFormData({ 
-        full_name: profile.full_name || '', 
-        email: profile.email || '', 
-        phone: profile.phone || '', 
-        photo_url: profile.photo_url || '',
-        date_hired: profile.date_hired || ''
-    });
-  }, [profile, isOpen]);
-
-  const handleUpdate = async () => {
-    if (profile.role !== 'Visiteur' && !formData.date_hired) {
-        alert("La date d'entrée est obligatoire pour le personnel.");
-        return;
-    }
-
-    setLoading(true);
-    const { error } = await supabase.from('profiles').update({ 
-        full_name: formData.full_name, 
-        phone: formData.phone,
-        photo_url: formData.photo_url,
-        date_hired: formData.date_hired
-    }).eq('id', profile.id);
-
-    if (!error && profile.role !== 'Visiteur') {
-       await supabase.from('technicians').update({ name: formData.full_name }).eq('id', profile.id);
-    }
-    setLoading(false);
-    if (error) alert("Erreur mise à jour profil");
-    else { alert("Profil mis à jour !"); onClose(); window.location.reload(); }
-  };
-
-  const calculateSeniority = (dateString: string) => {
-      if (!dateString) return "Non définie";
-      const start = new Date(dateString);
-      const now = new Date();
-      let years = now.getFullYear() - start.getFullYear();
-      let months = now.getMonth() - start.getMonth();
-      if (months < 0) {
-          years--;
-          months += 12;
-      }
-      if (years === 0 && months === 0) return "Moins d'un mois";
-      return `${years > 0 ? years + ' an(s) ' : ''}${months} mois`;
-  };
-
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange flex flex-col max-h-[90vh]">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
-        
-        {/* Visual Identity Card */}
-        <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-xl border border-gray-200 dark:border-gray-600 mb-6 shadow-inner">
-            <div className="w-20 h-20 rounded-full bg-white border-2 border-ebf-orange p-1 flex-shrink-0 overflow-hidden">
-                {formData.photo_url ? (
-                    <img src={formData.photo_url} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400"><User size={32}/></div>
-                )}
-            </div>
-            <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase">{formData.full_name || 'Nom Inconnu'}</h3>
-                <div className="flex flex-wrap gap-2 mt-1">
-                    <span className="text-xs font-bold bg-ebf-orange text-white px-2 py-0.5 rounded uppercase">{profile.role}</span>
-                    <span className="text-xs font-bold bg-green-600 text-white px-2 py-0.5 rounded uppercase">{profile.site}</span>
-                </div>
-                {formData.date_hired && (
-                    <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
-                        <Award size={12}/> Ancienneté: <span className="font-bold text-gray-700">{calculateSeniority(formData.date_hired)}</span>
-                    </p>
-                )}
-            </div>
-        </div>
-
-        <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2">
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Photo (Lien URL)</label><input value={formData.photo_url} onChange={e => setFormData({...formData, photo_url: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" placeholder="https://..." /></div>
-           
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" placeholder="0707..." /></div>
-           
-           <div>
-               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
-                   Date d'Entrée {profile.role !== 'Visiteur' && <span className="text-red-500">*</span>}
-               </label>
-               <input type="date" value={formData.date_hired} onChange={e => setFormData({...formData, date_hired: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" />
-           </div>
-
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Email (Lecture seule)</label><input value={formData.email} disabled className="w-full border border-gray-200 p-2 rounded-lg bg-gray-100 text-gray-500" /></div>
-           
-           <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-orange text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 shadow-md mt-4">{loading ? '...' : 'Enregistrer les modifications'}</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- HEADER WITH NOTIFICATIONS ---
-const HeaderWithNotif = ({ 
-  title, onMenuClick, onLogout, onOpenFlashInfo, onOpenPermissions, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
-}: any) => {
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
-    const unreadCount = notifications.filter((n: Notification) => !n.read).length;
-    const notifRef = useRef<HTMLDivElement>(null);
-    const settingsRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: any) => {
-            if (notifRef.current && !notifRef.current.contains(event.target)) setShowDropdown(false);
-            if (settingsRef.current && !settingsRef.current.contains(event.target)) setShowSettingsDropdown(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const canEditFlashInfo = userRole === 'Admin' || userRole === 'DG';
-    const canManagePermissions = userRole === 'Admin' || userRole === 'DG';
-
-    return (
-        <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
-           <div className="flex items-center gap-4">
-              <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-600"><Menu/></button>
-              <h2 className="text-lg font-extrabold text-green-950 hidden md:block tracking-tight">{title}</h2>
-           </div>
-           <div className="flex items-center gap-3">
-               <div className="flex items-center gap-3 border-l pl-4 ml-2 border-gray-200">
-                  <div className="hidden md:block text-right">
-                     <p className="text-sm font-bold text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
-                     <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg shadow-inner border border-green-200 overflow-hidden">
-                      {userProfile?.photo_url ? <img src={userProfile.photo_url} alt="Profile" className="w-full h-full object-cover" /> : (userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>)}
-                  </div>
-               </div>
-              <div className="relative ml-2" ref={notifRef}>
-                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-gray-100 rounded-full transition text-gray-600">
-                     <Bell />
-                     {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-sm">{unreadCount}</span>}
-                 </button>
-                 {showDropdown && (
-                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-50">
-                         <div className="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                             <h3 className="font-bold text-gray-800 text-sm">Notifications</h3>
-                             <span className="text-xs text-gray-500">{unreadCount} non lues</span>
-                         </div>
-                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                             {notifications.length === 0 ? <div className="p-4 text-center text-gray-400 text-sm">Aucune notification</div> : 
-                                 notifications.map((notif: Notification) => (
-                                     <div key={notif.id} onClick={() => { markNotificationAsRead(notif); setShowDropdown(false); }} className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-orange-50/20' : ''}`}>
-                                         <div className="flex items-start gap-3">
-                                             <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'alert' ? 'bg-red-500' : notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
-                                             <div>
-                                                 <p className={`text-sm ${!notif.read ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{notif.title}</p>
-                                                 <p className="text-xs text-gray-500 line-clamp-2">{notif.message}</p>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 ))
-                             }
-                         </div>
-                     </div>
-                 )}
-              </div>
-              <div className="relative" ref={settingsRef}>
-                 <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
-                    <Settings />
-                 </button>
-                 {showSettingsDropdown && (
-                   <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fade-in z-50">
-                      <div className="py-2">
-                         <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Mon Compte</div>
-                         <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                             <User size={18} className="text-ebf-orange"/> Modifier Profil
-                         </button>
-
-                         {(canEditFlashInfo || canManagePermissions) && (
-                            <>
-                                <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-                                <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Administration</div>
-                                {canEditFlashInfo && (
-                                    <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                                        <Megaphone size={18} className="text-blue-500"/> Gestion Flash Info
-                                    </button>
-                                )}
-                                {canManagePermissions && (
-                                    <button onClick={() => { onOpenPermissions(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                                        <Shield size={18} className="text-purple-500"/> Gestion des Permissions
-                                    </button>
-                                )}
-                            </>
-                         )}
-
-                         <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-
-                         <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Sécurité</div>
-                         <button onClick={() => { onResetBiometrics(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                             <ScanFace size={18} className="text-purple-500"/> Réinitialiser Biométrie
-                         </button>
-
-                         <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-                         
-                         <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Application</div>
-                         <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                            <div className="flex items-center gap-3"><Moon size={18} className="text-indigo-500"/> Mode Sombre</div>
-                            <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}><div className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-0'}`}></div></div>
-                         </button>
-                         <button onClick={() => { onOpenHelp(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
-                             <HelpCircle size={18} className="text-green-500"/> Aide & Support
-                         </button>
-                         
-                         <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-                         <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 text-sm font-bold text-red-600 bg-red-50/50">
-                             <LogOut size={18}/> Se déconnecter
-                         </button>
-                      </div>
-                   </div>
-                 )}
-              </div>
-           </div>
-        </header>
-    )
-};
-
-const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
-  const [currentPath, setCurrentPath] = useState('/');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
-  const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
-  const [darkMode, setDarkMode] = useState(false);
-  
-  // Note: We won't use 'stats' from daily_stats anymore for real-time dashboard
-  // We will compute it from transactions and reports
-  const [stats, setStats] = useState<StatData[]>([]); // Keep it for legacy or if needed
-  
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [interventions, setInterventions] = useState<Intervention[]>([]);
-  const [reports, setReports] = useState<DailyReport[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [manualTickerMessages, setManualTickerMessages] = useState<TickerMessage[]>([]);
-  const [autoTickerMessages, setAutoTickerMessages] = useState<TickerMessage[]>([]);
-
-  // NEW STATES FOR CONFIGURED MODULES
-  const [chantiers, setChantiers] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [payrolls, setPayrolls] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [caisse, setCaisse] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [purchases, setPurchases] = useState<any[]>([]);
-
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
-  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [crudTarget, setCrudTarget] = useState('');
-  const [itemToDelete, setItemToDelete] = useState<any>(null);
-  const [crudLoading, setCrudLoading] = useState(false);
-
-  // Force Write Permission if Dev Mode or Admin/DG or Allowed
-  const { canWrite } = getPermission(currentPath, userRole, userProfile?.permissions);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      // Existing
-      const { data: intervData } = await supabase.from('interventions').select('*');
-      if (intervData) setInterventions(intervData);
-      const { data: stockData } = await supabase.from('stocks').select('*');
-      if (stockData) setStock(stockData);
-      const { data: techData } = await supabase.from('technicians').select('*');
-      if (techData) setTechnicians(techData);
-      const { data: reportsData } = await supabase.from('reports').select('*');
-      if (reportsData) setReports(reportsData);
-      // We still fetch stats for initial load but will rely on calculation
-      const { data: statsData } = await supabase.from('daily_stats').select('*');
-      if (statsData) setStats(statsData);
-      const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-      if (notifData) setNotifications(notifData);
-      const { data: tickerData } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
-      if (tickerData) setManualTickerMessages(tickerData.map((m: any) => ({ ...m, isManual: true })));
-
-      // New Modules Fetching
-      const { data: chantiersData } = await supabase.from('chantiers').select('*');
-      if (chantiersData) setChantiers(chantiersData);
-      
-      const { data: transData } = await supabase.from('transactions').select('*');
-      if (transData) setTransactions(transData);
-      
-      const { data: empData } = await supabase.from('employees').select('*');
-      if (empData) setEmployees(empData);
-      
-      const { data: payrollData } = await supabase.from('payrolls').select('*');
-      if (payrollData) setPayrolls(payrollData);
-      
-      const { data: clientData } = await supabase.from('clients').select('*');
-      if (clientData) setClients(clientData);
-      
-      const { data: caisseData } = await supabase.from('caisse').select('*');
-      if (caisseData) setCaisse(caisseData);
-      
-      const { data: suppData } = await supabase.from('suppliers').select('*');
-      if (suppData) setSuppliers(suppData);
-      
-      const { data: purchData } = await supabase.from('purchases').select('*');
-      if (purchData) setPurchases(purchData);
-    };
-
-    fetchData();
-
-    // REALTIME SUBSCRIPTIONS FOR ALL DATA SOURCES
-    const channels = supabase.channel('realtime-ebf')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, (payload) => {
-          if (payload.eventType === 'INSERT') setInterventions(prev => [...prev, payload.new as Intervention]);
-          else if (payload.eventType === 'UPDATE') setInterventions(prev => prev.map(i => i.id === payload.new.id ? payload.new as Intervention : i));
-          else if (payload.eventType === 'DELETE') setInterventions(prev => prev.filter(i => i.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stocks' }, (payload) => {
-          if (payload.eventType === 'INSERT') setStock(prev => [...prev, payload.new as StockItem]);
-          else if (payload.eventType === 'UPDATE') setStock(prev => prev.map(s => s.id === payload.new.id ? payload.new as StockItem : s));
-          else if (payload.eventType === 'DELETE') setStock(prev => prev.filter(s => s.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
-          if (payload.eventType === 'INSERT') setReports(prev => [...prev, payload.new as DailyReport]);
-          else if (payload.eventType === 'UPDATE') setReports(prev => prev.map(r => r.id === payload.new.id ? payload.new as DailyReport : r));
-          else if (payload.eventType === 'DELETE') setReports(prev => prev.filter(r => r.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
-          if (payload.eventType === 'INSERT') setTransactions(prev => [...prev, payload.new as any]);
-          else if (payload.eventType === 'UPDATE') setTransactions(prev => prev.map(t => t.id === payload.new.id ? payload.new as any : t));
-          else if (payload.eventType === 'DELETE') setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channels); };
-  }, []);
-
-  // --- REAL-TIME STATS CALCULATION ENGINE ---
-  // Instead of relying on daily_stats table, we calculate aggregate on the fly from raw data
-  const calculatedStats = useMemo(() => {
-      const statsMap = new Map<string, StatData>();
-
-      const getKey = (date: string, site: Site) => `${date}_${site}`;
-      const initStat = (date: string, site: Site): StatData => ({
-          date, site, revenue: 0, expenses: 0, profit: 0, interventions: 0
-      });
-
-      // 1. Process Reports (Revenue + Expenses from technicians)
-      reports.forEach(r => {
-          if (!r.date) return;
-          const key = getKey(r.date, r.site);
-          if (!statsMap.has(key)) statsMap.set(key, initStat(r.date, r.site));
-          const stat = statsMap.get(key)!;
-          stat.revenue += (r.revenue || 0);
-          stat.expenses += (r.expenses || 0);
-      });
-
-      // 2. Process Transactions (Accounting)
-      transactions.forEach(t => {
-          if (!t.date) return;
-          const key = getKey(t.date, t.site);
-          if (!statsMap.has(key)) statsMap.set(key, initStat(t.date, t.site));
-          const stat = statsMap.get(key)!;
-          if (t.type === 'Recette') stat.revenue += (t.amount || 0);
-          if (t.type === 'Dépense') stat.expenses += (t.amount || 0);
-      });
-
-      // 3. Process Interventions (Count)
-      interventions.forEach(i => {
-          if (!i.date) return;
-          const key = getKey(i.date, i.site);
-          if (!statsMap.has(key)) statsMap.set(key, initStat(i.date, i.site));
-          const stat = statsMap.get(key)!;
-          stat.interventions += 1;
-      });
-
-      // 4. Calculate Profit & Format
-      const result = Array.from(statsMap.values()).map(s => ({
-          ...s,
-          profit: s.revenue - s.expenses
-      }));
-
-      // Sort by date
-      return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  }, [reports, transactions, interventions]);
-
-  useEffect(() => {
-    if (calculatedStats.length > 0) generateAutoTickerMessages(calculatedStats);
-    else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', type: 'info', display_order: 0, isManual: false }]);
-  }, [calculatedStats]);
-
-  const generateAutoTickerMessages = (data: StatData[]) => {
-      const messages: TickerMessage[] = [];
-      const calcPerf = (items: StatData[]) => {
-          const revenue = items.reduce((acc, curr) => acc + curr.revenue, 0);
-          const expenses = items.reduce((acc, curr) => acc + curr.expenses, 0);
-          const profit = revenue - expenses;
-          const percent = revenue > 0 ? (profit / revenue) * 100 : 0;
-          return { profit, percent };
-      };
-      const todayStats = data.filter(d => isInPeriod(d.date, Period.DAY));
-      if (todayStats.length > 0) {
-          const { percent } = calcPerf(todayStats);
-          if (percent !== 0) messages.push({ id: 'auto-day', text: percent > 0 ? `Félicitations ! Nous sommes à +${percent.toFixed(1)}% de bénéfice aujourd'hui.` : `Alerte : Nous sommes à ${percent.toFixed(1)}% de perte aujourd'hui.`, type: percent > 0 ? 'success' : 'alert', display_order: 100, isManual: false });
-      }
-      const weekStats = data.filter(d => isInPeriod(d.date, Period.WEEK));
-      if (weekStats.length > 0) {
-          const { percent } = calcPerf(weekStats);
-          if (percent !== 0) messages.push({ id: 'auto-week', text: percent > 0 ? `Bravo ! Cette semaine enregistre +${percent.toFixed(1)}% de marge positive.` : `Attention ! Nous sommes à ${percent.toFixed(1)}% de perte cette semaine.`, type: percent > 0 ? 'success' : 'alert', display_order: 101, isManual: false });
-      }
-      const monthStats = data.filter(d => isInPeriod(d.date, Period.MONTH));
-      if (monthStats.length > 0) {
-          const { percent } = calcPerf(monthStats);
-          if (percent !== 0) messages.push({ id: 'auto-month', text: percent > 0 ? `Excellent ! Le mois en cours est à +${percent.toFixed(1)}% de rentabilité.` : `Vigilance : Le cumul mensuel est à ${percent.toFixed(1)}%.`, type: percent > 0 ? 'success' : 'alert', display_order: 102, isManual: false });
-      }
-      const yearStats = data.filter(d => isInPeriod(d.date, Period.YEAR));
-      if (yearStats.length > 0) {
-           const { percent } = calcPerf(yearStats);
-           if (percent !== 0) messages.push({ id: 'auto-year', text: `Bilan Annuel Global : ${percent > 0 ? '+' : ''}${percent.toFixed(1)}% de marge.`, type: percent > 0 ? 'info' : 'alert', display_order: 103, isManual: false });
-      }
-      setAutoTickerMessages(messages);
-  };
-
-  const combinedTickerMessages = useMemo(() => {
-     if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
-     return [...manualTickerMessages, ...autoTickerMessages];
-  }, [manualTickerMessages, autoTickerMessages]);
-
-  const handleNavigate = (path: string) => { setCurrentPath(path); setIsMenuOpen(false); };
-  const toggleTheme = () => { setDarkMode(!darkMode); document.documentElement.classList.toggle('dark'); };
-  const handleOpenAdd = (table: string) => { setCrudTarget(table); setIsAddOpen(true); };
-  const handleOpenDelete = (item: any, table: string) => { setItemToDelete(item); setCrudTarget(table); setIsDeleteOpen(true); };
-  
-  const handleResetBiometrics = () => {
-      localStorage.removeItem('ebf_biometric_active');
-      alert("Préférence biométrique réinitialisée. Elle sera demandée à la prochaine connexion.");
-  };
-
-  const confirmDelete = async () => {
-      if (!itemToDelete || !crudTarget) return;
-
-      // SAFETY CHECK FOR USER DELETION
-      if ((crudTarget === 'technicians' || crudTarget === 'profiles') && userRole !== 'Admin' && userRole !== 'DG') {
-          alert("Seul l'Administrateur peut supprimer des comptes utilisateurs.");
-          setIsDeleteOpen(false);
-          setItemToDelete(null);
-          return;
-      }
-
-      setCrudLoading(true);
-      const { error } = await supabase.from(crudTarget).delete().eq('id', itemToDelete.id);
-      setCrudLoading(false);
-      if (error) alert("Erreur: " + error.message);
-      else { setIsDeleteOpen(false); setItemToDelete(null); }
-  };
-  const confirmAdd = async (formData: any) => {
-      if (!crudTarget) return;
-      setCrudLoading(true);
-      if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
-      const config = FORM_CONFIGS[crudTarget];
-      const processedData = { ...formData };
-      if (config) config.fields.forEach(f => { if (f.type === 'number' && processedData[f.name]) processedData[f.name] = Number(processedData[f.name]); });
-      const { error } = await supabase.from(crudTarget).insert([processedData]);
-      setCrudLoading(false);
-      if (error) alert("Erreur: " + error.message);
-      else setIsAddOpen(false);
-  };
-  const handleDeleteDirectly = async (id: string, table: string) => {
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) alert("Erreur: " + error.message);
-  };
-  const saveManualTickerMessage = async (text: string, type: string) => {
-      const { error } = await supabase.from('ticker_messages').insert([{ text, type, display_order: manualTickerMessages.length + 1 }]);
-      if (error) alert("Erreur: " + error.message);
-  };
-  const deleteManualTickerMessage = async (id: string) => {
-      const { error } = await supabase.from('ticker_messages').delete().eq('id', id);
-      if (error) alert("Erreur: " + error.message);
-  };
-
-  const renderContent = () => {
-     if (currentPath === '/') return <Dashboard data={calculatedStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
-     if (currentPath === '/synthesis') return <DetailedSynthesis data={calculatedStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
-     const section = currentPath.substring(1);
-     if (MODULE_ACTIONS[section]) return (
-             <div className="space-y-6 animate-fade-in">
-                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white capitalize flex items-center gap-2"><ArrowLeft className="cursor-pointer" onClick={() => handleNavigate('/')} /> Module {section}</h2>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {MODULE_ACTIONS[section].map((action) => (
-                        <button key={action.id} onClick={() => handleNavigate(action.path)} className={`bg-white hover:bg-orange-50 p-6 rounded-xl shadow-md border border-gray-100 hover:border-orange-200 transition transform hover:-translate-y-1 text-left group`}>
-                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${action.color.replace('bg-', 'bg-').replace('600', '100').replace('500', '100')} ${action.color.replace('bg-', 'text-').replace('600', '600').replace('500', '600')}`}><action.icon size={24} /></div>
-                            <h3 className="text-xl font-bold mb-1 text-gray-800 group-hover:text-ebf-orange">{action.label}</h3>
-                            <p className="text-gray-500 text-sm">{action.description}</p>
-                            {action.managedBy && <p className="text-[10px] text-gray-400 mt-3 font-medium uppercase tracking-wider">{action.managedBy}</p>}
-                        </button>
-                    ))}
-                 </div>
-             </div>
-     );
-
-     // Existing Routes
-     if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} readOnly={!canWrite} />;
-     if (currentPath === '/techniciens/rapports') return <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else alert("Rapport vocal pas encore disponible."); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />;
-     if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     // MODIFIED: Only Admin/DG can delete users in Team
-     if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(userRole === 'Admin' || userRole === 'DG') ? (item: any) => handleOpenDelete(item, 'technicians') : undefined} readOnly={!canWrite} />;
-
-     // NEWLY CONFIGURED ROUTES
-     if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} readOnly={!canWrite} />;
-     if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} readOnly={!canWrite} />;
-     if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} readOnly={!canWrite} />;
-     if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} readOnly={!canWrite} />;
-     if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={true} />; // Read only here usually
-     if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données CRM" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} readOnly={!canWrite} />;
-     if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} readOnly={!canWrite} />;
-
-     return <div className="flex flex-col items-center justify-center h-full text-gray-400"><Wrench size={48} className="mb-4 opacity-50" /><p className="text-xl">Module "{currentPath}" en construction.</p><button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-orange font-bold hover:underline">Retour Accueil</button></div>;
-  };
-
-  return (
-    <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
-        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto shadow-2xl flex flex-col`}>
-            <div className="flex items-center justify-between h-20 px-6 bg-green-950/50"><div className="transform scale-75 origin-left bg-white p-2"><EbfLogo size="small" /></div><button onClick={() => setIsMenuOpen(false)} className="lg:hidden text-gray-400 hover:text-white"><X /></button></div>
-            <div className="p-4 flex-1 overflow-y-auto">
-                <nav className="space-y-2">
-                    {MAIN_MENU.map(item => (
-                        <button key={item.id} onClick={() => handleNavigate(item.path)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 group ${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'bg-ebf-orange text-white font-bold shadow-lg transform scale-105' : 'text-gray-300 hover:bg-green-900 hover:text-white'}`}>
-                            <item.icon size={20} className={`${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
-                            <span>{item.label}</span>
-                        </button>
-                    ))}
-                </nav>
-            </div>
-            <div className="p-4 bg-green-900/30">
-                <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center font-bold text-white text-sm border border-green-700 overflow-hidden">
-                        {userProfile?.photo_url ? <img src={userProfile.photo_url} alt="Profile" className="w-full h-full object-cover" /> : (userProfile?.full_name?.charAt(0) || 'U')}
-                    </div>
-                    <div className="overflow-hidden">
-                        <p className="text-sm font-bold truncate text-white">{userProfile?.full_name || 'Utilisateur'}</p>
-                        <p className="text-xs text-gray-300 truncate opacity-80">{userRole}</p>
-                    </div>
-                </div>
-            </div>
-        </aside>
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-             <HeaderWithNotif 
-                 title="EBF Manager" 
-                 onMenuClick={() => setIsMenuOpen(true)} 
-                 onLogout={onLogout} 
-                 notifications={notifications} 
-                 userProfile={userProfile} 
-                 userRole={userRole} 
-                 markNotificationAsRead={(n: any) => setNotifications(notifications.map(x => x.id === n.id ? {...x, read: true} : x))} 
-                 onOpenProfile={() => setIsProfileOpen(true)} 
-                 onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
-                 onOpenPermissions={() => setIsPermissionsOpen(true)}
-                 onOpenHelp={() => setIsHelpOpen(true)} 
-                 darkMode={darkMode} 
-                 onToggleTheme={toggleTheme} 
-                 onResetBiometrics={handleResetBiometrics}
-             />
-             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-ebf-pattern dark:bg-gray-900">{renderContent()}</main>
-        </div>
-        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
-        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-        <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
-        <PermissionsModal isOpen={isPermissionsOpen} onClose={() => setIsPermissionsOpen(false)} />
-        <AddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} />
-        <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
-    </div>
-  );
-};
-
-// --- App Wrapper with State Machine ---
-export default function App() {
-  const [appState, setAppState] = useState<'LOADING' | 'LOGIN' | 'ONBOARDING' | 'APP'>('LOADING');
-  const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<Role>('Visiteur');
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-
-  // Helper to fetch profile data
-  const fetchUserProfile = async (userId: string) => {
-      // 1. Get Auth Metadata (Source of Truth for Signup Role)
-      const { data: { user } } = await supabase.auth.getUser();
-      const metaRole = user?.user_metadata?.role as Role | undefined;
-
-      // 2. Get Profile from DB
-      let { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      
-      // 3. FORCE ADMIN: Si le rôle est Visiteur (par défaut ou erreur), on FORCE Admin pour débloquer
-      if (profile) {
-          if (FORCE_ADMIN_ON_LOGIN || profile.role === 'Visiteur') {
-              console.warn("DEV MODE: FORCE ADMIN ACTIVE. Role local forcé à ADMIN.");
-              profile.role = 'Admin';
-              // Tentative de persistance en arrière-plan (non bloquante)
-              supabase.from('profiles').update({ role: 'Admin' }).eq('id', userId).then(({ error }) => {
-                 if (error) console.log("DB Update (RLS blocked) ignored, local Admin active.");
-              });
-          }
-      }
-
-      // 4. Fallback: Create profile if it doesn't exist (using Metadata)
-      if (!profile) {
-          const meta = user?.user_metadata;
-          if (meta) {
-              const newProfile = {
-                  id: userId,
-                  full_name: meta.full_name || 'Utilisateur',
-                  role: FORCE_ADMIN_ON_LOGIN ? 'Admin' : (meta.role || 'Visiteur'),
-                  site: meta.site || 'Global',
-                  email: user?.email,
-                  permissions: {} // Default empty = Read Only
-              };
-              const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-              if (!insertError) profile = newProfile as any;
-          }
-      }
-
-      if (profile) {
-          setUserRole(profile.role);
-          setUserProfile(profile);
-          
-          // Ensure user is in 'Notre Équipe' if not Visitor
-          if (profile.role !== 'Visiteur') {
-               const { data: tech } = await supabase.from('technicians').select('id').eq('id', userId).single();
-               if (!tech) {
-                   let specialty = profile.role;
-                   if (profile.role === 'Admin') specialty = 'Administration';
-                   if (profile.role === 'DG') specialty = 'Direction Générale';
-                   
-                   await supabase.from('technicians').insert([{
-                       id: userId,
-                       name: profile.full_name,
-                       specialty: specialty,
-                       site: profile.site,
-                       status: 'Available'
-                   }]);
-               }
-          }
-          return profile;
-      }
-      return null;
-  };
-
-  // Main Effect to check Session on Load
-  useEffect(() => {
-    // --- BYPASS LOGIN (DEV MODE) ---
-    if (DEV_MODE_BYPASS_LOGIN) {
-        setAppState('APP');
-        setUserRole('Admin');
-        setUserProfile({
-            id: 'dev-admin',
-            full_name: 'Administrateur (Dev)',
-            email: 'dev@ebf.ci',
-            role: 'Admin',
-            site: Site.GLOBAL,
-            permissions: { technique: true, comptabilite: true, secretariat: true, quincaillerie: true, rh: true }
-        });
-        return;
-    }
-
-    const init = async () => {
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      
-      if (existingSession) {
-         setSession(existingSession);
-         const profile = await fetchUserProfile(existingSession.user.id);
-         
-         const bioActive = localStorage.getItem('ebf_biometric_active');
-         if (bioActive === 'true') {
-             setAppState('APP');
-         } else {
-             setAppState('APP');
-         }
-      } else {
-         setAppState('LOGIN');
-      }
-    };
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-            setSession(null);
-            setUserProfile(null);
-            setAppState('LOGIN');
-        }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleExplicitLoginSuccess = async () => {
-      setAppState('LOADING');
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-          setSession(session);
-          await fetchUserProfile(session.user.id);
-          setAppState('ONBOARDING');
-      } else {
-          setAppState('LOGIN');
-      }
-  };
-
-  const handleOnboardingComplete = () => {
-      setAppState('APP');
-  };
-
-  if (appState === 'LOADING') return <LoadingScreen />;
-  if (appState === 'LOGIN') return <LoginScreen onLoginSuccess={handleExplicitLoginSuccess} />;
-  if (appState === 'ONBOARDING') return <OnboardingFlow role={userRole} onComplete={handleOnboardingComplete} />;
-
-  return (
-    <AppContent 
-        session={session} 
-        onLogout={() => { 
-            if (DEV_MODE_BYPASS_LOGIN) alert("Déconnexion simulée en Mode Dev. Pour réactiver la connexion, changez la variable DEV_MODE_BYPASS_LOGIN dans le code.");
-            else supabase.auth.signOut(); 
-        }} 
-        userRole={userRole} 
-        userProfile={userProfile} 
-    />
-  );
-}
+export default App;
