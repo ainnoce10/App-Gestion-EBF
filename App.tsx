@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -573,10 +574,11 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [loginSuccessRole, setLoginSuccessRole] = useState<string | null>(null);
   
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError(''); setSuccessMsg('');
+    setLoading(true); setError(''); setSuccessMsg(''); setLoginSuccessRole(null);
 
     const cleanIdentifier = identifier.trim();
     const cleanPassword = password.trim();
@@ -631,7 +633,10 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                  }
              }
              // DIRECT SUCCESS LOGIN
-             onLoginSuccess();
+             setLoginSuccessRole(role);
+             setTimeout(() => {
+                 onLoginSuccess();
+             }, 1500);
              return; 
         } else {
              // NO SESSION = CONFIRMATION REQUIRED BY SERVER
@@ -646,7 +651,18 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         );
         
         if (err) throw err;
-        onLoginSuccess();
+
+        // Fetch Role for display message
+        let roleName = 'Utilisateur';
+        if (data.session) {
+             const { data: p } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).single();
+             if (p && p.role) roleName = p.role;
+        }
+
+        setLoginSuccessRole(roleName);
+        setTimeout(() => {
+            onLoginSuccess();
+        }, 1500);
       }
     } catch (err: any) {
         console.error("Auth Error:", err);
@@ -671,8 +687,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         }
 
         setError(userMsg);
-    } finally {
-      setLoading(false); // STOP LOADING IN ALL CASES
+        setLoading(false); // Only stop loading on error (on success we wait for timeout)
     }
   };
 
@@ -752,8 +767,18 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                     </div>
                 </div>
                 )}
-                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2 shadow-orange-200">
-                    {loading ? <Loader2 className="animate-spin" size={20}/> : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter"))}
+
+                {/* LOGIN SUCCESS MESSAGE AREA */}
+                {loginSuccessRole && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center animate-fade-in mb-2">
+                        <div className="flex justify-center mb-1"><CheckCircle className="text-green-600" size={24} /></div>
+                        <p className="text-green-800 font-bold text-sm">Identité confirmée</p>
+                        <p className="text-green-900 text-xs">Vous allez vous connecter en tant que <span className="font-bold uppercase text-ebf-orange">{loginSuccessRole}</span></p>
+                    </div>
+                )}
+
+                <button type="submit" disabled={loading || !!loginSuccessRole} className="w-full bg-gradient-to-r from-ebf-orange to-orange-600 text-white font-bold py-3.5 rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-orange-700 transition duration-300 transform hover:-translate-y-0.5 mt-2 flex items-center justify-center gap-2 shadow-orange-200 disabled:opacity-70 disabled:cursor-not-allowed">
+                    {loading ? <Loader2 className="animate-spin" size={20}/> : (loginSuccessRole ? "Connexion en cours..." : (isResetMode ? "Envoyer le lien" : (isSignUp ? "Créer mon compte" : "Se Connecter")))}
                 </button>
             </form>
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
@@ -782,17 +807,9 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
 // --- Onboarding Flow ---
 const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => void }) => {
-  const [step, setStep] = useState<'message' | 'biometric'>('message');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (step === 'message') {
-      const timer = setTimeout(() => {
-         setStep('biometric');
-      }, 3000); 
-      return () => clearTimeout(timer);
-    }
-  }, [step]);
+  // Skipped 'message' step, directly to biometric prompt
 
   const handleEnableBiometrics = () => {
     if (window.PublicKeyCredential) {
@@ -810,46 +827,29 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
 
   return (
      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-900/50 backdrop-blur-md transition-all duration-700">
-        {step === 'message' && (
-           <div className="bg-white p-10 rounded-3xl shadow-2xl max-w-lg w-full text-center border-t-4 border-ebf-green animate-fade-in relative overflow-hidden mx-4">
-              <div className="mx-auto bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100">
-                  <CheckCircle className="text-green-600 h-10 w-10" />
-              </div>
-              <h3 className="text-2xl font-extrabold text-gray-800 mb-4">Connexion réussie</h3>
-              <div className="text-gray-600 text-lg leading-relaxed">
-                 Vous allez vous connecter en tant que<br/>
-                 <span className="text-ebf-orange font-black text-2xl uppercase tracking-wide mt-2 block transform scale-105 transition-transform">
-                    {role}
-                 </span>
-              </div>
-           </div>
-        )}
-
-        {step === 'biometric' && (
-           <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full mx-4 border-t-4 border-ebf-orange animate-slide-in relative overflow-hidden">
-               <div className="absolute -top-10 -right-10 text-gray-50 opacity-50 pointer-events-none">
-                  <ScanFace size={200} />
-               </div>
-               <div className="flex justify-center mb-8 relative z-10">
-                  <div className="p-5 bg-orange-50 rounded-full text-ebf-orange shadow-inner ring-1 ring-orange-100">
-                     <Fingerprint size={56} />
-                  </div>
-               </div>
-               <h3 className="text-2xl font-bold text-center text-gray-800 mb-3 relative z-10">Connexion Rapide</h3>
-               {error && <p className="text-red-500 bg-red-50 p-3 rounded-lg text-sm text-center mb-4 font-bold relative z-10">{error}</p>}
-               <p className="text-gray-500 text-center mb-10 leading-relaxed relative z-10">
-                  Souhaitez-vous activer la connexion par <strong className="text-gray-800">empreinte digitale</strong> ou <strong className="text-gray-800">reconnaissance faciale</strong> ?
-               </p>
-               <div className="space-y-3 relative z-10">
-                  <button onClick={handleEnableBiometrics} className="w-full bg-ebf-orange text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3">
-                     <ScanFace size={22}/> Oui, activer
-                  </button>
-                  <button onClick={handleSkip} className="w-full bg-white text-gray-500 font-bold py-3.5 rounded-xl hover:bg-gray-50 border border-gray-200 transition-colors">
-                     Plus tard
-                  </button>
-               </div>
-           </div>
-        )}
+        <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full mx-4 border-t-4 border-ebf-orange animate-slide-in relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 text-gray-50 opacity-50 pointer-events-none">
+                <ScanFace size={200} />
+            </div>
+            <div className="flex justify-center mb-8 relative z-10">
+                <div className="p-5 bg-orange-50 rounded-full text-ebf-orange shadow-inner ring-1 ring-orange-100">
+                    <Fingerprint size={56} />
+                </div>
+            </div>
+            <h3 className="text-2xl font-bold text-center text-gray-800 mb-3 relative z-10">Connexion Rapide</h3>
+            {error && <p className="text-red-500 bg-red-50 p-3 rounded-lg text-sm text-center mb-4 font-bold relative z-10">{error}</p>}
+            <p className="text-gray-500 text-center mb-10 leading-relaxed relative z-10">
+                Souhaitez-vous activer la connexion par <strong className="text-gray-800">empreinte digitale</strong> ou <strong className="text-gray-800">reconnaissance faciale</strong> ?
+            </p>
+            <div className="space-y-3 relative z-10">
+                <button onClick={handleEnableBiometrics} className="w-full bg-ebf-orange text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3">
+                    <ScanFace size={22}/> Oui, activer
+                </button>
+                <button onClick={handleSkip} className="w-full bg-white text-gray-500 font-bold py-3.5 rounded-xl hover:bg-gray-50 border border-gray-200 transition-colors">
+                    Plus tard
+                </button>
+            </div>
+        </div>
      </div>
   );
 };
