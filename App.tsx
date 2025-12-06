@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -5,7 +6,7 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, Shield
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
@@ -159,6 +160,91 @@ const ConfirmationModal = ({
             <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-bold">Annuler</button>
             <button onClick={() => { onConfirm(); onClose(); }} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-md">Supprimer</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Admin Panel Modal ---
+const AdminPanelModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) fetchUsers();
+  }, [isOpen]);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('profiles').select('*').order('full_name');
+    if (data) setUsers(data);
+    setLoading(false);
+  };
+
+  const handleRoleChange = async (userId: string, newRole: Role) => {
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    if (!error) {
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } else {
+      alert("Erreur lors de la mise à jour du rôle.");
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl p-6 shadow-2xl animate-fade-in flex flex-col max-h-[80vh]">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold text-green-900 dark:text-white flex items-center gap-2">
+            <Shield className="text-ebf-orange" /> Administration & Droits
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X /></button>
+        </div>
+        
+        <div className="overflow-y-auto custom-scrollbar flex-1">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+              <tr>
+                <th className="p-3 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Utilisateur</th>
+                <th className="p-3 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Email / Tél</th>
+                <th className="p-3 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Rôle (Accès)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {loading ? (
+                <tr><td colSpan={3} className="p-4 text-center"><Loader2 className="animate-spin mx-auto text-ebf-green"/></td></tr>
+              ) : (
+                users.map(user => (
+                  <tr key={user.id} className="hover:bg-orange-50 dark:hover:bg-gray-800">
+                    <td className="p-3">
+                      <div className="font-bold text-green-900 dark:text-white">{user.full_name || 'Sans nom'}</div>
+                      <div className="text-xs text-gray-400">{user.site}</div>
+                    </td>
+                    <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{user.email || user.phone}</td>
+                    <td className="p-3">
+                      <select 
+                        value={user.role} 
+                        onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
+                        className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm font-bold text-green-900 dark:text-white focus:border-ebf-orange outline-none"
+                      >
+                        <option value="Visiteur">Visiteur (Lecture Seule)</option>
+                        <option value="Technicien">Technicien</option>
+                        <option value="Secretaire">Secretaire</option>
+                        <option value="Magasinier">Magasinier</option>
+                        <option value="Admin">Administrateur</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-400">
+          * Les modifications de rôle sont immédiates mais peuvent nécessiter une reconnexion de l'utilisateur concerné.
         </div>
       </div>
     </div>
@@ -698,6 +784,7 @@ const HeaderWithNotif = ({
   onMenuClick, 
   onLogout, 
   onOpenFlashInfo, 
+  onOpenAdmin,
   notifications, 
   userProfile, 
   userRole, 
@@ -795,6 +882,11 @@ const HeaderWithNotif = ({
                          <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <Megaphone size={16} className="text-ebf-orange"/> Configurer Flash Info
                          </button>
+                         {userRole === 'Admin' && (
+                           <button onClick={() => { onOpenAdmin(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-gray-700 text-sm font-bold text-red-600 dark:text-red-400">
+                              <Shield size={16} /> Administration
+                           </button>
+                         )}
                          <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <div className="flex items-center gap-3"><Moon size={16} className="text-indigo-500"/> Mode Sombre</div>
                             <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}>
@@ -827,6 +919,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
   const [modalConfig, setModalConfig] = useState<FormConfig | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   
   // Settings Modals State
@@ -850,9 +943,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
 
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
-      // TEMPORAIRE : ACCÈS TOTAL POUR TOUS
-      return true;
-      /*
       if (role === 'Admin') return true;
       if (role === 'Visiteur') return false;
       
@@ -866,7 +956,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
       if (role === 'Magasinier' && (path.startsWith('/quincaillerie') || path.includes('/techniciens/materiel'))) return true;
       
       return false;
-      */
   };
   
   // Determine if current view is Read-Only based on Role
@@ -983,6 +1072,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
               onMenuClick={() => setSidebarOpen(true)} 
               onLogout={onLogout} 
               onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
+              onOpenAdmin={() => setIsAdminOpen(true)}
               notifications={notifications}
               userProfile={userProfile}
               userRole={userRole}
@@ -996,6 +1086,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: { session: any
         </div>
         <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={handleFormSubmit} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={tickerMessages} onUpdate={handleTickerUpdate} />
+        <AdminPanelModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
      </div>
