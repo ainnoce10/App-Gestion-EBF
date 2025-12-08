@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -865,6 +864,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [viewReport, setViewReport] = useState<DailyReport | null>(null);
+  
+  // Create / Edit / Delete Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState<FormConfig | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
 
   // Data state
   const [stats, setStats] = useState(MOCK_STATS);
@@ -874,6 +879,16 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [interventions, setInterventions] = useState(MOCK_INTERVENTIONS);
   const [technicians, setTechnicians] = useState(MOCK_TECHNICIANS);
   const [notifications, setNotifications] = useState<Notification[]>([]); // Empty for now
+  
+  const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
+
+  // --- PERMISSION CHECKER ---
+  const canUserWrite = (role: Role, path: string): boolean => {
+      // TEMPORAIRE : LEVÉE DE TOUTES LES RESTRICTIONS
+      return true;
+  };
+  
+  const isReadOnly = useMemo(() => !canUserWrite(userRole, currentPath), [userRole, currentPath]);
 
   // Handlers
   const handleNavigate = (path: string) => {
@@ -889,7 +904,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      setTickerMessages([...tickerMessages, msg]);
      setIsFlashInfoOpen(false);
   };
-
+  
   // Render logic based on path
   const renderContent = () => {
     if (currentPath === '/') {
@@ -923,27 +938,23 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       );
     }
     if (currentPath === '/techniciens') {
-        // Module placeholder or specific list
         return <ModulePlaceholder title="Techniciens" subtitle="Gestion des techniciens" items={technicians} onBack={() => handleNavigate('/')} color="bg-orange-600" currentSite={currentSite} />;
     }
     if (currentPath === '/equipe') {
-        // We need to fetch profiles for team grid. 
-        // For now, pass empty or mock. UserProfile is single.
-        // Let's use a mock team list or fetch from Supabase if possible.
-        // We'll reuse the logic from AdminPanelModal to fetch users?
-        // Let's just use a simple list for now or reuse AdminPanelModal logic inside TeamGrid if we passed it.
-        // But TeamGrid takes `members`. We'll pass `[userProfile]` if available or empty.
         return <TeamGrid members={userProfile ? [userProfile] : []} onBack={() => handleNavigate('/')} />;
     }
-
-    // Generic fallback for sub-routes
-    return (
-        <div className="p-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-400">Page en construction</h2>
-            <p className="text-gray-500">{currentPath}</p>
-            <button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-green font-bold">Retour Accueil</button>
-        </div>
-    );
+    
+    const moduleName = currentPath.split('/')[1];
+    if (currentPath === `/${moduleName}` && MODULE_ACTIONS[moduleName]) return <ModuleMenu title={MAIN_MENU.find(m => m.id === moduleName)?.label} actions={MODULE_ACTIONS[moduleName]} onNavigate={handleNavigate} />;
+    
+    // Lists & Forms with Permissions
+    if (currentPath === '/techniciens/rapports') { if (reportMode === 'select') return <ReportModeSelector reports={reports} onSelectMode={setReportMode} onBack={() => setCurrentPath('/techniciens')} onViewReport={setViewReport} readOnly={isReadOnly} />; }
+    
+    let items: any[] = []; let title = 'Liste'; let color = 'bg-gray-500';
+    if (currentPath === '/techniciens/interventions') { items = interventions; title = 'Interventions'; color = 'bg-orange-500'; }
+    else if (currentPath === '/quincaillerie/stocks') { items = stock; title = 'Stocks'; color = 'bg-blue-500'; }
+    
+    return <ModulePlaceholder title={title} items={items} onBack={() => handleNavigate(`/${moduleName}`)} onAdd={!isReadOnly ? () => { setIsModalOpen(true); } : undefined} onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: '...'}) : undefined} color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
   };
 
   return (
@@ -1019,6 +1030,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
        </div>
 
        {/* Modals */}
+       <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={() => {}} />
        <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} onSave={handleFlashInfoSave} />
        <AdminPanelModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
