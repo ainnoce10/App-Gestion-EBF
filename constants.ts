@@ -1,6 +1,6 @@
 
 
-import { Site, StatData, Technician, StockItem, Intervention, DailyReport, TickerMessage, Transaction, Client, Supplier } from './types';
+import { Site, StatData, Technician, StockItem, Intervention, DailyReport, TickerMessage, Transaction, Client, Supplier, Chantier, Material } from './types';
 
 // Helper pour générer des dates dynamiques
 const today = new Date();
@@ -100,4 +100,14 @@ export const MOCK_CLIENTS: Client[] = [
 export const MOCK_SUPPLIERS: Supplier[] = [
   { id: 'F1', name: 'Bernabé', contact: '0101010101', category: 'Outillage', site: Site.ABIDJAN },
   { id: 'F2', name: 'Sivop', contact: '0202020202', category: 'Peinture', site: Site.BOUAKE },
+];
+
+export const MOCK_CHANTIERS: Chantier[] = [
+  { id: 'CH1', name: 'Immeuble Le Paris', client: 'SCI Les Bâtisseurs', location: 'Plateau', status: 'En Cours', budget: 5000000, site: Site.ABIDJAN, startDate: getDateStr(30) },
+  { id: 'CH2', name: 'Villa M. Konan', client: 'M. Konan', location: 'Air France', status: 'En Attente', budget: 1500000, site: Site.BOUAKE, startDate: getDateStr(5) },
+];
+
+export const MOCK_MATERIALS: Material[] = [
+  { id: 'M1', name: 'Perceuse Bosch', serialNumber: 'SN123456', condition: 'Bon', assignedTo: 'Kouamé Jean', site: Site.ABIDJAN },
+  { id: 'M2', name: 'Echelle Télescopique', serialNumber: 'SN789012', condition: 'Usé', assignedTo: 'Equipe Bouaké', site: Site.BOUAKE },
 ];

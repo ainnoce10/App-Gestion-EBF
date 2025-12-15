@@ -5,11 +5,11 @@ import {
 import { 
   LayoutDashboard, Wrench, Briefcase, ShoppingCart, Menu, X, Bell, Search, Settings,
   HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
-  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, Shield
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, ChevronRight, Mic, Send, Save, Plus, CheckCircle, Trash2, User, HelpCircle, Moon, Sun, Play, StopCircle, RefreshCw, FileInput, MapPin, Volume2, Megaphone, AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, Mail, Lock, UserPlus, ScanFace, Fingerprint, Phone, CheckSquare, Key, Shield
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
-import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician, Client, Supplier } from './types';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician, Client, Supplier, Chantier, Material } from './types';
 import { supabase } from './services/supabaseClient';
 
 // --- Types for Navigation & Forms ---
@@ -42,12 +42,11 @@ interface FormField {
 
 interface FormConfig {
   title: string;
-  type: 'Intervention' | 'Stock' | 'Technician' | 'Transaction' | 'Client' | 'Supplier' | 'Generic'; // To identify what we are saving
+  type: 'Intervention' | 'Stock' | 'Technician' | 'Transaction' | 'Client' | 'Supplier' | 'Chantier' | 'Material' | 'Generic'; // To identify what we are saving
   fields: FormField[];
 }
 
 // --- CONFIGURATION DES FORMULAIRES ---
-// Note: We need to fetch technicians dynamically for the select options now, but for static config we keep empty and fill later
 const INTERVENTION_FORM_TEMPLATE: FormConfig = {
   title: "Nouvelle Intervention",
   type: 'Intervention',
@@ -92,8 +91,20 @@ const TRANSACTION_FORM: FormConfig = {
     { name: 'date', label: 'Date', type: 'date' },
     { name: 'type', label: 'Type', type: 'select', options: ['Recette', 'Dépense'] },
     { name: 'amount', label: 'Montant', type: 'number', placeholder: '0' },
-    { name: 'category', label: 'Catégorie', type: 'select', options: ['Prestation', 'Achat Matériel', 'Salaire', 'Loyer', 'Autre'] },
+    { name: 'category', label: 'Catégorie', type: 'select', options: ['Prestation', 'Achat Matériel', 'Salaire', 'Loyer', 'Caisse', 'Autre'] },
     { name: 'label', label: 'Libellé', type: 'text', placeholder: 'Ex: Achat câbles' },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const CAISSE_FORM: FormConfig = {
+  title: "Mouvement Caisse",
+  type: 'Transaction', // Uses transaction table but specific context
+  fields: [
+    { name: 'date', label: 'Date', type: 'date' },
+    { name: 'type', label: 'Mouvement', type: 'select', options: ['Dépense', 'Recette'] },
+    { name: 'amount', label: 'Montant', type: 'number', placeholder: '0' },
+    { name: 'label', label: 'Motif', type: 'text', placeholder: 'Ex: Transport Technicien' },
     { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
   ]
 };
@@ -117,6 +128,32 @@ const SUPPLIER_FORM: FormConfig = {
     { name: 'name', label: 'Nom Entreprise', type: 'text' },
     { name: 'contact', label: 'Contact', type: 'text' },
     { name: 'category', label: 'Catégorie', type: 'text', placeholder: 'Ex: Électricité, Plomberie' },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const CHANTIER_FORM: FormConfig = {
+  title: "Nouveau Chantier",
+  type: 'Chantier',
+  fields: [
+    { name: 'name', label: 'Nom du Chantier', type: 'text', placeholder: 'Ex: Immeuble Le Paris' },
+    { name: 'client', label: 'Client', type: 'text' },
+    { name: 'location', label: 'Lieu', type: 'text' },
+    { name: 'budget', label: 'Budget Estimé', type: 'number' },
+    { name: 'startDate', label: 'Date Début', type: 'date' },
+    { name: 'status', label: 'Statut', type: 'select', options: ['En Cours', 'Terminé', 'En Attente'] },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const MATERIAL_FORM: FormConfig = {
+  title: "Matériel / Outil",
+  type: 'Material',
+  fields: [
+    { name: 'name', label: 'Nom Matériel', type: 'text', placeholder: 'Ex: Perceuse Bosch' },
+    { name: 'serialNumber', label: 'N° Série (Optionnel)', type: 'text' },
+    { name: 'condition', label: 'État', type: 'select', options: ['Neuf', 'Bon', 'Usé', 'Panne'] },
+    { name: 'assignedTo', label: 'Assigné à', type: 'text', placeholder: 'Nom Technicien ou Equipe' },
     { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
   ]
 };
@@ -173,7 +210,7 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
   ],
   comptabilite: [
     { id: 'bilan', label: 'Bilan Financier', description: 'Analyses des coûts et recettes', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600' },
-    { id: 'rh', label: 'Ressources Humaines', description: 'Dossiers du personnel', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600' },
+    { id: 'rh', label: 'Ressources Humaines', description: 'Dossiers du personnel', icon: Users, path: '/equipe', color: 'bg-purple-600' }, // Redirects to Team view
     { id: 'paie', label: 'Paie & Salaires', description: 'Gestion des virements mensuels', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500' },
   ],
   secretariat: [
@@ -638,13 +675,16 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
         name: 'Nom', quantity: 'Quantité', unit: 'Unité', threshold: 'Seuil', site: 'Site',
         client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technicianName: 'Technicien', date: 'Date', status: 'Statut',
         amount: 'Montant', type: 'Type', label: 'Libellé', category: 'Catégorie', email: 'Email', specialty: 'Spécialité',
-        full_name: 'Nom Complet', role: 'Rôle', contact: 'Contact', phone: 'Téléphone', address: 'Adresse'
+        full_name: 'Nom Complet', role: 'Rôle', contact: 'Contact', phone: 'Téléphone', address: 'Adresse',
+        budget: 'Budget', serialNumber: 'N° Série', condition: 'État', assignedTo: 'Assigné à', startDate: 'Début'
     };
 
     const filteredItems = useMemo(() => {
         return items.filter((item: any) => {
             if (currentSite && currentSite !== Site.GLOBAL && item.site && item.site !== currentSite) return false;
-            if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
+            // Only apply period filter if the item has a 'date' or 'startDate' field
+            const dateField = item.date || item.startDate;
+            if (currentPeriod && dateField && !isInPeriod(dateField, currentPeriod)) return false;
             return true;
         });
     }, [items, currentSite, currentPeriod]);
@@ -656,9 +696,9 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
     const renderCell = (col: string, value: any) => {
        if (col === 'status') {
           // Intervention Status
-          if (value === 'Pending') return <span className="flex items-center gap-1 text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-xs font-extrabold border border-gray-200"><Calendar size={12}/> Planifié</span>;
-          if (value === 'In Progress') return <span className="flex items-center gap-1 text-orange-600 bg-orange-50 px-3 py-1 rounded-full text-xs font-extrabold border border-orange-100"><Loader2 size={12} className="animate-spin"/> En cours</span>;
-          if (value === 'Completed') return <span className="flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-extrabold border border-green-100"><CheckCircle size={12}/> Exécuté</span>;
+          if (value === 'Pending' || value === 'En Attente') return <span className="flex items-center gap-1 text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-xs font-extrabold border border-gray-200"><Calendar size={12}/> {value}</span>;
+          if (value === 'In Progress' || value === 'En Cours') return <span className="flex items-center gap-1 text-orange-600 bg-orange-50 px-3 py-1 rounded-full text-xs font-extrabold border border-orange-100"><Loader2 size={12} className="animate-spin"/> {value}</span>;
+          if (value === 'Completed' || value === 'Terminé') return <span className="flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-extrabold border border-green-100"><CheckCircle size={12}/> {value}</span>;
           
           // Technician Status
           if (value === 'Available') return <span className="text-green-700 bg-green-100 px-3 py-1 rounded-full text-xs font-bold border border-green-200 flex items-center w-fit gap-1"><CheckCircle size={10}/> Disponible</span>;
@@ -667,7 +707,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
 
           return value;
        }
-       if (col === 'amount') return value ? `${value.toLocaleString()} F` : '-';
+       if (col === 'amount' || col === 'budget') return value ? `${value.toLocaleString()} F` : '-';
        if (col === 'type' && value === 'Recette') return <span className="text-green-600 font-bold">{value}</span>;
        if (col === 'type' && value === 'Dépense') return <span className="text-red-600 font-bold">{value}</span>;
 
@@ -903,140 +943,118 @@ const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void 
    );
 };
 
-// --- Header Component ---
 const HeaderWithNotif = ({ 
   title, 
   onMenuClick, 
   onLogout, 
   onOpenFlashInfo, 
-  onOpenAdmin,
+  onOpenAdmin, 
+  onOpenProfile, 
+  onOpenHelp, 
   notifications, 
   userProfile, 
   userRole, 
-  markNotificationAsRead,
-  onOpenProfile,
-  onOpenHelp,
-  darkMode,
-  onToggleTheme,
-  session
+  markNotificationAsRead, 
+  darkMode, 
+  onToggleTheme, 
+  session 
 }: any) => {
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
-    const unreadCount = notifications.filter((n: Notification) => !n.read).length;
-    
-    const notifRef = useRef<HTMLDivElement>(null);
-    const settingsRef = useRef<HTMLDivElement>(null);
-    
-    // Fallback logic for name and role using session metadata if profile is not yet loaded
-    const displayName = userProfile?.full_name || session?.user?.user_metadata?.full_name || 'Utilisateur';
-    const displayRole = userRole === 'Visiteur' && session?.user?.user_metadata?.role ? session.user.user_metadata.role : userRole;
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
 
-    useEffect(() => {
-        const handleClickOutside = (event: any) => {
-            if (notifRef.current && !notifRef.current.contains(event.target)) setShowDropdown(false);
-            if (settingsRef.current && !settingsRef.current.contains(event.target)) setShowSettingsDropdown(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+  const unreadCount = notifications.filter((n: any) => !n.read).length;
 
-    return (
-        <header className="bg-white/90 backdrop-blur-md border-b border-orange-100 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
-           <div className="flex items-center gap-4">
-              <button onClick={onMenuClick} className="lg:hidden p-2"><Menu/></button>
-              <h2 className="text-xl font-bold text-green-900 hidden md:block">{title}</h2>
-           </div>
-           
-           <div className="flex items-center gap-3">
-               <div className="flex items-center gap-3 border-l pl-4 ml-2 border-orange-200">
-                  <div className="hidden md:block text-right">
-                     <p className="text-sm font-bold text-green-900">{displayName}</p>
-                     <p className="text-xs text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {displayRole}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-ebf-green to-emerald-700 text-white flex items-center justify-center font-bold text-lg shadow-md border-2 border-white">
-                      {displayName !== 'Utilisateur' ? displayName.charAt(0) : <User size={20}/>}
-                  </div>
-               </div>
+  return (
+    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center sticky top-0 z-30 transition-colors duration-300">
+      <div className="flex items-center space-x-4">
+        <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
+          <Menu size={24} />
+        </button>
+        <h1 className="text-xl md:text-2xl font-bold text-green-900 dark:text-white truncate">{title}</h1>
+      </div>
 
-              {/* Notification Bell */}
-              <div className="relative ml-2" ref={notifRef}>
-                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-orange-50 rounded-full transition">
-                     <Bell className="text-ebf-green"/>
-                     {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}
-                 </button>
-                 
-                 {showDropdown && (
-                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-orange-100 overflow-hidden animate-fade-in z-50">
-                         <div className="p-3 border-b border-orange-50 bg-gray-50 flex justify-between items-center">
-                             <h3 className="font-bold text-green-900 text-sm">Notifications</h3>
-                             <span className="text-xs text-gray-500">{unreadCount} non lues</span>
-                         </div>
-                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                             {notifications.length === 0 ? (
-                                 <div className="p-4 text-center text-gray-400 text-sm">Aucune notification</div>
-                             ) : (
-                                 notifications.map((notif: Notification) => (
-                                     <div 
-                                         key={notif.id} 
-                                         onClick={() => { markNotificationAsRead(notif); setShowDropdown(false); }}
-                                         className={`p-3 border-b border-gray-50 hover:bg-orange-50 cursor-pointer transition ${!notif.read ? 'bg-orange-50/30' : ''}`}
-                                     >
-                                         <div className="flex items-start gap-3">
-                                             <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'alert' ? 'bg-red-500' : notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
-                                             <div>
-                                                 <p className={`text-sm ${!notif.read ? 'font-bold text-green-900' : 'text-gray-600'}`}>{notif.title}</p>
-                                                 <p className="text-xs text-gray-500 line-clamp-2">{notif.message}</p>
-                                                 <p className="text-[10px] text-gray-400 mt-1">{new Date(notif.created_at).toLocaleDateString()}</p>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 ))
-                             )}
-                         </div>
+      <div className="flex items-center space-x-2 md:space-x-4">
+        
+        {/* Theme Toggle */}
+        <button onClick={onToggleTheme} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+           {darkMode ? <Sun size={20} className="text-yellow-400"/> : <Moon size={20}/>}
+        </button>
+
+        {/* Notifications */}
+        <div className="relative">
+           <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition relative">
+              <Bell size={20} />
+              {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
+           </button>
+           {showNotifMenu && (
+             <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 z-50 animate-fade-in">
+               <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 font-bold text-gray-700 dark:text-gray-200">Notifications</div>
+               <div className="max-h-64 overflow-y-auto">
+                 {notifications.length === 0 ? (
+                   <div className="p-4 text-center text-gray-400 text-sm">Aucune notification.</div>
+                 ) : (
+                   notifications.map((n: any) => (
+                     <div key={n.id} className={`p-3 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${!n.read ? 'bg-orange-50/50 dark:bg-gray-700/50' : ''}`}>
+                       <p className="text-sm font-bold text-green-900 dark:text-white">{n.title}</p>
+                       <p className="text-xs text-gray-500">{n.message}</p>
+                       <span className="text-[10px] text-gray-400 mt-1 block">{new Date(n.created_at).toLocaleDateString()}</span>
                      </div>
+                   ))
                  )}
-              </div>
+               </div>
+             </div>
+           )}
+        </div>
 
-              {/* Settings Dropdown */}
-              <div className="relative" ref={settingsRef}>
-                 <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition">
-                    <Settings className="text-gray-600" />
-                 </button>
-                 {showSettingsDropdown && (
-                   <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-orange-100 dark:border-gray-700 overflow-hidden animate-fade-in z-50">
-                      <div className="p-2 space-y-1">
-                         <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
-                            <User size={16} className="text-ebf-green"/> Mon Profil
-                         </button>
-                         <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
-                            <Megaphone size={16} className="text-ebf-orange"/> Configurer Flash Info
-                         </button>
-                         
-                         {/* ADMIN UNLOCKED FOR EVERYONE */}
-                         <button onClick={() => { onOpenAdmin(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-gray-700 text-sm font-bold text-red-600 dark:text-red-400">
-                            <Shield size={16} /> Administration
-                         </button>
-                         
-                         <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
-                            <div className="flex items-center gap-3"><Moon size={16} className="text-indigo-500"/> Mode Sombre</div>
-                            <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}>
-                               <div className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                            </div>
-                         </button>
-                         <button onClick={() => { onOpenHelp(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
-                            <HelpCircle size={16} className="text-blue-500"/> Aide & Support
-                         </button>
-                         <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
-                         <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-sm font-bold text-red-600">
-                            <LogOut size={16}/> Se déconnecter
-                         </button>
-                      </div>
-                   </div>
-                 )}
+        {/* User Profile Dropdown */}
+        <div className="relative">
+          <button onClick={() => setShowUserMenu(!showUserMenu)} className="flex items-center space-x-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+             <div className="w-8 h-8 bg-gradient-to-tr from-ebf-green to-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md">
+                {userProfile?.full_name?.charAt(0) || 'U'}
+             </div>
+             <div className="hidden md:block text-left">
+                <p className="text-xs font-bold text-green-900 dark:text-white">{userProfile?.full_name || 'Utilisateur'}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 capitalize">{userProfile?.role}</p>
+             </div>
+          </button>
+          
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 z-50 animate-fade-in">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                <p className="text-sm font-bold text-green-900 dark:text-white">{userProfile?.full_name}</p>
+                <p className="text-xs text-gray-500 truncate">{session?.user?.email || session?.user?.phone}</p>
               </div>
-           </div>
-        </header>
-    )
+              
+              <button onClick={() => { onOpenProfile(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                <User size={16} /> Mon Profil
+              </button>
+
+              {userRole === 'Admin' && (
+                <>
+                <button onClick={() => { onOpenAdmin(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                   <Shield size={16} /> Admin & Droits
+                </button>
+                <button onClick={() => { onOpenFlashInfo(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                   <Megaphone size={16} /> Flash Info
+                </button>
+                </>
+              )}
+
+              <button onClick={() => { onOpenHelp(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                <HelpCircle size={16} /> Aide
+              </button>
+
+              <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
+                <button onClick={onLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-700 flex items-center gap-2 font-bold">
+                  <LogOut size={16} /> Déconnexion
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
 };
 
 const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
@@ -1072,6 +1090,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [chantiers, setChantiers] = useState<Chantier[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
 
@@ -1108,9 +1128,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const mapIntervention = (i: any): Intervention => ({ ...i, clientPhone: i.client_phone, technicianId: i.technician_id, technicianName: technicians.find(t => t.id === i.technician_id)?.name });
   const mapReport = (r: any): DailyReport => ({ ...r, technicianName: r.technician_name, interventionType: r.intervention_type, clientName: r.client_name, clientPhone: r.client_phone, audioUrl: r.audio_url });
   const mapTicker = (t: any): TickerMessage => ({ ...t, isManual: t.is_manual });
-  
-  // Note: Stats and Stock usually match simply, or we assume DB columns match JSON keys if generated from JSON. 
-  // For robustness, let's assume standard names match, if not, we'd map.
+  const mapChantier = (c: any): Chantier => ({ ...c, startDate: c.start_date });
+  const mapMaterial = (m: any): Material => ({ ...m, serialNumber: m.serial_number, assignedTo: m.assigned_to });
   
   // --- ACTIVATE REAL-TIME ---
   useRealtime('daily_reports', setReports, mapReport);
@@ -1121,6 +1140,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   useRealtime('transactions', setTransactions);
   useRealtime('clients', setClients);
   useRealtime('suppliers', setSuppliers);
+  useRealtime('chantiers', setChantiers, mapChantier);
+  useRealtime('materials', setMaterials, mapMaterial);
 
   // --- NEW: DYNAMIC STATS AGGREGATION ENGINE ---
   // Calculates live dashboard stats from raw Transactions and Reports instead of relying on a pre-filled table
@@ -1240,6 +1261,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
        tableName = 'clients';
     } else if (modalConfig.type === 'Supplier') {
        tableName = 'suppliers';
+    } else if (modalConfig.type === 'Chantier') {
+        tableName = 'chantiers';
+        payload = { ...formData, start_date: formData.startDate }; // map camel to snake
+    } else if (modalConfig.type === 'Material') {
+        tableName = 'materials';
+        payload = { ...formData, serial_number: formData.serialNumber, assigned_to: formData.assignedTo }; // map camel to snake
     }
 
     if (tableName) {
@@ -1262,6 +1289,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     else if (deleteModalConfig.type === 'Transaction') tableName = 'transactions';
     else if (deleteModalConfig.type === 'Client') tableName = 'clients';
     else if (deleteModalConfig.type === 'Supplier') tableName = 'suppliers';
+    else if (deleteModalConfig.type === 'Chantier') tableName = 'chantiers';
+    else if (deleteModalConfig.type === 'Material') tableName = 'materials';
 
     if (tableName) {
         await supabase.from(tableName).delete().eq('id', deleteModalConfig.itemId);
@@ -1361,7 +1390,13 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
             onEdit={!isReadOnly ? (item: any) => openInterventionModal(item) : undefined}
             onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type}) : undefined} 
             color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
-    } 
+    }
+    else if (currentPath === '/techniciens/chantiers') {
+        title = "Chantiers"; items = chantiers; color = "bg-green-600"; type="Chantier"; formConfig = CHANTIER_FORM; subtitle = "Suivi des projets";
+    }
+    else if (currentPath === '/techniciens/materiel') {
+        title = "Matériel Technique"; items = materials; color = "bg-blue-600"; type="Material"; formConfig = MATERIAL_FORM; subtitle = "Outillage et Équipements";
+    }
     else if (currentPath === '/quincaillerie/stocks') { 
         title = "Stocks"; items = stock; color = "bg-blue-500"; type="Stock"; formConfig = STOCK_FORM;
     } 
@@ -1369,11 +1404,15 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         title = "Bilan Financier"; items = transactions; color = "bg-green-600"; type="Transaction"; formConfig = TRANSACTION_FORM; subtitle="Recettes et Dépenses";
     }
     else if (currentPath === '/comptabilite/paie') { 
-        // Filter transactions for 'Salaire' category mainly, or generic transaction view
+        // Filter transactions for 'Salaire' category mainly
         title = "Paie & Salaires"; items = transactions.filter(t => t.category === 'Salaire'); color = "bg-orange-500"; type="Transaction"; formConfig = TRANSACTION_FORM; subtitle="Historique salaires";
     }
     else if (currentPath === '/secretariat/clients') { 
         title = "Gestion Clients"; items = clients; color = "bg-blue-500"; type="Client"; formConfig = CLIENT_FORM;
+    }
+    else if (currentPath === '/secretariat/caisse') {
+        // Caisse uses transaction but specific view
+        title = "Caisse Menu"; items = transactions.filter(t => t.category === 'Caisse'); color = "bg-gray-600"; type="Transaction"; formConfig = CAISSE_FORM; subtitle="Petite Caisse & Dépenses Courantes";
     }
     else if (currentPath === '/secretariat/planning') { 
         // Planning is essentially Intervention list view (reuse)

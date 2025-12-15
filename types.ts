@@ -75,6 +75,26 @@ export interface Intervention {
   status: 'Pending' | 'In Progress' | 'Completed'; // Mapped to Planifié, En cours, Exécuté
 }
 
+export interface Chantier {
+  id: string;
+  name: string;
+  client: string;
+  location: string;
+  status: 'En Cours' | 'Terminé' | 'En Attente';
+  budget: number;
+  site: Site;
+  startDate: string;
+}
+
+export interface Material {
+  id: string;
+  name: string;
+  serialNumber?: string;
+  condition: 'Neuf' | 'Bon' | 'Usé' | 'Panne';
+  assignedTo?: string; // Nom technicien
+  site: Site;
+}
+
 export interface DailyReport {
   id: string;
   technicianName: string;
