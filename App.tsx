@@ -859,7 +859,8 @@ const HeaderWithNotif = ({
   onOpenProfile,
   onOpenHelp,
   darkMode,
-  onToggleTheme
+  onToggleTheme,
+  session
 }: any) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
@@ -867,6 +868,10 @@ const HeaderWithNotif = ({
     
     const notifRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
+    
+    // Fallback logic for name and role using session metadata if profile is not yet loaded
+    const displayName = userProfile?.full_name || session?.user?.user_metadata?.full_name || 'Utilisateur';
+    const displayRole = userRole === 'Visiteur' && session?.user?.user_metadata?.role ? session.user.user_metadata.role : userRole;
 
     useEffect(() => {
         const handleClickOutside = (event: any) => {
@@ -887,11 +892,11 @@ const HeaderWithNotif = ({
            <div className="flex items-center gap-3">
                <div className="flex items-center gap-3 border-l pl-4 ml-2 border-orange-200">
                   <div className="hidden md:block text-right">
-                     <p className="text-sm font-bold text-green-900">{userProfile?.full_name || 'Utilisateur'}</p>
-                     <p className="text-xs text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
+                     <p className="text-sm font-bold text-green-900">{displayName}</p>
+                     <p className="text-xs text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {displayRole}</p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-ebf-green to-emerald-700 text-white flex items-center justify-center font-bold text-lg shadow-md border-2 border-white">
-                      {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
+                      {displayName !== 'Utilisateur' ? displayName.charAt(0) : <User size={20}/>}
                   </div>
                </div>
 
@@ -1316,6 +1321,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
              markNotificationAsRead={() => {}}
              darkMode={darkMode}
              onToggleTheme={() => setDarkMode(!darkMode)}
+             session={session}
           />
           
           <main className="flex-1 p-4 md:p-6 overflow-x-hidden">
@@ -1383,74 +1389,62 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   );
 };
 
-// --- App Wrapper ---
-function App() {
+const App = () => {
   const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<Role>('Visiteur');
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        if (session) fetchUserProfile(session.user.id);
+      setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
     });
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-            setIsPasswordResetOpen(true);
-        }
-        setSession(session);
-        if (session) fetchUserProfile(session.user.id);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+        setLoading(false);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (userId: string) => {
-      // 1. Try to get profile
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (data) {
-          // --- FORCE ADMIN MODE ---
-          // On ignore le rôle de la DB pour l'instant et on force Admin localement
-          console.warn(`Override: Force Admin pour ${data.full_name}`);
-          
-          setUserRole('Admin');
-          setUserProfile({ ...data, role: 'Admin' });
-          
-      } else {
-          // 2. AUTO-RECOVERY (If no profile exists)
-          console.warn("Profil introuvable, création Admin auto...");
-          
-          if (user && user.user_metadata) {
-              const meta = user.user_metadata;
-              const newProfile = {
-                  id: userId,
-                  email: user.email,
-                  full_name: meta.full_name || 'Utilisateur',
-                  role: 'Admin', // FORCE ADMIN
-                  site: meta.site || 'Abidjan'
-              };
-              
-              const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
-              
-              if (!insertError) {
-                   setUserRole('Admin');
-                   setUserProfile(newProfile as any);
-              }
-          }
-      }
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    if (data) setUserProfile(data);
+    setLoading(false);
   };
 
-  if (!session) return <LoginScreen onLogin={() => {}} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="animate-spin text-ebf-green" size={48} />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen onLogin={() => {}} />;
+  }
 
   return (
-    <>
-      <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userRole} userProfile={userProfile} />
-      <PasswordUpdateModal isOpen={isPasswordResetOpen} onClose={() => setIsPasswordResetOpen(false)} />
-    </>
+    <AppContent 
+      session={session} 
+      onLogout={async () => await supabase.auth.signOut()} 
+      userRole={userProfile?.role || 'Visiteur'} 
+      userProfile={userProfile} 
+    />
   );
-}
+};
 
 export default App;
