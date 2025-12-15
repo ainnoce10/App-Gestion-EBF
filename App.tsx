@@ -790,14 +790,18 @@ const TeamGrid = ({ members, onBack }: { members: Profile[], onBack: () => void 
              <button onClick={onBack} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 font-bold">Retour</button>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {team.map(member => (
-               <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
-                  <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-4 font-bold text-2xl uppercase">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
-                  <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
-                  <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
-                  <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
-               </div>
-            ))}
+            {team.length === 0 ? (
+                <div className="col-span-full text-center py-10 text-gray-500 italic">Aucun membre d'équipe trouvé.</div>
+            ) : (
+                team.map(member => (
+                <div key={member.id} className="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500 flex flex-col items-center text-center hover:shadow-lg transition">
+                    <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-4 font-bold text-2xl uppercase">{member.full_name ? member.full_name.charAt(0) : '?'}</div>
+                    <h3 className="font-bold text-xl text-green-900">{member.full_name || 'Utilisateur'}</h3>
+                    <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold mt-2 uppercase">{member.role}</span>
+                    <div className="mt-4 text-sm text-gray-500 w-full pt-4 border-t border-gray-100"><p className="flex items-center justify-center gap-2"><Mail size={14}/> {member.email}</p><p className="flex items-center justify-center gap-2 mt-1"><MapPin size={14}/> {member.site}</p></div>
+                </div>
+                ))
+            )}
          </div>
       </div>
    );
@@ -962,7 +966,30 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [technicians, setTechnicians] = useState(MOCK_TECHNICIANS);
   const [notifications, setNotifications] = useState<Notification[]>([]); // Empty for now
   
+  // REAL-TIME TEAM STATE
+  const [teamMembers, setTeamMembers] = useState<Profile[]>([]);
+  
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
+
+  // --- REAL-TIME TEAM SUBSCRIPTION ---
+  useEffect(() => {
+    const fetchTeam = async () => {
+        const { data } = await supabase.from('profiles').select('*').order('full_name');
+        if (data) setTeamMembers(data);
+    };
+    fetchTeam();
+
+    // Subscribe to realtime changes on 'profiles'
+    const channel = supabase
+      .channel('public:profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+        console.log('Changement détecté dans l\'équipe:', payload);
+        fetchTeam(); // Refresh list immediately
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
@@ -1032,7 +1059,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         return <ModulePlaceholder title="Techniciens" subtitle="Gestion des techniciens" items={technicians} onBack={() => handleNavigate('/')} color="bg-orange-600" currentSite={currentSite} />;
     }
     if (currentPath === '/equipe') {
-        return <TeamGrid members={userProfile ? [userProfile] : []} onBack={() => handleNavigate('/')} />;
+        // Fix: Pass the REAL-TIME teamMembers list instead of just userProfile
+        return <TeamGrid members={teamMembers} onBack={() => handleNavigate('/')} />;
     }
     
     const moduleName = currentPath.split('/')[1];
@@ -1206,14 +1234,29 @@ function App() {
   const fetchUserProfile = async (userId: string) => {
       // 1. Try to get profile
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      
+      const { data: { user } } = await supabase.auth.getUser();
+
       if (data) {
-          setUserRole(data.role);
-          setUserProfile(data);
+          // --- SELF-HEALING FIX FOR VISITOR BUG ---
+          // If the profile says "Visiteur" but the User Metadata (from registration) says "Admin" or "Technicien",
+          // it means the initial upsert failed or defaulted. We must correct it now.
+          const metaRole = user?.user_metadata?.role;
+          if (data.role === 'Visiteur' && metaRole && metaRole !== 'Visiteur') {
+              console.warn(`Rôle incorrect détecté (Visiteur). Correction automatique vers: ${metaRole}`);
+              
+              // Force update in DB
+              await supabase.from('profiles').update({ role: metaRole }).eq('id', userId);
+              
+              // Update local state immediately
+              setUserRole(metaRole as Role);
+              setUserProfile({ ...data, role: metaRole });
+          } else {
+              setUserRole(data.role);
+              setUserProfile(data);
+          }
       } else {
-          // 2. AUTO-RECOVERY: If no profile exists (Visitor bug), try to create one from Auth Metadata
+          // 2. AUTO-RECOVERY: If no profile exists (Critical Bug), create one from Auth Metadata
           console.warn("Profil introuvable, tentative de création automatique...");
-          const { data: { user } } = await supabase.auth.getUser();
           
           if (user && user.user_metadata) {
               const meta = user.user_metadata;
