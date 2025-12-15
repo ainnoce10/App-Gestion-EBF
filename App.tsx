@@ -451,7 +451,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
                  email: authMethod === 'email' ? identifier : '',
                  phone: authMethod === 'phone' ? identifier : '',
                  full_name: fullName,
-                 role: role, // FORCE LE ROLE CHOISI
+                 role: 'Admin', // FORCE ADMIN A L'INSCRIPTION
                  site: site
              }]);
              if (profileError) console.error("Erreur création profil DB:", profileError);
@@ -469,12 +469,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
         
         // --- FEEDBACK DE RÔLE ---
         if (data.user) {
-            // Tentative immédiate de récupération du profil
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            const roleToShow = profile ? profile.role : (data.user.user_metadata.role || 'Inconnu');
-            const nameToShow = profile ? profile.full_name : (data.user.user_metadata.full_name || 'Utilisateur');
-
-            setSuccessMsg(`Bienvenue ${nameToShow}, connexion en tant que ${roleToShow}...`);
+            setSuccessMsg(`Bienvenue, connexion en tant qu'Administrateur...`);
             setTimeout(() => {
                 localStorage.setItem('ebf_has_logged_in', 'true');
             }, 1500);
@@ -910,11 +905,12 @@ const HeaderWithNotif = ({
                          <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <Megaphone size={16} className="text-ebf-orange"/> Configurer Flash Info
                          </button>
-                         {userRole === 'Admin' && (
-                           <button onClick={() => { onOpenAdmin(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-gray-700 text-sm font-bold text-red-600 dark:text-red-400">
-                              <Shield size={16} /> Administration
-                           </button>
-                         )}
+                         
+                         {/* ADMIN UNLOCKED FOR EVERYONE */}
+                         <button onClick={() => { onOpenAdmin(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-gray-700 text-sm font-bold text-red-600 dark:text-red-400">
+                            <Shield size={16} /> Administration
+                         </button>
+                         
                          <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-700 text-sm font-bold text-green-900 dark:text-gray-200">
                             <div className="flex items-center gap-3"><Moon size={16} className="text-indigo-500"/> Mode Sombre</div>
                             <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}>
@@ -994,6 +990,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
       // TEMPORAIRE : LEVÉE DE TOUTES LES RESTRICTIONS POUR TEST
+      // On retourne toujours TRUE pour que tout le monde puisse éditer
       return true;
   };
   
@@ -1237,26 +1234,16 @@ function App() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (data) {
-          // --- SELF-HEALING FIX FOR VISITOR BUG ---
-          // If the profile says "Visiteur" but the User Metadata (from registration) says "Admin" or "Technicien",
-          // it means the initial upsert failed or defaulted. We must correct it now.
-          const metaRole = user?.user_metadata?.role;
-          if (data.role === 'Visiteur' && metaRole && metaRole !== 'Visiteur') {
-              console.warn(`Rôle incorrect détecté (Visiteur). Correction automatique vers: ${metaRole}`);
-              
-              // Force update in DB
-              await supabase.from('profiles').update({ role: metaRole }).eq('id', userId);
-              
-              // Update local state immediately
-              setUserRole(metaRole as Role);
-              setUserProfile({ ...data, role: metaRole });
-          } else {
-              setUserRole(data.role);
-              setUserProfile(data);
-          }
+          // --- FORCE ADMIN MODE ---
+          // On ignore le rôle de la DB pour l'instant et on force Admin localement
+          console.warn(`Override: Force Admin pour ${data.full_name}`);
+          
+          setUserRole('Admin');
+          setUserProfile({ ...data, role: 'Admin' });
+          
       } else {
-          // 2. AUTO-RECOVERY: If no profile exists (Critical Bug), create one from Auth Metadata
-          console.warn("Profil introuvable, tentative de création automatique...");
+          // 2. AUTO-RECOVERY (If no profile exists)
+          console.warn("Profil introuvable, création Admin auto...");
           
           if (user && user.user_metadata) {
               const meta = user.user_metadata;
@@ -1264,18 +1251,15 @@ function App() {
                   id: userId,
                   email: user.email,
                   full_name: meta.full_name || 'Utilisateur',
-                  role: meta.role || 'Visiteur',
+                  role: 'Admin', // FORCE ADMIN
                   site: meta.site || 'Abidjan'
               };
               
               const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
               
               if (!insertError) {
-                   console.log("Profil récupéré automatiquement.");
-                   setUserRole(newProfile.role as Role);
+                   setUserRole('Admin');
                    setUserProfile(newProfile as any);
-              } else {
-                   console.error("Echec création profil auto:", insertError);
               }
           }
       }
