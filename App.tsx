@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -280,21 +279,93 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
 
 // --- Helper: Permission Check (STRICT) ---
 const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  if (role === 'Admin') return { canWrite: true }; // Admin a tous les droits
-  if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
+  // RESTRICTIONS LEVÉES : Tout le monde a les droits d'écriture partout
+  return { canWrite: true };
+};
 
-  // Rôles internes spécifiques
-  // Technicien écrit UNIQUEMENT dans /techniciens
-  if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
-  
-  // Magasinier écrit UNIQUEMENT dans /quincaillerie
-  if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
-  
-  // Secrétaire écrit UNIQUEMENT dans /secretariat
-  if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
-  
-  // TOUT LE RESTE (y compris /equipe, /comptabilite pour les non-admins) est strictement Lecture Seule
-  return { canWrite: false };
+// --- Admin Panel Modal ---
+const AdminPanelModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) fetchUsers();
+  }, [isOpen]);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('profiles').select('*').order('full_name');
+    if (data) setUsers(data);
+    setLoading(false);
+  };
+
+  const handleRoleChange = async (userId: string, newRole: Role) => {
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    if (!error) {
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } else {
+      alert("Erreur lors de la mise à jour du rôle.");
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-green-900/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl p-6 shadow-2xl animate-fade-in flex flex-col max-h-[80vh]">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold text-green-900 dark:text-white flex items-center gap-2">
+            <Shield className="text-ebf-orange" /> Administration & Droits
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X /></button>
+        </div>
+        
+        <div className="overflow-y-auto custom-scrollbar flex-1">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+              <tr>
+                <th className="p-3 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Utilisateur</th>
+                <th className="p-3 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Email / Tél</th>
+                <th className="p-3 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Rôle (Accès)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {loading ? (
+                <tr><td colSpan={3} className="p-4 text-center"><Loader2 className="animate-spin mx-auto text-ebf-green"/></td></tr>
+              ) : (
+                users.map(user => (
+                  <tr key={user.id} className="hover:bg-orange-50 dark:hover:bg-gray-800">
+                    <td className="p-3">
+                      <div className="font-bold text-green-900 dark:text-white">{user.full_name || 'Sans nom'}</div>
+                      <div className="text-xs text-gray-400">{user.site}</div>
+                    </td>
+                    <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{user.email || user.phone}</td>
+                    <td className="p-3">
+                      <select 
+                        value={user.role} 
+                        onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
+                        className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm font-bold text-green-900 dark:text-white focus:border-ebf-orange outline-none"
+                      >
+                        <option value="Visiteur">Visiteur</option>
+                        <option value="Technicien">Technicien</option>
+                        <option value="Secretaire">Secretaire</option>
+                        <option value="Magasinier">Magasinier</option>
+                        <option value="Admin">Administrateur</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-400">
+          * Les modifications de rôle sont immédiates.
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // --- EBF Vector Logo (Globe + Plug) ---
@@ -1037,7 +1108,7 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
 
 // --- HEADER WITH NOTIFICATIONS ---
 const HeaderWithNotif = ({ 
-  title, onMenuClick, onLogout, onOpenFlashInfo, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
+  title, onMenuClick, onLogout, onOpenFlashInfo, onOpenAdmin, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
 }: any) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
@@ -1054,7 +1125,7 @@ const HeaderWithNotif = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const canEditFlashInfo = userRole === 'Admin' || userRole === 'Administrateur';
+    const canEditFlashInfo = true;
 
     return (
         <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
@@ -1117,6 +1188,9 @@ const HeaderWithNotif = ({
                             <>
                                 <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
                                 <div className="px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Administration</div>
+                                <button onClick={() => { onOpenAdmin(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
+                                    <Shield size={18} className="text-purple-600"/> Admin & Droits
+                                </button>
                                 <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200">
                                     <Megaphone size={18} className="text-blue-500"/> Gestion Flash Info
                                 </button>
@@ -1183,6 +1257,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [crudTarget, setCrudTarget] = useState('');
@@ -1395,7 +1470,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} readOnly={!canWrite} />;
      if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} readOnly={!canWrite} />;
      if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} readOnly={!canWrite} />;
-     if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={true} />; 
+     if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={!canWrite} />; 
      if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} readOnly={!canWrite} />;
      if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} readOnly={!canWrite} />;
      if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} readOnly={!canWrite} />;
@@ -1446,7 +1521,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
                  userRole={userRole} 
                  markNotificationAsRead={(n: any) => setNotifications(notifications.map(x => x.id === n.id ? {...x, read: true} : x))} 
                  onOpenProfile={() => setIsProfileOpen(true)} 
-                 onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
+                 onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
+                 onOpenAdmin={() => setIsAdminOpen(true)} 
                  onOpenHelp={() => setIsHelpOpen(true)} 
                  darkMode={darkMode} 
                  onToggleTheme={toggleTheme} 
@@ -1457,6 +1533,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
+        <AdminPanelModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
         <AddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} />
         <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
     </div>
