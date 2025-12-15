@@ -1,4 +1,5 @@
 
+
 export enum Site {
   ABIDJAN = 'Abidjan',
   BOUAKE = 'Bouaké',
@@ -43,6 +44,7 @@ export interface Technician {
 }
 
 export interface StatData {
+  id: string;
   date: string;
   revenue: number;
   interventions: number;

@@ -11,7 +11,6 @@ import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
 import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
-import { MOCK_STATS, MOCK_TECHNICIANS, MOCK_STOCK, MOCK_INTERVENTIONS, MOCK_REPORTS, DEFAULT_TICKER_MESSAGES } from './constants';
 
 // --- Types for Navigation & Forms ---
 interface ModuleAction {
@@ -48,14 +47,15 @@ interface FormConfig {
 }
 
 // --- CONFIGURATION DES FORMULAIRES ---
-const INTERVENTION_FORM: FormConfig = {
+// Note: We need to fetch technicians dynamically for the select options now, but for static config we keep empty and fill later
+const INTERVENTION_FORM_TEMPLATE: FormConfig = {
   title: "Nouvelle Intervention",
   type: 'Intervention',
   fields: [
     { name: 'client', label: 'Client', type: 'text', placeholder: 'Nom du client ou entreprise' },
     { name: 'location', label: 'Lieu / Quartier', type: 'text', placeholder: 'Ex: Cocody Riviera' },
     { name: 'description', label: 'Description de la tâche', type: 'text', placeholder: 'Ex: Maintenance Clim' },
-    { name: 'technicianId', label: 'Technicien assigné', type: 'select', options: MOCK_TECHNICIANS.map(t => t.id) }, // Simplified for mock
+    { name: 'technicianId', label: 'Technicien assigné', type: 'select', options: [] }, // Will be filled dynamically
     { name: 'date', label: 'Date prévue', type: 'date' },
     { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
     { name: 'status', label: 'Statut', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
@@ -589,7 +589,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
 const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDelete, color, currentSite, currentPeriod, readOnly }: any) => {
     const COLUMN_LABELS: Record<string, string> = {
         name: 'Nom', quantity: 'Quantité', unit: 'Unité', threshold: 'Seuil', site: 'Site',
-        client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technician: 'Technicien', date: 'Date', status: 'Statut',
+        client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technicianName: 'Technicien', date: 'Date', status: 'Statut',
         amount: 'Montant', type: 'Type', label: 'Libellé', category: 'Catégorie', email: 'Email', specialty: 'Spécialité',
         full_name: 'Nom Complet', role: 'Rôle'
     };
@@ -603,7 +603,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
     }, [items, currentSite, currentPeriod]);
 
     const columns = filteredItems.length > 0 
-        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url') 
+        ? Object.keys(filteredItems[0]).filter(k => k !== 'id' && k !== 'technicianId' && k !== 'avatar_url' && k !== 'technician_id' && k !== 'client_phone' && k !== 'created_at') 
         : []; 
 
     const renderCell = (col: string, value: any) => {
@@ -641,7 +641,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {filteredItems.length === 0 ? <tr><td colSpan={columns.length + 1} className="p-8 text-center text-gray-400">Aucune donnée.</td></tr> : 
+                            {filteredItems.length === 0 ? <tr><td colSpan={columns.length + 1} className="p-8 text-center text-gray-400">Aucune donnée trouvée.</td></tr> : 
                                 filteredItems.map((item: any, i: number) => (
                                     <tr key={i} className="hover:bg-orange-50/30">
                                         {columns.map(col => (
@@ -664,7 +664,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
     );
 };
 
-// --- Module Menu Component (MISSING FIX) ---
+// --- Module Menu Component ---
 const ModuleMenu = ({ title, actions, onNavigate }: any) => (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center space-x-4 mb-2">
@@ -699,13 +699,15 @@ const ModuleMenu = ({ title, actions, onNavigate }: any) => (
     </div>
 );
 
-// --- Dynamic Modal Component (MISSING FIX) ---
+// --- Dynamic Modal Component ---
 const DynamicModal = ({ isOpen, onClose, config, initialData, onSubmit }: any) => {
     const [formData, setFormData] = useState<any>({});
 
     useEffect(() => {
         if (isOpen) {
             setFormData(initialData || {});
+        } else {
+            setFormData({});
         }
     }, [isOpen, initialData]);
 
@@ -742,7 +744,7 @@ const DynamicModal = ({ isOpen, onClose, config, initialData, onSubmit }: any) =
                 )}
               </div>
             ))}
-            <button onClick={() => { onSubmit(formData); onClose(); }} className="w-full bg-ebf-green text-white font-bold py-2 rounded hover:bg-green-800 transition">
+            <button onClick={() => { onSubmit(formData); }} className="w-full bg-ebf-green text-white font-bold py-2 rounded hover:bg-green-800 transition">
               {isEditMode ? "Mettre à jour" : "Ajouter"}
             </button>
           </div>
@@ -795,7 +797,8 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
                  </tr>
                </thead>
                <tbody className="divide-y divide-gray-50">
-                  {reports.map((r: any) => (
+                  {reports.length === 0 ? <tr><td colSpan={5} className="p-4 text-center text-gray-400">Aucun rapport.</td></tr> :
+                  reports.map((r: any) => (
                     <tr key={r.id} className="hover:bg-orange-50/50">
                       <td className="p-3 text-sm font-bold text-gray-700">{r.date}</td>
                       <td className="p-3 text-sm text-gray-700">{r.technicianName}</td>
@@ -994,45 +997,88 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   
   const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
 
-  // Data state
-  const [stats, setStats] = useState(MOCK_STATS);
-  const [reports, setReports] = useState(MOCK_REPORTS);
-  const [tickerMessages, setTickerMessages] = useState(DEFAULT_TICKER_MESSAGES);
-  const [stock, setStock] = useState(MOCK_STOCK);
-  const [interventions, setInterventions] = useState(MOCK_INTERVENTIONS);
-  const [technicians, setTechnicians] = useState(MOCK_TECHNICIANS);
-  const [notifications, setNotifications] = useState<Notification[]>([]); // Empty for now
-  
-  // REAL-TIME TEAM STATE
+  // REAL-TIME STATE
+  const [stats, setStats] = useState<StatData[]>([]);
+  const [reports, setReports] = useState<DailyReport[]>([]);
+  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>([]);
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [interventions, setInterventions] = useState<Intervention[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [teamMembers, setTeamMembers] = useState<Profile[]>([]);
   
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
 
-  // --- REAL-TIME TEAM SUBSCRIPTION ---
+  // --- GENERIC REAL-TIME HOOK ---
+  const useRealtime = <T extends { id: string }>(tableName: string, setter: React.Dispatch<React.SetStateAction<T[]>>, mapper?: (item: any) => T) => {
+      useEffect(() => {
+        const fetchData = async () => {
+            const { data, error } = await supabase.from(tableName).select('*');
+            if (!error && data) {
+                setter(data.map(item => mapper ? mapper(item) : item));
+            }
+        };
+        fetchData();
+
+        const channel = supabase.channel(`public:${tableName}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+                const newItem = mapper ? mapper(payload.new) : payload.new;
+                setter(prev => [...prev, newItem]);
+            } else if (payload.eventType === 'UPDATE') {
+                const updatedItem = mapper ? mapper(payload.new) : payload.new;
+                setter(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+            } else if (payload.eventType === 'DELETE') {
+                setter(prev => prev.filter(item => item.id !== payload.old.id));
+            }
+        })
+        .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+      }, [tableName]);
+  };
+
+  // --- MAPPERS (Db SnakeCase -> App CamelCase) ---
+  const mapIntervention = (i: any): Intervention => ({ ...i, clientPhone: i.client_phone, technicianId: i.technician_id, technicianName: technicians.find(t => t.id === i.technician_id)?.name });
+  const mapReport = (r: any): DailyReport => ({ ...r, technicianName: r.technician_name, interventionType: r.intervention_type, clientName: r.client_name, clientPhone: r.client_phone, audioUrl: r.audio_url });
+  const mapTicker = (t: any): TickerMessage => ({ ...t, isManual: t.is_manual });
+  
+  // Note: Stats and Stock usually match simply, or we assume DB columns match JSON keys if generated from JSON. 
+  // For robustness, let's assume standard names match, if not, we'd map.
+  
+  // --- ACTIVATE REAL-TIME ---
+  useRealtime('daily_stats', setStats);
+  useRealtime('daily_reports', setReports, mapReport);
+  useRealtime('ticker_messages', setTickerMessages, mapTicker);
+  useRealtime('stock_items', setStock);
+  useRealtime('interventions', setInterventions, mapIntervention);
+  useRealtime('technicians', setTechnicians); 
+  // Team is special (profiles table)
   useEffect(() => {
     const fetchTeam = async () => {
         const { data } = await supabase.from('profiles').select('*').order('full_name');
         if (data) setTeamMembers(data);
     };
     fetchTeam();
-
-    // Subscribe to realtime changes on 'profiles'
-    const channel = supabase
-      .channel('public:profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-        console.log('Changement détecté dans l\'équipe:', payload);
-        fetchTeam(); // Refresh list immediately
-      })
+    const channel = supabase.channel('public:profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchTeam())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Update Technician Names in Interventions when Technicians list changes
+  useEffect(() => {
+     if (technicians.length > 0 && interventions.length > 0) {
+         setInterventions(prev => prev.map(i => ({
+             ...i,
+             technicianName: technicians.find(t => t.id === i.technicianId)?.name || i.technicianName
+         })));
+     }
+  }, [technicians]);
+
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
-      // TEMPORAIRE : LEVÉE DE TOUTES LES RESTRICTIONS POUR TEST
-      // On retourne toujours TRUE pour que tout le monde puisse éditer
-      return true;
+      return true; // Unlocked for demo/usage
   };
   
   const isReadOnly = useMemo(() => !canUserWrite(userRole, currentPath), [userRole, currentPath]);
@@ -1043,34 +1089,48 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     setSidebarOpen(false); // Close mobile sidebar on nav
   };
 
-  const handleDeleteReport = (id: string) => {
-     setReports(reports.filter(r => r.id !== id));
+  const handleDeleteReport = async (id: string) => {
+     await supabase.from('daily_reports').delete().eq('id', id);
   };
 
-  const handleFlashInfoSave = (msg: TickerMessage) => {
-     setTickerMessages([...tickerMessages, msg]);
+  const handleFlashInfoSave = async (msg: TickerMessage) => {
+     // DB Insert
+     await supabase.from('ticker_messages').insert({
+         text: msg.text,
+         type: msg.type,
+         display_order: msg.display_order,
+         is_manual: true
+     });
      setIsFlashInfoOpen(false);
   };
   
-  // --- CORE SAVE LOGIC (CREATE OR UPDATE) ---
-  const handleSaveItem = (formData: any) => {
+  // --- CORE SAVE LOGIC (CREATE OR UPDATE TO SUPABASE) ---
+  const handleSaveItem = async (formData: any) => {
     if (!modalConfig) return;
 
     if (modalConfig.type === 'Intervention') {
+       // Map back to Snake Case
+       const payload = {
+           site: formData.site,
+           client: formData.client,
+           client_phone: formData.clientPhone, // Note: Form currently doesn't have this field explicitly in config, if added later
+           location: formData.location,
+           description: formData.description,
+           technician_id: formData.technicianId,
+           date: formData.date,
+           status: formData.status
+       };
+
        if (editingItem) {
-         // Update
-         setInterventions(interventions.map(i => i.id === editingItem.id ? { ...i, ...formData } : i));
+         await supabase.from('interventions').update(payload).eq('id', editingItem.id);
        } else {
-         // Create
-         const newItem = { id: Date.now().toString(), ...formData };
-         setInterventions([...interventions, newItem]);
+         await supabase.from('interventions').insert(payload);
        }
     } else if (modalConfig.type === 'Stock') {
        if (editingItem) {
-          setStock(stock.map(s => s.id === editingItem.id ? { ...s, ...formData } : s));
+          await supabase.from('stock_items').update(formData).eq('id', editingItem.id);
        } else {
-          const newItem = { id: Date.now().toString(), ...formData };
-          setStock([...stock, newItem]);
+          await supabase.from('stock_items').insert(formData);
        }
     }
     
@@ -1078,13 +1138,28 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     setEditingItem(null);
   };
 
-  const handleDeleteItem = () => {
+  const handleDeleteItem = async () => {
     if (deleteModalConfig.type === 'Intervention') {
-      setInterventions(interventions.filter(i => i.id !== deleteModalConfig.itemId));
+      await supabase.from('interventions').delete().eq('id', deleteModalConfig.itemId);
     } else if (deleteModalConfig.type === 'Stock') {
-      setStock(stock.filter(s => s.id !== deleteModalConfig.itemId));
+      await supabase.from('stock_items').delete().eq('id', deleteModalConfig.itemId);
     }
     setDeleteModalConfig({isOpen: false, itemId: null, type: null});
+  };
+
+  // --- DYNAMIC FORM UPDATE ---
+  // When opening intervention form, populate technicians list
+  const openInterventionModal = (item?: any) => {
+      const config = { ...INTERVENTION_FORM_TEMPLATE };
+      config.fields = config.fields.map(f => {
+          if (f.name === 'technicianId') {
+              return { ...f, options: technicians.map(t => t.id) }; // Should ideally be name-value pair in select, simplified here
+          }
+          return f;
+      });
+      setModalConfig(config);
+      setEditingItem(item || null);
+      setIsModalOpen(true);
   };
 
   // Render logic based on path
@@ -1123,7 +1198,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         return <ModulePlaceholder title="Techniciens" subtitle="Gestion des techniciens" items={technicians} onBack={() => handleNavigate('/')} color="bg-orange-600" currentSite={currentSite} />;
     }
     if (currentPath === '/equipe') {
-        // Fix: Pass the REAL-TIME teamMembers list instead of just userProfile
         return <TeamGrid members={teamMembers} onBack={() => handleNavigate('/')} />;
     }
     
@@ -1137,21 +1211,39 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     let title = 'Liste'; 
     let color = 'bg-gray-500'; 
     let type: any = '';
-    let formConfig: FormConfig | null = null;
-
+    
     if (currentPath === '/techniciens/interventions') { 
-        items = interventions; title = 'Interventions'; color = 'bg-orange-500'; type = 'Intervention'; formConfig = INTERVENTION_FORM;
+        return <ModulePlaceholder 
+            title="Interventions" 
+            items={interventions} 
+            onBack={() => handleNavigate(`/${moduleName}`)} 
+            onAdd={!isReadOnly ? () => openInterventionModal() : undefined} 
+            onEdit={!isReadOnly ? (item: any) => openInterventionModal(item) : undefined}
+            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: 'Intervention'}) : undefined} 
+            color="bg-orange-500" 
+            currentSite={currentSite} 
+            currentPeriod={currentPeriod} 
+            readOnly={isReadOnly} 
+        />;
     } else if (currentPath === '/quincaillerie/stocks') { 
-        items = stock; title = 'Stocks'; color = 'bg-blue-500'; type = 'Stock'; formConfig = STOCK_FORM;
+        return <ModulePlaceholder 
+            title="Stocks" 
+            items={stock} 
+            onBack={() => handleNavigate(`/${moduleName}`)} 
+            onAdd={!isReadOnly ? () => { setModalConfig(STOCK_FORM); setEditingItem(null); setIsModalOpen(true); } : undefined} 
+            onEdit={!isReadOnly ? (item: any) => { setModalConfig(STOCK_FORM); setEditingItem(item); setIsModalOpen(true); } : undefined}
+            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: 'Stock'}) : undefined} 
+            color="bg-blue-500" 
+            currentSite={currentSite} 
+            currentPeriod={currentPeriod} 
+            readOnly={isReadOnly} 
+        />;
     }
     
     return <ModulePlaceholder 
         title={title} 
         items={items} 
         onBack={() => handleNavigate(`/${moduleName}`)} 
-        onAdd={!isReadOnly && formConfig ? () => { setModalConfig(formConfig); setEditingItem(null); setIsModalOpen(true); } : undefined} 
-        onEdit={!isReadOnly && formConfig ? (item: any) => { setModalConfig(formConfig); setEditingItem(item); setIsModalOpen(true); } : undefined}
-        onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: type}) : undefined} 
         color={color} 
         currentSite={currentSite} 
         currentPeriod={currentPeriod} 

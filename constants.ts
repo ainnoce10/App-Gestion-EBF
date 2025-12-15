@@ -1,4 +1,5 @@
 
+
 import { Site, StatData, Technician, StockItem, Intervention, DailyReport, TickerMessage } from './types';
 
 // Helper pour générer des dates dynamiques
@@ -11,21 +12,21 @@ const getDateStr = (daysOffset: number) => {
 
 export const MOCK_STATS: StatData[] = [
   // Abidjan Data - Aujourd'hui
-  { date: getDateStr(0), revenue: 150000, interventions: 5, profit: 45000, expenses: 105000, site: Site.ABIDJAN },
+  { id: 'st1', date: getDateStr(0), revenue: 150000, interventions: 5, profit: 45000, expenses: 105000, site: Site.ABIDJAN },
   // Hier
-  { date: getDateStr(1), revenue: 200000, interventions: 8, profit: 60000, expenses: 140000, site: Site.ABIDJAN },
+  { id: 'st2', date: getDateStr(1), revenue: 200000, interventions: 8, profit: 60000, expenses: 140000, site: Site.ABIDJAN },
   // Il y a 2 jours
-  { date: getDateStr(2), revenue: 120000, interventions: 4, profit: 30000, expenses: 90000, site: Site.ABIDJAN },
+  { id: 'st3', date: getDateStr(2), revenue: 120000, interventions: 4, profit: 30000, expenses: 90000, site: Site.ABIDJAN },
   // Il y a 5 jours (Dans la semaine)
-  { date: getDateStr(5), revenue: 300000, interventions: 10, profit: 100000, expenses: 200000, site: Site.ABIDJAN },
+  { id: 'st4', date: getDateStr(5), revenue: 300000, interventions: 10, profit: 100000, expenses: 200000, site: Site.ABIDJAN },
   // Il y a 15 jours (Dans le mois)
-  { date: getDateStr(15), revenue: 450000, interventions: 12, profit: 150000, expenses: 300000, site: Site.ABIDJAN },
+  { id: 'st5', date: getDateStr(15), revenue: 450000, interventions: 12, profit: 150000, expenses: 300000, site: Site.ABIDJAN },
   
   // Bouaké Data
-  { date: getDateStr(0), revenue: 80000, interventions: 3, profit: 20000, expenses: 60000, site: Site.BOUAKE },
-  { date: getDateStr(1), revenue: 95000, interventions: 4, profit: 25000, expenses: 70000, site: Site.BOUAKE },
-  { date: getDateStr(3), revenue: 110000, interventions: 5, profit: 35000, expenses: 75000, site: Site.BOUAKE },
-  { date: getDateStr(6), revenue: 70000, interventions: 2, profit: 15000, expenses: 55000, site: Site.BOUAKE },
+  { id: 'st6', date: getDateStr(0), revenue: 80000, interventions: 3, profit: 20000, expenses: 60000, site: Site.BOUAKE },
+  { id: 'st7', date: getDateStr(1), revenue: 95000, interventions: 4, profit: 25000, expenses: 70000, site: Site.BOUAKE },
+  { id: 'st8', date: getDateStr(3), revenue: 110000, interventions: 5, profit: 35000, expenses: 75000, site: Site.BOUAKE },
+  { id: 'st9', date: getDateStr(6), revenue: 70000, interventions: 2, profit: 15000, expenses: 55000, site: Site.BOUAKE },
 ];
 
 export const MOCK_TECHNICIANS: Technician[] = [
