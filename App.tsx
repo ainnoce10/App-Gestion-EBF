@@ -640,9 +640,91 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
     );
 };
 
+// --- Module Menu Component (MISSING FIX) ---
+const ModuleMenu = ({ title, actions, onNavigate }: any) => (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center space-x-4 mb-2">
+         <button onClick={() => onNavigate('/')} className="p-2 bg-orange-50 border border-orange-100 rounded-full shadow hover:bg-orange-100 transition"><ArrowLeft className="text-ebf-orange"/></button>
+         <h2 className="text-2xl font-bold text-green-900 dark:text-white">{title}</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {actions.map((action: any) => (
+          <button
+            key={action.id}
+            onClick={() => onNavigate(action.path)}
+            className={`p-6 rounded-xl shadow-md hover:shadow-xl transition transform hover:-translate-y-1 text-left group relative overflow-hidden ${action.color} text-white`}
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition">
+              <action.icon size={80} />
+            </div>
+            <div className="relative z-10">
+              <div className="bg-white/20 w-12 h-12 rounded-lg flex items-center justify-center mb-4 backdrop-blur-sm">
+                <action.icon size={24} className="text-white" />
+              </div>
+              <h3 className="text-xl font-bold mb-1">{action.label}</h3>
+              <p className="text-sm opacity-90">{action.description}</p>
+              {action.managedBy && (
+                <span className="inline-block mt-3 text-[10px] font-bold uppercase tracking-wider bg-black/20 px-2 py-1 rounded">
+                  {action.managedBy}
+                </span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+);
+
+// --- Dynamic Modal Component (MISSING FIX) ---
+const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
+    const [formData, setFormData] = useState<any>({});
+
+    if (!isOpen || !config) return null;
+
+    return (
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in">
+          <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4">{config.title}</h3>
+          <div className="space-y-4">
+            {config.fields.map((field: any) => (
+              <div key={field.name}>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
+                {field.type === 'select' ? (
+                  <select
+                    className="w-full border border-orange-200 p-2 rounded bg-white text-green-900"
+                    onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
+                  >
+                    {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type}
+                    className="w-full border border-orange-200 p-2 rounded bg-white text-green-900"
+                    placeholder={field.placeholder}
+                    onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
+                  />
+                )}
+              </div>
+            ))}
+            <button onClick={() => { onSubmit(formData); onClose(); }} className="w-full bg-ebf-green text-white font-bold py-2 rounded hover:bg-green-800 transition">
+              Enregistrer
+            </button>
+          </div>
+          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X /></button>
+        </div>
+      </div>
+    );
+};
+
 const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
   return (
     <div className="space-y-8 animate-fade-in">
+       <div className="flex items-center space-x-4 mb-2">
+         <button onClick={onBack} className="p-2 bg-orange-50 border border-orange-100 rounded-full shadow hover:bg-orange-100 transition"><ArrowLeft className="text-ebf-orange"/></button>
+         <h2 className="text-2xl font-bold text-green-900 dark:text-white">Rapports Journaliers</h2>
+       </div>
+
        {!readOnly && (
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <button onClick={() => onSelectMode('voice')} className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition text-left relative overflow-hidden group">
@@ -884,7 +966,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   // --- PERMISSION CHECKER ---
   const canUserWrite = (role: Role, path: string): boolean => {
-      // TEMPORAIRE : LEVÉE DE TOUTES LES RESTRICTIONS
+      // TEMPORAIRE : LEVÉE DE TOUTES LES RESTRICTIONS POUR TEST
       return true;
   };
   
@@ -905,6 +987,15 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      setIsFlashInfoOpen(false);
   };
   
+  const handleDeleteItem = () => {
+    if (deleteModalConfig.type === 'Intervention') {
+      setInterventions(interventions.filter(i => i.id !== deleteModalConfig.itemId));
+    } else if (deleteModalConfig.type === 'Stock') {
+      setStock(stock.filter(s => s.id !== deleteModalConfig.itemId));
+    }
+    setDeleteModalConfig({isOpen: false, itemId: null, type: null});
+  };
+
   // Render logic based on path
   const renderContent = () => {
     if (currentPath === '/') {
@@ -950,11 +1041,11 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     // Lists & Forms with Permissions
     if (currentPath === '/techniciens/rapports') { if (reportMode === 'select') return <ReportModeSelector reports={reports} onSelectMode={setReportMode} onBack={() => setCurrentPath('/techniciens')} onViewReport={setViewReport} readOnly={isReadOnly} />; }
     
-    let items: any[] = []; let title = 'Liste'; let color = 'bg-gray-500';
-    if (currentPath === '/techniciens/interventions') { items = interventions; title = 'Interventions'; color = 'bg-orange-500'; }
-    else if (currentPath === '/quincaillerie/stocks') { items = stock; title = 'Stocks'; color = 'bg-blue-500'; }
+    let items: any[] = []; let title = 'Liste'; let color = 'bg-gray-500'; let type = '';
+    if (currentPath === '/techniciens/interventions') { items = interventions; title = 'Interventions'; color = 'bg-orange-500'; type = 'Intervention'; }
+    else if (currentPath === '/quincaillerie/stocks') { items = stock; title = 'Stocks'; color = 'bg-blue-500'; type = 'Stock'; }
     
-    return <ModulePlaceholder title={title} items={items} onBack={() => handleNavigate(`/${moduleName}`)} onAdd={!isReadOnly ? () => { setIsModalOpen(true); } : undefined} onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: '...'}) : undefined} color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+    return <ModulePlaceholder title={title} items={items} onBack={() => handleNavigate(`/${moduleName}`)} onAdd={!isReadOnly ? () => { setIsModalOpen(true); } : undefined} onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: type}) : undefined} color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
   };
 
   return (
@@ -1036,6 +1127,14 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
        
+       <ConfirmationModal 
+          isOpen={deleteModalConfig.isOpen}
+          onClose={() => setDeleteModalConfig({...deleteModalConfig, isOpen: false})}
+          onConfirm={handleDeleteItem}
+          title="Suppression"
+          message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible."
+       />
+
        {/* Report Detail Modal (Read Only) */}
         {viewReport && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
