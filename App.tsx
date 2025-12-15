@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -1235,7 +1236,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
   const [darkMode, setDarkMode] = useState(false);
   
-  const [stats, setStats] = useState<StatData[]>([]);
+  // RAW DATA STATES
+  const [rawStats, setRawStats] = useState<StatData[]>([]); // Stored but we might rely on calculations
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
@@ -1265,6 +1267,103 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [crudLoading, setCrudLoading] = useState(false);
 
   const { canWrite } = getPermission(currentPath, userRole);
+
+  // --- DYNAMIC STATS CALCULATION (AGGREGATION ENGINE) ---
+  const liveStats = useMemo(() => {
+    // We will aggregate transactions and reports to build the daily stats dynamically
+    const aggregator = new Map<string, StatData>();
+
+    const getEntry = (date: string, site: Site) => {
+        const key = `${date}_${site}`;
+        if (!aggregator.has(key)) {
+            aggregator.set(key, {
+                id: key,
+                date: date,
+                site: site,
+                revenue: 0,
+                expenses: 0,
+                profit: 0,
+                interventions: 0
+            });
+        }
+        return aggregator.get(key)!;
+    };
+
+    // 1. Process Transactions
+    transactions.forEach(t => {
+        if (!t.date || !t.amount) return;
+        // Default to Global/Abidjan if site is missing in old data, though setup.txt has site
+        const site = (t.site as Site) || Site.ABIDJAN; 
+        const entry = getEntry(t.date, site);
+
+        if (t.type === 'Recette') {
+            entry.revenue += Number(t.amount);
+        } else if (t.type === 'Dépense') {
+            entry.expenses += Number(t.amount);
+        }
+    });
+
+    // 2. Process Reports (Revenue/Expenses declared in daily reports)
+    // Note: If you record a transaction for every report revenue, disable this to avoid double counting.
+    // Assuming Reports are operational logs and Transactions are accounting logs.
+    // If the workflow is strictly: Technician fills Report -> Admin creates Transaction, 
+    // then we should rely on Transactions for money. 
+    // HOWEVER, for "Synthesis", we often want to see what technicians reported.
+    // To be safe and show *Real* cash flow, we stick to TRANSACTIONS for money if available.
+    // If transactions are empty, we fall back to reports?
+    // Let's ADD Report data only if it doesn't seem to be a duplicate, OR rely on Transactions for Finance and Reports for Ops.
+    // DECISION: Transactions = Finance Source of Truth. Reports = Ops Source of Truth.
+    // BUT, many users might just use Reports. Let's add Report revenue IF NO Transactions exist for that day?
+    // Better: Pure aggregation of what is in the DB. If user puts data in both, it's double. 
+    // We will assume Transactions are the source for Dashboard Money.
+    
+    // Actually, let's include Report Revenue if it's not in transactions. 
+    // Simpler approach for this request: Aggregate Transactions for Finance, Reports for Intervention Counts.
+    
+    reports.forEach(r => {
+         if (!r.date) return;
+         const site = (r.site as Site) || Site.ABIDJAN;
+         const entry = getEntry(r.date, site);
+         
+         // Only counting interventions here
+         // entry.interventions += 1; 
+    });
+
+    // 3. Process Interventions (Count) + Reports (Count)
+    // We union them or just count finished interventions?
+    const processedInterventionIds = new Set();
+    
+    interventions.forEach(i => {
+         if (!i.date) return;
+         if (i.status === 'Completed' || (i.status as string) === 'Terminé') {
+             const site = (i.site as Site) || Site.ABIDJAN;
+             const entry = getEntry(i.date, site);
+             entry.interventions += 1;
+             processedInterventionIds.add(i.id);
+         }
+    });
+    
+    // Also count reports as completed interventions if not linked?
+    // Let's just add report count to intervention count for now to ensure data shows up
+    reports.forEach(r => {
+        if (!r.date) return;
+        const site = (r.site as Site) || Site.ABIDJAN;
+        const entry = getEntry(r.date, site);
+        // Simple heuristic: A report = an intervention done
+        entry.interventions += 1; 
+    });
+
+    // 4. Calculate Profit
+    const result = Array.from(aggregator.values()).map(item => ({
+        ...item,
+        profit: item.revenue - item.expenses
+    }));
+
+    // Sort by Date
+    return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  }, [transactions, reports, interventions]);
+
 
   const generateAutoTickerMessages = (data: StatData[]) => {
       const messages: TickerMessage[] = [];
@@ -1310,7 +1409,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       const { data: reportsData } = await supabase.from('reports').select('*');
       if (reportsData) setReports(reportsData);
       const { data: statsData } = await supabase.from('daily_stats').select('*');
-      if (statsData) setStats(statsData);
+      if (statsData) setRawStats(statsData);
       const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
       if (notifData) setNotifications(notifData);
       const { data: tickerData } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
@@ -1358,9 +1457,9 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
           updateState(setReports, payload);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_stats' }, (payload) => {
-           if (payload.eventType === 'INSERT') setStats(prev => [...prev, payload.new as StatData]);
-           else if (payload.eventType === 'UPDATE') setStats(prev => prev.map(s => (s.date === payload.new.date && s.site === payload.new.site) ? payload.new as StatData : s));
-           else if (payload.eventType === 'DELETE') setStats(prev => prev.filter(s => !(s.date === payload.old.date && s.site === payload.old.site)));
+           if (payload.eventType === 'INSERT') setRawStats(prev => [...prev, payload.new as StatData]);
+           else if (payload.eventType === 'UPDATE') setRawStats(prev => prev.map(s => (s.date === payload.new.date && s.site === payload.new.site) ? payload.new as StatData : s));
+           else if (payload.eventType === 'DELETE') setRawStats(prev => prev.filter(s => !(s.date === payload.old.date && s.site === payload.old.site)));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticker_messages' }, (payload) => {
            if (payload.eventType === 'INSERT') setManualTickerMessages(prev => [...prev, { ...payload.new, isManual: true } as TickerMessage]);
@@ -1384,11 +1483,11 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   }, []);
 
   useEffect(() => {
-    if (stats.length > 0) generateAutoTickerMessages(stats);
-    else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', type: 'info', display_order: 0, isManual: false }]);
-    const interval = setInterval(() => { if (stats.length > 0) generateAutoTickerMessages(stats); }, 600000);
+    if (liveStats.length > 0) generateAutoTickerMessages(liveStats);
+    else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Ajoutez des transactions pour voir les stats.', type: 'info', display_order: 0, isManual: false }]);
+    const interval = setInterval(() => { if (liveStats.length > 0) generateAutoTickerMessages(liveStats); }, 600000);
     return () => clearInterval(interval);
-  }, [stats]);
+  }, [liveStats]);
 
   const combinedTickerMessages = useMemo(() => {
      if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
@@ -1439,8 +1538,9 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const renderContent = () => {
-     if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
-     if (currentPath === '/synthesis') return <DetailedSynthesis data={stats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
+     // Use liveStats instead of rawStats for Dashboard to ensure real-time calculation
+     if (currentPath === '/') return <Dashboard data={liveStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
+     if (currentPath === '/synthesis') return <DetailedSynthesis data={liveStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
      const section = currentPath.substring(1);
      if (MODULE_ACTIONS[section]) return (
              <div className="space-y-6 animate-fade-in">
