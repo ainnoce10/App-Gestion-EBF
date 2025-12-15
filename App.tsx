@@ -1113,7 +1113,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   // For robustness, let's assume standard names match, if not, we'd map.
   
   // --- ACTIVATE REAL-TIME ---
-  useRealtime('daily_stats', setStats);
   useRealtime('daily_reports', setReports, mapReport);
   useRealtime('ticker_messages', setTickerMessages, mapTicker);
   useRealtime('stock_items', setStock);
@@ -1122,6 +1121,43 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   useRealtime('transactions', setTransactions);
   useRealtime('clients', setClients);
   useRealtime('suppliers', setSuppliers);
+
+  // --- NEW: DYNAMIC STATS AGGREGATION ENGINE ---
+  // Calculates live dashboard stats from raw Transactions and Reports instead of relying on a pre-filled table
+  useEffect(() => {
+    const generatedStats: Record<string, StatData> = {};
+    
+    // Helper to init stat object
+    const initStat = (id: string, date: string, site: Site) => ({
+        id, date, site, revenue: 0, expenses: 0, profit: 0, interventions: 0
+    });
+
+    // 1. Process Transactions (Financials)
+    transactions.forEach(t => {
+        const key = `${t.date}-${t.site}`;
+        if (!generatedStats[key]) generatedStats[key] = initStat(key, t.date, t.site);
+        
+        if (t.type === 'Recette') generatedStats[key].revenue += (t.amount || 0);
+        else if (t.type === 'Dépense') generatedStats[key].expenses += (t.amount || 0);
+    });
+
+    // 2. Process Reports (Operational counts)
+    reports.forEach(r => {
+        const key = `${r.date}-${r.site}`;
+        if (!generatedStats[key]) generatedStats[key] = initStat(key, r.date, r.site);
+        
+        generatedStats[key].interventions += 1;
+    });
+
+    // 3. Calculate Profits & Array
+    const statsArray = Object.values(generatedStats).map(s => ({
+        ...s,
+        profit: s.revenue - s.expenses
+    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    setStats(statsArray);
+
+  }, [transactions, reports]);
 
   // Team is special (profiles table)
   useEffect(() => {
