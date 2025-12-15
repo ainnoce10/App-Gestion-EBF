@@ -43,8 +43,36 @@ interface FormField {
 
 interface FormConfig {
   title: string;
+  type: 'Intervention' | 'Stock' | 'Technician' | 'Generic'; // To identify what we are saving
   fields: FormField[];
 }
+
+// --- CONFIGURATION DES FORMULAIRES ---
+const INTERVENTION_FORM: FormConfig = {
+  title: "Nouvelle Intervention",
+  type: 'Intervention',
+  fields: [
+    { name: 'client', label: 'Client', type: 'text', placeholder: 'Nom du client ou entreprise' },
+    { name: 'location', label: 'Lieu / Quartier', type: 'text', placeholder: 'Ex: Cocody Riviera' },
+    { name: 'description', label: 'Description de la tâche', type: 'text', placeholder: 'Ex: Maintenance Clim' },
+    { name: 'technicianId', label: 'Technicien assigné', type: 'select', options: MOCK_TECHNICIANS.map(t => t.id) }, // Simplified for mock
+    { name: 'date', label: 'Date prévue', type: 'date' },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
+    { name: 'status', label: 'Statut', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
+  ]
+};
+
+const STOCK_FORM: FormConfig = {
+  title: "Article de Stock",
+  type: 'Stock',
+  fields: [
+    { name: 'name', label: 'Nom de l\'article', type: 'text', placeholder: 'Ex: Câble 2.5mm' },
+    { name: 'quantity', label: 'Quantité', type: 'number', placeholder: '0' },
+    { name: 'unit', label: 'Unité', type: 'text', placeholder: 'm, pcs, kg...' },
+    { name: 'threshold', label: 'Seuil d\'alerte', type: 'number', placeholder: '10' },
+    { name: 'site', label: 'Site de stockage', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
 
 // --- Menu Configuration ---
 const MAIN_MENU: MenuItem[] = [
@@ -558,7 +586,7 @@ const LoginScreen = ({ onLogin }: { onLogin: () => void }) => {
 };
 
 // --- Module Placeholder (Lists) ---
-const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, color, currentSite, currentPeriod, readOnly }: any) => {
+const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDelete, color, currentSite, currentPeriod, readOnly }: any) => {
     const COLUMN_LABELS: Record<string, string> = {
         name: 'Nom', quantity: 'Quantité', unit: 'Unité', threshold: 'Seuil', site: 'Site',
         client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technician: 'Technicien', date: 'Date', status: 'Statut',
@@ -609,7 +637,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
                                 {columns.length > 0 ? columns.map(col => (
                                     <th key={col} className="p-4 text-left text-xs font-bold uppercase text-green-900">{COLUMN_LABELS[col] || col}</th>
                                 )) : <th className="p-4 text-left font-bold text-green-900">Info</th>}
-                                {!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-green-900">Actions</th>}
+                                {!readOnly && (onDelete || onEdit) && <th className="p-4 text-right text-xs font-bold uppercase text-green-900">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -619,9 +647,10 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onDelete, co
                                         {columns.map(col => (
                                             <td key={col} className="p-4 text-sm text-green-900">{renderCell(col, item[col])}</td>
                                         ))}
-                                        {!readOnly && onDelete && (
+                                        {!readOnly && (
                                             <td className="p-4 text-right flex justify-end gap-2">
-                                                <button onClick={() => onDelete(item)} className="p-1.5 text-red-500 bg-red-50 rounded"><Trash2 size={16}/></button>
+                                                {onEdit && <button onClick={() => onEdit(item)} className="p-1.5 text-blue-500 bg-blue-50 rounded hover:bg-blue-100 transition"><Edit size={16}/></button>}
+                                                {onDelete && <button onClick={() => onDelete(item)} className="p-1.5 text-red-500 bg-red-50 rounded hover:bg-red-100 transition"><Trash2 size={16}/></button>}
                                             </td>
                                         )}
                                     </tr>
@@ -671,16 +700,24 @@ const ModuleMenu = ({ title, actions, onNavigate }: any) => (
 );
 
 // --- Dynamic Modal Component (MISSING FIX) ---
-const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
+const DynamicModal = ({ isOpen, onClose, config, initialData, onSubmit }: any) => {
     const [formData, setFormData] = useState<any>({});
 
+    useEffect(() => {
+        if (isOpen) {
+            setFormData(initialData || {});
+        }
+    }, [isOpen, initialData]);
+
     if (!isOpen || !config) return null;
+
+    const isEditMode = !!initialData;
 
     return (
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in">
-          <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4">{config.title}</h3>
+          <h3 className="text-xl font-bold text-green-900 dark:text-white mb-4">{isEditMode ? `Modifier: ${config.title}` : config.title}</h3>
           <div className="space-y-4">
             {config.fields.map((field: any) => (
               <div key={field.name}>
@@ -688,8 +725,10 @@ const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
                 {field.type === 'select' ? (
                   <select
                     className="w-full border border-orange-200 p-2 rounded bg-white text-green-900"
+                    value={formData[field.name] || ''}
                     onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
                   >
+                    <option value="">Sélectionner...</option>
                     {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 ) : (
@@ -697,13 +736,14 @@ const DynamicModal = ({ isOpen, onClose, config, onSubmit }: any) => {
                     type={field.type}
                     className="w-full border border-orange-200 p-2 rounded bg-white text-green-900"
                     placeholder={field.placeholder}
+                    value={formData[field.name] || ''}
                     onChange={e => setFormData({ ...formData, [field.name]: e.target.value })}
                   />
                 )}
               </div>
             ))}
             <button onClick={() => { onSubmit(formData); onClose(); }} className="w-full bg-ebf-green text-white font-bold py-2 rounded hover:bg-green-800 transition">
-              Enregistrer
+              {isEditMode ? "Mettre à jour" : "Ajouter"}
             </button>
           </div>
           <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X /></button>
@@ -950,7 +990,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   // Create / Edit / Delete Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState<FormConfig | null>(null);
-  const [showToast, setShowToast] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null); // For Edit
+  
   const [deleteModalConfig, setDeleteModalConfig] = useState<{isOpen: boolean, itemId: string | null, type: string | null}>({ isOpen: false, itemId: null, type: null });
 
   // Data state
@@ -1011,6 +1052,32 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      setIsFlashInfoOpen(false);
   };
   
+  // --- CORE SAVE LOGIC (CREATE OR UPDATE) ---
+  const handleSaveItem = (formData: any) => {
+    if (!modalConfig) return;
+
+    if (modalConfig.type === 'Intervention') {
+       if (editingItem) {
+         // Update
+         setInterventions(interventions.map(i => i.id === editingItem.id ? { ...i, ...formData } : i));
+       } else {
+         // Create
+         const newItem = { id: Date.now().toString(), ...formData };
+         setInterventions([...interventions, newItem]);
+       }
+    } else if (modalConfig.type === 'Stock') {
+       if (editingItem) {
+          setStock(stock.map(s => s.id === editingItem.id ? { ...s, ...formData } : s));
+       } else {
+          const newItem = { id: Date.now().toString(), ...formData };
+          setStock([...stock, newItem]);
+       }
+    }
+    
+    setIsModalOpen(false);
+    setEditingItem(null);
+  };
+
   const handleDeleteItem = () => {
     if (deleteModalConfig.type === 'Intervention') {
       setInterventions(interventions.filter(i => i.id !== deleteModalConfig.itemId));
@@ -1066,11 +1133,30 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     // Lists & Forms with Permissions
     if (currentPath === '/techniciens/rapports') { if (reportMode === 'select') return <ReportModeSelector reports={reports} onSelectMode={setReportMode} onBack={() => setCurrentPath('/techniciens')} onViewReport={setViewReport} readOnly={isReadOnly} />; }
     
-    let items: any[] = []; let title = 'Liste'; let color = 'bg-gray-500'; let type = '';
-    if (currentPath === '/techniciens/interventions') { items = interventions; title = 'Interventions'; color = 'bg-orange-500'; type = 'Intervention'; }
-    else if (currentPath === '/quincaillerie/stocks') { items = stock; title = 'Stocks'; color = 'bg-blue-500'; type = 'Stock'; }
+    let items: any[] = []; 
+    let title = 'Liste'; 
+    let color = 'bg-gray-500'; 
+    let type: any = '';
+    let formConfig: FormConfig | null = null;
+
+    if (currentPath === '/techniciens/interventions') { 
+        items = interventions; title = 'Interventions'; color = 'bg-orange-500'; type = 'Intervention'; formConfig = INTERVENTION_FORM;
+    } else if (currentPath === '/quincaillerie/stocks') { 
+        items = stock; title = 'Stocks'; color = 'bg-blue-500'; type = 'Stock'; formConfig = STOCK_FORM;
+    }
     
-    return <ModulePlaceholder title={title} items={items} onBack={() => handleNavigate(`/${moduleName}`)} onAdd={!isReadOnly ? () => { setIsModalOpen(true); } : undefined} onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: type}) : undefined} color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+    return <ModulePlaceholder 
+        title={title} 
+        items={items} 
+        onBack={() => handleNavigate(`/${moduleName}`)} 
+        onAdd={!isReadOnly && formConfig ? () => { setModalConfig(formConfig); setEditingItem(null); setIsModalOpen(true); } : undefined} 
+        onEdit={!isReadOnly && formConfig ? (item: any) => { setModalConfig(formConfig); setEditingItem(item); setIsModalOpen(true); } : undefined}
+        onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: type}) : undefined} 
+        color={color} 
+        currentSite={currentSite} 
+        currentPeriod={currentPeriod} 
+        readOnly={isReadOnly} 
+    />;
   };
 
   return (
@@ -1146,7 +1232,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
        </div>
 
        {/* Modals */}
-       <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} onSubmit={() => {}} />
+       <DynamicModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} config={modalConfig} initialData={editingItem} onSubmit={handleSaveItem} />
        <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} onSave={handleFlashInfoSave} />
        <AdminPanelModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
