@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
-import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician, Client, Supplier } from './types';
 import { supabase } from './services/supabaseClient';
 
 // --- Types for Navigation & Forms ---
@@ -42,7 +42,7 @@ interface FormField {
 
 interface FormConfig {
   title: string;
-  type: 'Intervention' | 'Stock' | 'Technician' | 'Generic'; // To identify what we are saving
+  type: 'Intervention' | 'Stock' | 'Technician' | 'Transaction' | 'Client' | 'Supplier' | 'Generic'; // To identify what we are saving
   fields: FormField[];
 }
 
@@ -71,6 +71,53 @@ const STOCK_FORM: FormConfig = {
     { name: 'unit', label: 'Unité', type: 'text', placeholder: 'm, pcs, kg...' },
     { name: 'threshold', label: 'Seuil d\'alerte', type: 'number', placeholder: '10' },
     { name: 'site', label: 'Site de stockage', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const TECHNICIAN_FORM: FormConfig = {
+  title: "Gérer Technicien",
+  type: 'Technician',
+  fields: [
+    { name: 'name', label: 'Nom Complet', type: 'text', placeholder: 'Ex: Kouamé Jean' },
+    { name: 'specialty', label: 'Spécialité', type: 'text', placeholder: 'Ex: Électricité, Froid, Plomberie' },
+    { name: 'status', label: 'Statut Actuel', type: 'select', options: ['Available', 'Busy', 'Off'] },
+    { name: 'site', label: 'Site de Rattachement', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const TRANSACTION_FORM: FormConfig = {
+  title: "Transaction",
+  type: 'Transaction',
+  fields: [
+    { name: 'date', label: 'Date', type: 'date' },
+    { name: 'type', label: 'Type', type: 'select', options: ['Recette', 'Dépense'] },
+    { name: 'amount', label: 'Montant', type: 'number', placeholder: '0' },
+    { name: 'category', label: 'Catégorie', type: 'select', options: ['Prestation', 'Achat Matériel', 'Salaire', 'Loyer', 'Autre'] },
+    { name: 'label', label: 'Libellé', type: 'text', placeholder: 'Ex: Achat câbles' },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const CLIENT_FORM: FormConfig = {
+  title: "Client",
+  type: 'Client',
+  fields: [
+    { name: 'name', label: 'Nom / Entreprise', type: 'text' },
+    { name: 'phone', label: 'Téléphone', type: 'text' },
+    { name: 'email', label: 'Email', type: 'email' },
+    { name: 'address', label: 'Adresse', type: 'text' },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+  ]
+};
+
+const SUPPLIER_FORM: FormConfig = {
+  title: "Fournisseur",
+  type: 'Supplier',
+  fields: [
+    { name: 'name', label: 'Nom Entreprise', type: 'text' },
+    { name: 'contact', label: 'Contact', type: 'text' },
+    { name: 'category', label: 'Catégorie', type: 'text', placeholder: 'Ex: Électricité, Plomberie' },
+    { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
   ]
 };
 
@@ -591,7 +638,7 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
         name: 'Nom', quantity: 'Quantité', unit: 'Unité', threshold: 'Seuil', site: 'Site',
         client: 'Client', clientPhone: 'Tél Client', location: 'Lieu', description: 'Description', technicianName: 'Technicien', date: 'Date', status: 'Statut',
         amount: 'Montant', type: 'Type', label: 'Libellé', category: 'Catégorie', email: 'Email', specialty: 'Spécialité',
-        full_name: 'Nom Complet', role: 'Rôle'
+        full_name: 'Nom Complet', role: 'Rôle', contact: 'Contact', phone: 'Téléphone', address: 'Adresse'
     };
 
     const filteredItems = useMemo(() => {
@@ -608,11 +655,22 @@ const ModulePlaceholder = ({ title, subtitle, items, onBack, onAdd, onEdit, onDe
 
     const renderCell = (col: string, value: any) => {
        if (col === 'status') {
+          // Intervention Status
           if (value === 'Pending') return <span className="flex items-center gap-1 text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-xs font-extrabold border border-gray-200"><Calendar size={12}/> Planifié</span>;
           if (value === 'In Progress') return <span className="flex items-center gap-1 text-orange-600 bg-orange-50 px-3 py-1 rounded-full text-xs font-extrabold border border-orange-100"><Loader2 size={12} className="animate-spin"/> En cours</span>;
           if (value === 'Completed') return <span className="flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-extrabold border border-green-100"><CheckCircle size={12}/> Exécuté</span>;
+          
+          // Technician Status
+          if (value === 'Available') return <span className="text-green-700 bg-green-100 px-3 py-1 rounded-full text-xs font-bold border border-green-200 flex items-center w-fit gap-1"><CheckCircle size={10}/> Disponible</span>;
+          if (value === 'Busy') return <span className="text-orange-700 bg-orange-100 px-3 py-1 rounded-full text-xs font-bold border border-orange-200 flex items-center w-fit gap-1"><Wrench size={10}/> Occupé</span>;
+          if (value === 'Off') return <span className="text-gray-700 bg-gray-200 px-3 py-1 rounded-full text-xs font-bold border border-gray-300 flex items-center w-fit gap-1"><User size={10}/> Absent</span>;
+
           return value;
        }
+       if (col === 'amount') return value ? `${value.toLocaleString()} F` : '-';
+       if (col === 'type' && value === 'Recette') return <span className="text-green-600 font-bold">{value}</span>;
+       if (col === 'type' && value === 'Dépense') return <span className="text-red-600 font-bold">{value}</span>;
+
        return value;
     };
 
@@ -1011,6 +1069,9 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [teamMembers, setTeamMembers] = useState<Profile[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   
   const [reportMode, setReportMode] = useState<'select' | 'voice' | 'form'>('select');
 
@@ -1057,7 +1118,11 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   useRealtime('ticker_messages', setTickerMessages, mapTicker);
   useRealtime('stock_items', setStock);
   useRealtime('interventions', setInterventions, mapIntervention);
-  useRealtime('technicians', setTechnicians); 
+  useRealtime('technicians', setTechnicians);
+  useRealtime('transactions', setTransactions);
+  useRealtime('clients', setClients);
+  useRealtime('suppliers', setSuppliers);
+
   // Team is special (profiles table)
   useEffect(() => {
     const fetchTeam = async () => {
@@ -1113,30 +1178,40 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const handleSaveItem = async (formData: any) => {
     if (!modalConfig) return;
 
+    let tableName = '';
+    let payload = formData;
+
     if (modalConfig.type === 'Intervention') {
+       tableName = 'interventions';
        // Map back to Snake Case
-       const payload = {
+       payload = {
            site: formData.site,
            client: formData.client,
-           client_phone: formData.clientPhone, // Note: Form currently doesn't have this field explicitly in config, if added later
+           client_phone: formData.clientPhone, 
            location: formData.location,
            description: formData.description,
            technician_id: formData.technicianId,
            date: formData.date,
            status: formData.status
        };
-
-       if (editingItem) {
-         await supabase.from('interventions').update(payload).eq('id', editingItem.id);
-       } else {
-         await supabase.from('interventions').insert(payload);
-       }
     } else if (modalConfig.type === 'Stock') {
-       if (editingItem) {
-          await supabase.from('stock_items').update(formData).eq('id', editingItem.id);
-       } else {
-          await supabase.from('stock_items').insert(formData);
-       }
+       tableName = 'stock_items';
+    } else if (modalConfig.type === 'Technician') {
+       tableName = 'technicians';
+    } else if (modalConfig.type === 'Transaction') {
+       tableName = 'transactions';
+    } else if (modalConfig.type === 'Client') {
+       tableName = 'clients';
+    } else if (modalConfig.type === 'Supplier') {
+       tableName = 'suppliers';
+    }
+
+    if (tableName) {
+        if (editingItem) {
+            await supabase.from(tableName).update(payload).eq('id', editingItem.id);
+        } else {
+            await supabase.from(tableName).insert(payload);
+        }
     }
     
     setIsModalOpen(false);
@@ -1144,10 +1219,16 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const handleDeleteItem = async () => {
-    if (deleteModalConfig.type === 'Intervention') {
-      await supabase.from('interventions').delete().eq('id', deleteModalConfig.itemId);
-    } else if (deleteModalConfig.type === 'Stock') {
-      await supabase.from('stock_items').delete().eq('id', deleteModalConfig.itemId);
+    let tableName = '';
+    if (deleteModalConfig.type === 'Intervention') tableName = 'interventions';
+    else if (deleteModalConfig.type === 'Stock') tableName = 'stock_items';
+    else if (deleteModalConfig.type === 'Technician') tableName = 'technicians';
+    else if (deleteModalConfig.type === 'Transaction') tableName = 'transactions';
+    else if (deleteModalConfig.type === 'Client') tableName = 'clients';
+    else if (deleteModalConfig.type === 'Supplier') tableName = 'suppliers';
+
+    if (tableName) {
+        await supabase.from(tableName).delete().eq('id', deleteModalConfig.itemId);
     }
     setDeleteModalConfig({isOpen: false, itemId: null, type: null});
   };
@@ -1166,6 +1247,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       setEditingItem(item || null);
       setIsModalOpen(true);
   };
+
+  const openModal = (config: FormConfig, item?: any) => {
+      setModalConfig(config);
+      setEditingItem(item || null);
+      setIsModalOpen(true);
+  }
 
   // Render logic based on path
   const renderContent = () => {
@@ -1200,7 +1287,18 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       );
     }
     if (currentPath === '/techniciens') {
-        return <ModulePlaceholder title="Techniciens" subtitle="Gestion des techniciens" items={technicians} onBack={() => handleNavigate('/')} color="bg-orange-600" currentSite={currentSite} />;
+        return <ModulePlaceholder 
+            title="Techniciens" 
+            subtitle="Gestion des techniciens" 
+            items={technicians} 
+            onBack={() => handleNavigate('/')} 
+            onAdd={!isReadOnly ? () => openModal(TECHNICIAN_FORM) : undefined} 
+            onEdit={!isReadOnly ? (item: any) => openModal(TECHNICIAN_FORM, item) : undefined}
+            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: 'Technician'}) : undefined} 
+            color="bg-orange-600" 
+            currentSite={currentSite} 
+            readOnly={isReadOnly}
+        />;
     }
     if (currentPath === '/equipe') {
         return <TeamGrid members={teamMembers} onBack={() => handleNavigate('/')} />;
@@ -1212,43 +1310,59 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     // Lists & Forms with Permissions
     if (currentPath === '/techniciens/rapports') { if (reportMode === 'select') return <ReportModeSelector reports={reports} onSelectMode={setReportMode} onBack={() => setCurrentPath('/techniciens')} onViewReport={setViewReport} readOnly={isReadOnly} />; }
     
+    // -- CONFIGURATION DES ROUTES DE MODULES --
     let items: any[] = []; 
     let title = 'Liste'; 
     let color = 'bg-gray-500'; 
     let type: any = '';
-    
+    let formConfig: FormConfig | null = null;
+    let subtitle = '';
+
     if (currentPath === '/techniciens/interventions') { 
-        return <ModulePlaceholder 
-            title="Interventions" 
-            items={interventions} 
-            onBack={() => handleNavigate(`/${moduleName}`)} 
+        title = "Interventions"; items = interventions; color = "bg-orange-500"; type="Intervention";
+        return <ModulePlaceholder title={title} items={items} onBack={() => handleNavigate(`/${moduleName}`)} 
             onAdd={!isReadOnly ? () => openInterventionModal() : undefined} 
             onEdit={!isReadOnly ? (item: any) => openInterventionModal(item) : undefined}
-            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: 'Intervention'}) : undefined} 
-            color="bg-orange-500" 
-            currentSite={currentSite} 
-            currentPeriod={currentPeriod} 
-            readOnly={isReadOnly} 
-        />;
-    } else if (currentPath === '/quincaillerie/stocks') { 
-        return <ModulePlaceholder 
-            title="Stocks" 
-            items={stock} 
-            onBack={() => handleNavigate(`/${moduleName}`)} 
-            onAdd={!isReadOnly ? () => { setModalConfig(STOCK_FORM); setEditingItem(null); setIsModalOpen(true); } : undefined} 
-            onEdit={!isReadOnly ? (item: any) => { setModalConfig(STOCK_FORM); setEditingItem(item); setIsModalOpen(true); } : undefined}
-            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type: 'Stock'}) : undefined} 
-            color="bg-blue-500" 
-            currentSite={currentSite} 
-            currentPeriod={currentPeriod} 
-            readOnly={isReadOnly} 
-        />;
+            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type}) : undefined} 
+            color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+    } 
+    else if (currentPath === '/quincaillerie/stocks') { 
+        title = "Stocks"; items = stock; color = "bg-blue-500"; type="Stock"; formConfig = STOCK_FORM;
+    } 
+    else if (currentPath === '/comptabilite/bilan') { 
+        title = "Bilan Financier"; items = transactions; color = "bg-green-600"; type="Transaction"; formConfig = TRANSACTION_FORM; subtitle="Recettes et Dépenses";
+    }
+    else if (currentPath === '/comptabilite/paie') { 
+        // Filter transactions for 'Salaire' category mainly, or generic transaction view
+        title = "Paie & Salaires"; items = transactions.filter(t => t.category === 'Salaire'); color = "bg-orange-500"; type="Transaction"; formConfig = TRANSACTION_FORM; subtitle="Historique salaires";
+    }
+    else if (currentPath === '/secretariat/clients') { 
+        title = "Gestion Clients"; items = clients; color = "bg-blue-500"; type="Client"; formConfig = CLIENT_FORM;
+    }
+    else if (currentPath === '/secretariat/planning') { 
+        // Planning is essentially Intervention list view (reuse)
+        title = "Planning Global"; items = interventions; color = "bg-indigo-500"; type="Intervention";
+        return <ModulePlaceholder title={title} items={items} onBack={() => handleNavigate(`/${moduleName}`)} 
+            onAdd={!isReadOnly ? () => openInterventionModal() : undefined} 
+            onEdit={!isReadOnly ? (item: any) => openInterventionModal(item) : undefined}
+            onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type}) : undefined} 
+            color={color} currentSite={currentSite} currentPeriod={currentPeriod} readOnly={isReadOnly} />;
+    }
+    else if (currentPath === '/quincaillerie/fournisseurs') { 
+        title = "Fournisseurs"; items = suppliers; color = "bg-green-600"; type="Supplier"; formConfig = SUPPLIER_FORM;
+    }
+    else if (currentPath === '/quincaillerie/achats') { 
+        title = "Achats Matériel"; items = transactions.filter(t => t.category === 'Achat Matériel' || t.category === 'Achats'); color = "bg-red-500"; type="Transaction"; formConfig = TRANSACTION_FORM;
     }
     
     return <ModulePlaceholder 
         title={title} 
+        subtitle={subtitle}
         items={items} 
         onBack={() => handleNavigate(`/${moduleName}`)} 
+        onAdd={!isReadOnly && formConfig ? () => openModal(formConfig!) : undefined} 
+        onEdit={!isReadOnly && formConfig ? (item: any) => openModal(formConfig!, item) : undefined}
+        onDelete={!isReadOnly ? (item: any) => setDeleteModalConfig({isOpen:true, itemId:item.id, type}) : undefined} 
         color={color} 
         currentSite={currentSite} 
         currentPeriod={currentPeriod} 

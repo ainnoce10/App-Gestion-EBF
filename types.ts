@@ -105,6 +105,23 @@ export interface Transaction {
   site: Site;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  site: Site;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact: string;
+  category: string;
+  site: Site;
+}
+
 export interface TickerMessage {
   id: string;
   text: string;

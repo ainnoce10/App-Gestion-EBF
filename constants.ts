@@ -1,6 +1,6 @@
 
 
-import { Site, StatData, Technician, StockItem, Intervention, DailyReport, TickerMessage } from './types';
+import { Site, StatData, Technician, StockItem, Intervention, DailyReport, TickerMessage, Transaction, Client, Supplier } from './types';
 
 // Helper pour générer des dates dynamiques
 const today = new Date();
@@ -83,4 +83,21 @@ export const DEFAULT_TICKER_MESSAGES: TickerMessage[] = [
   { id: '2', text: 'Félicitations ! Nous sommes à 30% de profits aujourd\'hui', type: 'success', display_order: 2 },
   { id: '3', text: 'Attention ! Stock de câble faible à Abidjan', type: 'alert', display_order: 3 },
   { id: '4', text: 'Réunion générale Lundi à 08h00', type: 'info', display_order: 4 },
+];
+
+export const MOCK_TRANSACTIONS: Transaction[] = [
+  { id: 'TR1', type: 'Recette', amount: 150000, label: 'Contrat Hôtel Ivoire', category: 'Prestation', date: getDateStr(0), site: Site.ABIDJAN },
+  { id: 'TR2', type: 'Dépense', amount: 25000, label: 'Achat Carburant', category: 'Transport', date: getDateStr(0), site: Site.ABIDJAN },
+  { id: 'TR3', type: 'Dépense', amount: 50000, label: 'Achat Matériel Élec', category: 'Achat Matériel', date: getDateStr(1), site: Site.BOUAKE },
+];
+
+export const MOCK_CLIENTS: Client[] = [
+  { id: 'C1', name: 'Hôtel Ivoire', phone: '0707010203', email: 'contact@hotelivoire.ci', address: 'Cocody', site: Site.ABIDJAN },
+  { id: 'C2', name: 'Résidence Akwaba', phone: '0505040506', address: 'Commerce', site: Site.BOUAKE },
+  { id: 'C3', name: 'M. Touré', phone: '0102030405', address: 'Marcory', site: Site.ABIDJAN },
+];
+
+export const MOCK_SUPPLIERS: Supplier[] = [
+  { id: 'F1', name: 'Bernabé', contact: '0101010101', category: 'Outillage', site: Site.ABIDJAN },
+  { id: 'F2', name: 'Sivop', contact: '0202020202', category: 'Peinture', site: Site.BOUAKE },
 ];
