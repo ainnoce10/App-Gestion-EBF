@@ -52,24 +52,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   // --- LOGIC: SCAN STOCK FOR ALERTS ---
+  // Analyse des stocks en temps réel pour injecter des alertes dans le ticker
   const combinedTickerMessages = useMemo(() => {
+    // 1. Identifier les stocks critiques
     const stockAlerts: TickerMessage[] = stock
       .filter(item => {
+        // Filtre par site si nécessaire : Global voit tout, sinon filtre par site
         const isSiteRelevant = currentSite === Site.GLOBAL || item.site === currentSite;
+        // Condition d'alerte : Quantité <= Seuil
         return isSiteRelevant && item.quantity <= item.threshold;
       })
       .map(item => ({
         id: `stock-alert-${item.id}`,
+        // Message clair avec icône alerte
         text: `⚠️ STOCK CRITIQUE : ${item.name} (${item.quantity} ${item.unit} restants) à ${item.site}`,
         type: 'alert',
-        display_order: 0,
+        display_order: 0, // Priorité haute pour apparaître en premier
         isManual: false
       }));
 
+    // 2. Fusionner avec les messages existants (Flash Info Auto & Manuel passés via props)
+    // Les alertes stock sont placées en premier
     return [...stockAlerts, ...tickerMessages];
   }, [stock, tickerMessages, currentSite]);
 
-  // Filter Data Logic (Robust Date Handling)
+  // Filter Data Logic
   const filteredData = useMemo(() => {
     return data.filter(d => {
       // 1. Site Filter
@@ -82,30 +89,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (dateRange.start && d.date < dateRange.start) matchPeriod = false;
         if (dateRange.end && d.date > dateRange.end) matchPeriod = false;
       } else {
-        // Use String comparison to avoid Timezone issues (YYYY-MM-DD)
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0]; // "2025-12-17"
-        const currentMonthPrefix = todayStr.substring(0, 7); // "2025-12"
-        const currentYearPrefix = todayStr.substring(0, 4); // "2025"
+        const date = new Date(d.date);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
         if (currentPeriod === Period.DAY) {
-           matchPeriod = d.date === todayStr;
+          matchPeriod = itemDate.getTime() === today.getTime();
         } else if (currentPeriod === Period.WEEK) {
-           const dDate = new Date(d.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay(); // 0 (Sun) to 6 (Sat)
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           
-           // Normalize comparison
-           matchPeriod = dDate >= monday && dDate <= sunday;
+          const oneWeekAgo = new Date(today);
+          oneWeekAgo.setDate(today.getDate() - 7);
+          matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
         } else if (currentPeriod === Period.MONTH) {
-           matchPeriod = d.date.startsWith(currentMonthPrefix);
+          matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         } else if (currentPeriod === Period.YEAR) {
-           matchPeriod = d.date.startsWith(currentYearPrefix);
+          matchPeriod = date.getFullYear() === now.getFullYear();
         }
       }
 
@@ -113,7 +111,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [data, currentSite, currentPeriod, useCustomDate, dateRange]);
 
-  // Filter Reports Logic (Robust Date Handling)
+  // Filter Reports Logic
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
       const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
@@ -124,27 +122,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (dateRange.start && r.date < dateRange.start) matchPeriod = false;
         if (dateRange.end && r.date > dateRange.end) matchPeriod = false;
       } else {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const currentMonthPrefix = todayStr.substring(0, 7);
-        const currentYearPrefix = todayStr.substring(0, 4);
+        const date = new Date(r.date);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
         if (currentPeriod === Period.DAY) {
-           matchPeriod = r.date === todayStr;
+          matchPeriod = itemDate.getTime() === today.getTime();
         } else if (currentPeriod === Period.WEEK) {
-           const rDate = new Date(r.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay();
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           matchPeriod = rDate >= monday && rDate <= sunday;
+          const oneWeekAgo = new Date(today);
+          oneWeekAgo.setDate(today.getDate() - 7);
+          matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
         } else if (currentPeriod === Period.MONTH) {
-           matchPeriod = r.date.startsWith(currentMonthPrefix);
+          matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         } else if (currentPeriod === Period.YEAR) {
-           matchPeriod = r.date.startsWith(currentYearPrefix);
+          matchPeriod = date.getFullYear() === now.getFullYear();
         }
       }
 

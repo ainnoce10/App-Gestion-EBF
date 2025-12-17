@@ -19,6 +19,35 @@ interface DetailedSynthesisProps {
   onViewReport: (report: any) => void; // Added prop for modal
 }
 
+// Helper local pour le filtrage par période standard (réplique de la logique App.tsx)
+const isInPeriod = (dateStr: string, period: Period): boolean => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (period === Period.DAY) {
+    return itemDate.getTime() === today.getTime();
+  } else if (period === Period.WEEK) {
+    const day = today.getDay(); 
+    const diffToMonday = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(diffToMonday);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    monday.setHours(0,0,0,0);
+    friday.setHours(23,59,59,999);
+    const itemDay = date.getDay();
+    if (itemDay === 0 || itemDay === 6) return false;
+    return itemDate >= monday && itemDate <= friday;
+  } else if (period === Period.MONTH) {
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  } else if (period === Period.YEAR) {
+    return date.getFullYear() === now.getFullYear();
+  }
+  return true;
+};
+
 export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({ 
   data, reports, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate, onViewReport 
 }) => {
@@ -43,28 +72,7 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
         if (dateRange.start && d.date < dateRange.start) dateMatch = false;
         if (dateRange.end && d.date > dateRange.end) dateMatch = false;
       } else {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const currentMonthPrefix = todayStr.substring(0, 7);
-        const currentYearPrefix = todayStr.substring(0, 4);
-
-        if (currentPeriod === Period.DAY) {
-           dateMatch = d.date === todayStr;
-        } else if (currentPeriod === Period.WEEK) {
-           const dDate = new Date(d.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay(); 
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           dateMatch = dDate >= monday && dDate <= sunday;
-        } else if (currentPeriod === Period.MONTH) {
-           dateMatch = d.date.startsWith(currentMonthPrefix);
-        } else if (currentPeriod === Period.YEAR) {
-           dateMatch = d.date.startsWith(currentYearPrefix);
-        }
+        dateMatch = isInPeriod(d.date, currentPeriod);
       }
 
       return siteMatch && dateMatch;
@@ -84,31 +92,8 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
         filtered = filtered.filter(r => r.date <= dateRange.end);
       }
     } else {
-      // Standard Period Filter with String Logic
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      const currentMonthPrefix = todayStr.substring(0, 7);
-      const currentYearPrefix = todayStr.substring(0, 4);
-
-      if (currentPeriod === Period.DAY) {
-        filtered = filtered.filter(r => r.date === todayStr);
-      } else if (currentPeriod === Period.WEEK) {
-        const tDate = new Date(todayStr);
-        const dayOfWeek = tDate.getDay(); 
-        const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        const monday = new Date(tDate);
-        monday.setDate(diffToMon);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        filtered = filtered.filter(r => {
-             const rDate = new Date(r.date);
-             return rDate >= monday && rDate <= sunday;
-        });
-      } else if (currentPeriod === Period.MONTH) {
-        filtered = filtered.filter(r => r.date.startsWith(currentMonthPrefix));
-      } else if (currentPeriod === Period.YEAR) {
-        filtered = filtered.filter(r => r.date.startsWith(currentYearPrefix));
-      }
+      // Standard Period Filter
+      filtered = filtered.filter(r => isInPeriod(r.date, currentPeriod));
     }
 
     // 2. Technician Filter
