@@ -102,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [data, currentSite, currentPeriod]);
 
-  // Filter Reports Logic for Satisfaction
+  // Filter Reports Logic
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
       const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
@@ -139,17 +139,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       expenses: acc.expenses + curr.expenses
     }), { revenue: 0, interventions: 0, profit: 0, expenses: 0 });
   }, [filteredData]);
-
-  // Calculate Average Satisfaction
-  const satisfactionStats = useMemo(() => {
-    const ratedReports = filteredReports.filter(r => r.rating !== undefined && r.rating > 0);
-    if (ratedReports.length === 0) return { avg: 0, count: 0 };
-    
-    const totalRating = ratedReports.reduce((sum, r) => sum + (r.rating || 0), 0);
-    const average = (totalRating / ratedReports.length).toFixed(1);
-    
-    return { avg: average, count: ratedReports.length };
-  }, [filteredReports]);
 
   // Calculate profit margin percentage
   const marginPercent = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(1) : "0";
@@ -338,8 +327,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* KPIs Grid */}
+      {/* KPIs Grid - RÉORGANISÉ: Interventions, CA, Dépenses, Bénéfice */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <KPICard 
+          title="Interventions" 
+          value={totals.interventions}
+          subtext="Réalisées avec succès"
+          icon={Activity}
+          colorClass="text-blue-500"
+          bgClass="bg-blue-50 dark:bg-gray-700"
+          borderClass="border-blue-500"
+        />
         <KPICard 
           title="Chiffre d'Affaires" 
           value={`${totals.revenue.toLocaleString()} FCFA`}
@@ -351,6 +349,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           borderClass="border-ebf-orange"
         />
         <KPICard 
+          title="Dépenses" 
+          value={`${totals.expenses.toLocaleString()} FCFA`}
+          subtext="Coûts opérationnels"
+          icon={ArrowDownRight}
+          trend={-5.0}
+          colorClass="text-red-500"
+          bgClass="bg-red-50 dark:bg-gray-700"
+          borderClass="border-red-500"
+        />
+        <KPICard 
           title="Bénéfice Net" 
           value={`${totals.profit.toLocaleString()} FCFA`}
           subtext={`${marginPercent}% de marge`}
@@ -360,33 +368,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
           bgClass="bg-green-50 dark:bg-gray-700"
           borderClass="border-ebf-green"
         />
-        <KPICard 
-          title="Interventions" 
-          value={totals.interventions}
-          subtext="Réalisées avec succès"
-          icon={Activity}
-          colorClass="text-blue-500"
-          bgClass="bg-blue-50 dark:bg-gray-700"
-          borderClass="border-blue-500"
-        />
-        <KPICard 
-          title="Satisfaction Client" 
-          value={satisfactionStats.count > 0 ? `${satisfactionStats.avg}/5` : "N/A"}
-          subtext={satisfactionStats.count > 0 ? `Basé sur ${satisfactionStats.count} avis` : "Aucune note disponible"}
-          icon={Star}
-          colorClass="text-yellow-500"
-          bgClass="bg-yellow-50 dark:bg-gray-700"
-          borderClass="border-yellow-500"
-        />
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {/* Main Single Histogram */}
+        {/* Main Single Histogram - MIS À JOUR: CA vs Dépenses vs Bénéfice */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-orange-100 dark:border-gray-700 border-t-4 border-gray-500">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-green-900 dark:text-white flex items-center">
               <TrendingUp className="mr-2 text-ebf-orange" size={20} />
-              Performance Globale (CA vs Bénéfice vs Interventions)
+              Performance Globale (CA vs Dépenses vs Bénéfice)
             </h3>
             <span className="text-xs text-orange-600 font-bold bg-orange-50 border border-orange-100 px-2 py-1 rounded">Vue temps réel</span>
           </div>
@@ -397,16 +387,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="date" tick={{fontSize: 12, fill: '#14532d'}} axisLine={false} tickLine={false} />
                   <YAxis yAxisId="left" orientation="left" stroke="#14532d" tickFormatter={(value) => `${value / 1000}k`} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="right" orientation="right" hide />
+                  {/* Plus besoin d'axe de droite pour interventions car tout est en monnaie maintenant */}
                   <Tooltip 
                     cursor={{fill: '#fff7ed'}}
                     contentStyle={{ borderRadius: '12px', border: '1px solid #fed7aa', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', color: '#14532d' }}
                     formatter={(value: number) => value.toLocaleString()}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#FF8C00" radius={[4, 4, 0, 0]} barSize={30} />
-                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={30} />
-                  <Bar yAxisId="right" dataKey="interventions" name="Volume Interventions" fill="#CBD5E1" radius={[4, 4, 0, 0]} barSize={30} />
+                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#FF8C00" radius={[4, 4, 0, 0]} barSize={25} />
+                  <Bar yAxisId="left" dataKey="expenses" name="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={25} />
+                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={25} />
                 </BarChart>
               ) : (
                 <div className="flex h-full items-center justify-center text-gray-400 flex-col">
