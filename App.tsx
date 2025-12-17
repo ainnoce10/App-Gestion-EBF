@@ -1295,12 +1295,74 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     return () => { supabase.removeChannel(channels); };
   }, []);
 
+  // --- REAL-TIME AGGREGATION LOGIC ---
+  // Calculates stats dynamically from Reports and Transactions
+  const realTimeStats = useMemo(() => {
+    const statsMap = new Map<string, StatData>();
+
+    // 1. Process Reports (Revenue/Expenses/Interventions)
+    reports.forEach(report => {
+        if (!report.date) return;
+        const key = `${report.date}_${report.site || 'Global'}`;
+        
+        if (!statsMap.has(key)) {
+            statsMap.set(key, {
+                id: key,
+                date: report.date,
+                site: report.site as Site,
+                revenue: 0,
+                expenses: 0,
+                profit: 0,
+                interventions: 0
+            });
+        }
+        
+        const stat = statsMap.get(key)!;
+        stat.revenue += Number(report.revenue || 0);
+        stat.expenses += Number(report.expenses || 0);
+        stat.interventions += 1;
+    });
+
+    // 2. Process Transactions (Revenue/Expenses from Accounting)
+    transactions.forEach(trans => {
+        if (!trans.date) return;
+        const key = `${trans.date}_${trans.site || 'Global'}`;
+
+        if (!statsMap.has(key)) {
+            statsMap.set(key, {
+                id: key,
+                date: trans.date,
+                site: trans.site as Site,
+                revenue: 0,
+                expenses: 0,
+                profit: 0,
+                interventions: 0
+            });
+        }
+
+        const stat = statsMap.get(key)!;
+        if (trans.type === 'Recette') {
+            stat.revenue += Number(trans.amount || 0);
+        } else if (trans.type === 'Dépense') {
+            stat.expenses += Number(trans.amount || 0);
+        }
+    });
+
+    // 3. Finalize Profit Calculation & Sort
+    return Array.from(statsMap.values()).map(stat => ({
+        ...stat,
+        profit: stat.revenue - stat.expenses
+    })).sort((a, b) => b.date.localeCompare(a.date));
+
+  }, [reports, transactions]);
+
+  // Use realTimeStats for Flash Info generation instead of static stats
   useEffect(() => {
-    if (stats.length > 0) generateAutoTickerMessages(stats);
+    if (realTimeStats.length > 0) generateAutoTickerMessages(realTimeStats);
     else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', type: 'info', display_order: 0, isManual: false }]);
-    const interval = setInterval(() => { if (stats.length > 0) generateAutoTickerMessages(stats); }, 600000);
+    const interval = setInterval(() => { if (realTimeStats.length > 0) generateAutoTickerMessages(realTimeStats); }, 600000);
     return () => clearInterval(interval);
-  }, [stats]);
+  }, [realTimeStats]);
 
   const combinedTickerMessages = useMemo(() => {
      if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
@@ -1351,8 +1413,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const renderContent = () => {
-     if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
-     if (currentPath === '/synthesis') return <DetailedSynthesis data={stats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
+     // MODIFICATION CRITIQUE: On passe 'realTimeStats' au lieu de 'stats' (qui venait de la table daily_stats)
+     if (currentPath === '/') return <Dashboard data={realTimeStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
+     if (currentPath === '/synthesis') return <DetailedSynthesis data={realTimeStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
+     
      const section = currentPath.substring(1);
      if (MODULE_ACTIONS[section]) return (
              <div className="space-y-6 animate-fade-in">
