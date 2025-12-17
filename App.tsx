@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -46,7 +45,7 @@ interface FormConfig {
   fields: FormField[];
 }
 
-// --- CONFIGURATION DES FORMULAIRES ---
+// --- CONFIGURATION DES FORMULAIRES (CRUD) ---
 const FORM_CONFIGS: Record<string, FormConfig> = {
   interventions: {
     title: 'Nouvelle Intervention',
@@ -55,7 +54,7 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'clientPhone', label: 'Tél Client', type: 'text' },
       { name: 'location', label: 'Lieu / Quartier', type: 'text' },
       { name: 'description', label: 'Description Panne', type: 'text' },
-      { name: 'technicianId', label: 'ID Technicien', type: 'text' },
+      { name: 'technicianId', label: 'ID Technicien (ex: T1)', type: 'text' },
       { name: 'date', label: 'Date Prévue', type: 'date' },
       { name: 'status', label: 'Statut', type: 'select', options: ['Pending', 'In Progress', 'Completed'] }
     ]
@@ -70,16 +69,6 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
     ]
   },
-  materials: {
-    title: 'Nouveau Matériel',
-    fields: [
-      { name: 'name', label: 'Nom de l\'outil', type: 'text' },
-      { name: 'serialNumber', label: 'N° Série / Réf', type: 'text' },
-      { name: 'condition', label: 'État', type: 'select', options: ['Neuf', 'Bon', 'Usé', 'Panne'] },
-      { name: 'assignedTo', label: 'Affecté à', type: 'text' },
-      { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
-    ]
-  },
   technicians: {
      title: 'Nouveau Membre Équipe',
      fields: [
@@ -90,14 +79,16 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
      ]
   },
   reports: {
-    title: 'Nouveau Rapport',
+    title: 'Nouveau Rapport (Formulaire)',
     fields: [
       { name: 'technicianName', label: 'Nom Technicien', type: 'text' },
       { name: 'date', label: 'Date', type: 'date' },
       { name: 'content', label: 'Détails Intervention', type: 'text' },
       { name: 'domain', label: 'Domaine', type: 'select', options: ['Electricité', 'Froid', 'Bâtiment', 'Plomberie'] },
       { name: 'revenue', label: 'Recette (FCFA)', type: 'number' },
-      { name: 'expenses', label: 'Dépenses (FCFA)', type: 'number' }
+      { name: 'expenses', label: 'Dépenses (FCFA)', type: 'number' },
+      { name: 'rating', label: 'Note Satisfaction (1-5)', type: 'number' },
+      { name: 'method', label: 'Méthode', type: 'select', options: ['Form'] } // Hidden or fixed normally
     ]
   },
   chantiers: {
@@ -121,9 +112,74 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
       { name: 'date', label: 'Date', type: 'date' },
       { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
     ]
+  },
+  employees: {
+    title: 'Dossier RH',
+    fields: [
+      { name: 'full_name', label: 'Nom Complet', type: 'text' },
+      { name: 'role', label: 'Poste', type: 'text' },
+      { name: 'phone', label: 'Téléphone', type: 'text' },
+      { name: 'email', label: 'Email', type: 'email' },
+      { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] },
+      { name: 'salary', label: 'Salaire Base (FCFA)', type: 'number' },
+      { name: 'date_hired', label: 'Date Embauche', type: 'date' }
+    ]
+  },
+  payrolls: {
+    title: 'Bulletin de Paie',
+    fields: [
+      { name: 'employee_name', label: 'Employé', type: 'text' },
+      { name: 'amount', label: 'Montant Net (FCFA)', type: 'number' },
+      { name: 'period', label: 'Mois concerné', type: 'text', placeholder: 'Ex: Mars 2024' },
+      { name: 'date', label: 'Date paiement', type: 'date' },
+      { name: 'status', label: 'Statut', type: 'select', options: ['Payé', 'En attente'] }
+    ]
+  },
+  clients: {
+    title: 'Nouveau Client',
+    fields: [
+      { name: 'name', label: 'Nom Client / Entreprise', type: 'text' },
+      { name: 'phone', label: 'Téléphone', type: 'text' },
+      { name: 'email', label: 'Email', type: 'email' },
+      { name: 'address', label: 'Adresse', type: 'text' },
+      { name: 'site', label: 'Ville', type: 'select', options: ['Abidjan', 'Bouaké'] },
+      { name: 'type', label: 'Type', type: 'select', options: ['Particulier', 'Entreprise'] }
+    ]
+  },
+  caisse: {
+    title: 'Mouvement Caisse',
+    fields: [
+      { name: 'label', label: 'Motif', type: 'text' },
+      { name: 'amount', label: 'Montant (FCFA)', type: 'number' },
+      { name: 'type', label: 'Flux', type: 'select', options: ['Entrée', 'Sortie'] },
+      { name: 'date', label: 'Date', type: 'date' },
+      { name: 'operator', label: 'Opérateur', type: 'text' }
+    ]
+  },
+  suppliers: {
+    title: 'Nouveau Fournisseur',
+    fields: [
+      { name: 'name', label: 'Nom Entreprise', type: 'text' },
+      { name: 'contact', label: 'Contact Principal', type: 'text' },
+      { name: 'phone', label: 'Téléphone', type: 'text' },
+      { name: 'category', label: 'Spécialité', type: 'select', options: ['Électricité', 'Plomberie', 'Froid', 'Matériaux', 'Divers'] },
+      { name: 'site', label: 'Zone', type: 'select', options: ['Abidjan', 'Bouaké', 'National'] }
+    ]
+  },
+  purchases: {
+    title: 'Bon d\'Achat',
+    fields: [
+      { name: 'item_name', label: 'Article / Service', type: 'text' },
+      { name: 'supplier', label: 'Fournisseur', type: 'text' },
+      { name: 'quantity', label: 'Quantité', type: 'number' },
+      { name: 'cost', label: 'Coût Total (FCFA)', type: 'number' },
+      { name: 'date', label: 'Date', type: 'date' },
+      { name: 'status', label: 'Statut', type: 'select', options: ['Commandé', 'Reçu', 'Annulé'] }
+    ]
   }
 };
 
+// --- Menu Configuration ---
 const MAIN_MENU: MenuItem[] = [
   { id: 'accueil', label: 'Accueil', icon: LayoutDashboard, path: '/', description: 'Vue d\'ensemble', colorClass: 'text-orange-500' },
   { id: 'techniciens', label: 'Techniciens', icon: HardHat, path: '/techniciens', description: 'Gestion opérationnelle', colorClass: 'text-gray-600' },
@@ -133,483 +189,483 @@ const MAIN_MENU: MenuItem[] = [
   { id: 'equipe', label: 'Notre Équipe', icon: Users, path: '/equipe', description: 'Membres & Rôles', colorClass: 'text-gray-600' },
 ];
 
+// --- Sub-Menu Configurations ---
 const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
   techniciens: [
-    { id: 'interventions', label: 'Interventions', description: 'Planning', icon: Wrench, path: '/techniciens/interventions', color: 'bg-orange-500' },
-    { id: 'rapports', label: 'Rapports Journaliers', description: 'Vocal/Formulaire', icon: FileText, path: '/techniciens/rapports', color: 'bg-gray-700' },
-    { id: 'materiel', label: 'Matériel & Outils', description: 'Inventaire', icon: Truck, path: '/techniciens/materiel', color: 'bg-blue-600' },
-    { id: 'chantiers', label: 'Chantiers', description: 'Suivi', icon: ShieldCheck, path: '/techniciens/chantiers', color: 'bg-green-600' },
+    { 
+      id: 'interventions', 
+      label: 'Interventions', 
+      description: 'Planning des interventions', 
+      managedBy: 'Géré par le Superviseur',
+      icon: Wrench, 
+      path: '/techniciens/interventions', 
+      color: 'bg-orange-500' 
+    },
+    { 
+      id: 'rapports', 
+      label: 'Rapports Journaliers', 
+      description: 'Vocal ou Formulaire détaillé', 
+      managedBy: 'Géré par les Techniciens',
+      icon: FileText, 
+      path: '/techniciens/rapports', 
+      color: 'bg-gray-700' 
+    },
+    { 
+      id: 'materiel', 
+      label: 'Matériel', 
+      description: 'Inventaire & Affectation', 
+      managedBy: 'Géré par le Magasinier',
+      icon: Truck, 
+      path: '/techniciens/materiel', 
+      color: 'bg-blue-600' 
+    },
+    { 
+      id: 'chantiers', 
+      label: 'Chantiers', 
+      description: 'Suivi & Exécution', 
+      managedBy: 'Géré par le Chef de Chantier',
+      icon: ShieldCheck, 
+      path: '/techniciens/chantiers', 
+      color: 'bg-green-600' 
+    },
   ],
   comptabilite: [
-    { id: 'bilan', label: 'Bilan Financier', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600', description: 'Journal' },
-    { id: 'rh', label: 'Ressources Humaines', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600', description: 'Staff' },
-    { id: 'paie', label: 'Paie & Salaires', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500', description: 'Virements' },
+    { id: 'bilan', label: 'Bilan Financier', description: 'Journal des transactions', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600' },
+    { id: 'rh', label: 'Ressources Humaines', description: 'Dossiers du personnel', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600' },
+    { id: 'paie', label: 'Paie & Salaires', description: 'Gestion des virements mensuels', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500' },
   ],
   secretariat: [
-    { id: 'planning', label: 'Planning', icon: Calendar, path: '/secretariat/planning', color: 'bg-indigo-500', description: 'Agenda' },
-    { id: 'clients', label: 'Gestion Clients', icon: UserCheck, path: '/secretariat/clients', color: 'bg-blue-500', description: 'CRM' },
-    { id: 'caisse', label: 'Caisse', icon: Archive, path: '/secretariat/caisse', color: 'bg-gray-600', description: 'Mouvements' },
+    { id: 'planning', label: 'Planning', description: 'Agenda des équipes et rdv', icon: Calendar, path: '/secretariat/planning', color: 'bg-indigo-500' },
+    { id: 'clients', label: 'Gestion Clients', description: 'Base de données CRM', icon: UserCheck, path: '/secretariat/clients', color: 'bg-blue-500' },
+    { id: 'caisse', label: 'Caisse Menu', description: 'Suivi de la petite caisse', icon: Archive, path: '/secretariat/caisse', color: 'bg-gray-600' },
   ],
   quincaillerie: [
-    { id: 'stocks', label: 'Stocks', icon: ClipboardList, path: '/quincaillerie/stocks', color: 'bg-orange-600', description: 'Inventaire' },
-    { id: 'fournisseurs', label: 'Fournisseurs', icon: Truck, path: '/quincaillerie/fournisseurs', color: 'bg-green-600', description: 'Partenaires' },
-    { id: 'achats', label: 'Bons d\'achat', icon: FileText, path: '/quincaillerie/achats', color: 'bg-red-500', description: 'Commandes' },
+    { id: 'stocks', label: 'Stocks', description: 'État des stocks en temps réel', icon: ClipboardList, path: '/quincaillerie/stocks', color: 'bg-orange-600' },
+    { id: 'fournisseurs', label: 'Fournisseurs', description: 'Liste et contacts partenaires', icon: Truck, path: '/quincaillerie/fournisseurs', color: 'bg-green-600' },
+    { id: 'achats', label: 'Bons d\'achat', description: 'Historique des commandes', icon: FileText, path: '/quincaillerie/achats', color: 'bg-red-500' },
   ]
 };
 
+// --- Helper: Date Filter ---
 const isInPeriod = (dateStr: string, period: Period): boolean => {
   if (!dateStr) return false;
   const date = new Date(dateStr);
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  if (period === Period.DAY) return dateStr === todayStr;
-  if (period === Period.MONTH) return dateStr.startsWith(todayStr.substring(0, 7));
-  if (period === Period.YEAR) return dateStr.startsWith(todayStr.substring(0, 4));
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (period === Period.DAY) {
+    return itemDate.getTime() === today.getTime();
+  } else if (period === Period.WEEK) {
+    const day = today.getDay();
+    const diffToMonday = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(diffToMonday);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    monday.setHours(0,0,0,0);
+    friday.setHours(23,59,59,999);
+    const itemDay = date.getDay();
+    if (itemDay === 0 || itemDay === 6) return false;
+    return itemDate >= monday && itemDate <= friday;
+  } else if (period === Period.MONTH) {
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  } else if (period === Period.YEAR) {
+    return date.getFullYear() === now.getFullYear();
+  }
   return true;
 };
 
-// --- Composants UI ---
-const EbfLogo = ({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) => (
-  <div className={`font-black tracking-tighter flex items-baseline ${size === 'small' ? 'text-xl' : size === 'large' ? 'text-5xl' : 'text-3xl'}`}>
-    <span className="text-ebf-green">E</span><span className="text-ebf-orange">B</span><span className="text-ebf-green">F</span>
-  </div>
-);
-
-const HeaderWithNotif = ({ 
-  title, onMenuClick, onLogout, notifications, userProfile, userRole, onOpenProfile, onOpenFlashInfo, onOpenHelp, darkMode, onToggleTheme 
-}: any) => {
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
-    const unreadCount = notifications.filter((n: Notification) => !n.read).length;
-    const settingsRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: any) => {
-            if (settingsRef.current && !settingsRef.current.contains(event.target)) setShowSettingsDropdown(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    return (
-        <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
-           <div className="flex items-center gap-4">
-              <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-600"><Menu/></button>
-              <h2 className="text-lg font-extrabold text-green-950 hidden md:block tracking-tight">{title}</h2>
-           </div>
-           <div className="flex items-center gap-3">
-               <div className="flex items-center gap-3 border-l pl-4 ml-2 border-gray-200">
-                  <div className="hidden md:block text-right">
-                     <p className="text-sm font-bold text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
-                     <p className="text-[10px] text-ebf-orange font-bold uppercase bg-orange-50 px-2 py-0.5 rounded-full inline-block">Role: {userRole}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg border border-green-200">
-                      {userProfile?.full_name?.charAt(0) || <User size={20}/>}
-                  </div>
-               </div>
-              <div className="relative ml-2">
-                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-gray-100 rounded-full transition text-gray-600">
-                     <Bell size={20}/>
-                     {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{unreadCount}</span>}
-                 </button>
-                 {showDropdown && (
-                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
-                         <div className="p-3 border-b bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-sm">Notifications</h3></div>
-                         <div className="max-h-80 overflow-y-auto">
-                             {notifications.length === 0 ? <div className="p-4 text-center text-gray-400">Aucune notification</div> : 
-                                 notifications.map((n: any) => (
-                                     <div key={n.id} className="p-3 border-b hover:bg-gray-50 cursor-pointer">
-                                         <p className="text-sm font-bold">{n.title}</p>
-                                         <p className="text-xs text-gray-500">{n.message}</p>
-                                     </div>
-                                 ))
-                             }
-                         </div>
-                         <button onClick={() => setShowDropdown(false)} className="w-full py-2 text-xs text-gray-500 hover:bg-gray-50">Fermer</button>
-                     </div>
-                 )}
-              </div>
-              <div className="relative" ref={settingsRef}>
-                 <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
-                    <Settings size={20}/>
-                 </button>
-                 {showSettingsDropdown && (
-                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
-                      <div className="py-2">
-                         <button onClick={() => { onOpenProfile(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm font-medium text-gray-700">
-                             <User size={18} className="text-ebf-orange"/> Mon Profil
-                         </button>
-                         <button onClick={() => { onOpenFlashInfo(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm font-medium text-gray-700">
-                             <Megaphone size={18} className="text-blue-500"/> Gestion Flash Info
-                         </button>
-                         <div className="border-t my-1"></div>
-                         <button onClick={onToggleTheme} className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 text-sm font-medium text-gray-700">
-                            <div className="flex items-center gap-3"><Moon size={18} className="text-indigo-500"/> Mode Sombre</div>
-                            <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${darkMode ? 'bg-indigo-500' : 'bg-gray-300'}`}><div className={`w-3 h-3 bg-white rounded-full transform transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-0'}`}></div></div>
-                         </button>
-                         <button onClick={() => { onOpenHelp(); setShowSettingsDropdown(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-sm font-medium text-gray-700">
-                             <HelpCircle size={18} className="text-green-500"/> Aide & Support
-                         </button>
-                         <div className="border-t my-1"></div>
-                         <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-red-50 text-sm font-bold text-red-600">
-                             <LogOut size={18}/> Se déconnecter
-                         </button>
-                      </div>
-                   </div>
-                 )}
-              </div>
-           </div>
-        </header>
-    )
+// --- Helper: Permission Check (UNRESTRICTED) ---
+const getPermission = (path: string, role: Role): { canWrite: boolean } => {
+  return { canWrite: true };
 };
 
-const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, onAdd, onDelete, readOnly }: any) => (
-    <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <button onClick={onBack} className="p-2 bg-white rounded-full shadow-sm border border-gray-100 hover:text-ebf-orange"><ArrowLeft size={20}/></button>
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-                    <p className="text-gray-500 text-sm">{subtitle}</p>
-                </div>
-            </div>
-            {!readOnly && onAdd && (
-                <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow hover:opacity-90 flex items-center gap-2`}>
-                    <Plus size={18}/> Ajouter
-                </button>
-            )}
-        </div>
-        <div className="bg-white rounded-xl shadow border overflow-hidden">
-            <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                    <tr>
-                        <th className="p-4 text-left text-xs font-bold uppercase text-gray-500">Nom / Libellé</th>
-                        <th className="p-4 text-left text-xs font-bold uppercase text-gray-500">Détails</th>
-                        <th className="p-4 text-left text-xs font-bold uppercase text-gray-500">Site</th>
-                        <th className="p-4 text-right text-xs font-bold uppercase text-gray-500">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                    {items.filter((i:any) => currentSite === Site.GLOBAL || i.site === currentSite).map((item: any) => (
-                        <tr key={item.id} className="hover:bg-orange-50/20">
-                            <td className="p-4 font-bold text-gray-800">{item.name || item.client || item.label || item.full_name || 'Item'}</td>
-                            <td className="p-4 text-sm text-gray-600">{item.description || item.specialty || item.date || '-'}</td>
-                            <td className="p-4 text-sm">{item.site || '-'}</td>
-                            <td className="p-4 text-right">
-                                {!readOnly && onDelete && <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>}
-                            </td>
-                        </tr>
-                    ))}
-                    {items.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-gray-400">Aucune donnée.</td></tr>}
-                </tbody>
-            </table>
-        </div>
-    </div>
-);
-
-// Added session to props to fix 'Cannot find name session' error on line 521
-const AppContent = ({ onLogout, userRole, userProfile, session }: any) => {
-  const [currentPath, setCurrentPath] = useState('/');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
-  const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
-  const [darkMode, setDarkMode] = useState(false);
-  
-  // États de données
-  const [interventions, setInterventions] = useState<Intervention[]>([]);
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [reports, setReports] = useState<DailyReport[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [chantiers, setChantiers] = useState<any[]>([]);
-  const [tickerMessages, setTickerMessages] = useState<TickerMessage[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  
-  // États Modals
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [crudTarget, setCrudTarget] = useState('');
-  const [itemToDelete, setItemToDelete] = useState<any>(null);
-  const [crudLoading, setCrudLoading] = useState(false);
-
-  // Mapping Table -> Setter pour mise à jour instantanée
-  const stateSetterMap: Record<string, any> = {
-    interventions: setInterventions,
-    stocks: setStock,
-    materials: setMaterials,
-    technicians: setTechnicians,
-    reports: setReports,
-    transactions: setTransactions,
-    chantiers: setChantiers,
-    ticker_messages: setTickerMessages
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: interv } = await supabase.from('interventions').select('*'); if (interv) setInterventions(interv);
-      const { data: st } = await supabase.from('stocks').select('*'); if (st) setStock(st);
-      const { data: mat } = await supabase.from('materials').select('*'); if (mat) setMaterials(mat);
-      const { data: tech } = await supabase.from('technicians').select('*'); if (tech) setTechnicians(tech);
-      const { data: rep } = await supabase.from('reports').select('*'); if (rep) setReports(rep);
-      const { data: trans } = await supabase.from('transactions').select('*'); if (trans) setTransactions(trans);
-      const { data: chan } = await supabase.from('chantiers').select('*'); if (chan) setChantiers(chan);
-      const { data: tick } = await supabase.from('ticker_messages').select('*').order('display_order'); if (tick) setTickerMessages(tick);
-    };
-    fetchData();
-
-    const channel = supabase.channel('ebf-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        const setter = stateSetterMap[payload.table];
-        if (!setter) return;
-        if (payload.eventType === 'INSERT') setter((prev: any) => [...prev.filter((i:any) => i.id !== payload.new.id), payload.new]);
-        if (payload.eventType === 'UPDATE') setter((prev: any) => prev.map((i: any) => i.id === payload.new.id ? payload.new : i));
-        if (payload.eventType === 'DELETE') setter((prev: any) => prev.filter((i: any) => i.id !== payload.old.id));
-      }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const stats = useMemo(() => {
-    const map = new Map<string, StatData>();
-    reports.forEach(r => {
-      if (!r.date) return;
-      const key = `${r.date}_${r.site}`;
-      if (!map.has(key)) map.set(key, { id: key, date: r.date, site: r.site, revenue: 0, expenses: 0, profit: 0, interventions: 0 });
-      const s = map.get(key)!;
-      s.revenue += Number(r.revenue || 0);
-      s.expenses += Number(r.expenses || 0);
-      s.interventions += 1;
-    });
-    return Array.from(map.values()).map(s => ({ ...s, profit: s.revenue - s.expenses }));
-  }, [reports]);
-
-  // Actions CRUD Instantanées
-  const confirmAdd = async (formData: any) => {
-    setCrudLoading(true);
-    const processed = { ...formData, site: formData.site || (currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN) };
-    const { data, error } = await supabase.from(crudTarget).insert([processed]).select();
-    if (error) alert(error.message);
-    else if (data) {
-      const setter = stateSetterMap[crudTarget];
-      if (setter) setter((prev: any) => [...prev, data[0]]);
-      setIsAddOpen(false);
-    }
-    setCrudLoading(false);
-  };
-
-  const confirmDelete = async () => {
-    setCrudLoading(true);
-    const { error } = await supabase.from(crudTarget).delete().eq('id', itemToDelete.id);
-    if (error) alert(error.message);
-    else {
-      const setter = stateSetterMap[crudTarget];
-      if (setter) setter((prev: any) => prev.filter((i: any) => i.id !== itemToDelete.id));
-      setIsDeleteOpen(false);
-    }
-    setCrudLoading(false);
-  };
-
-  const handleNavigate = (path: string) => { setCurrentPath(path); setIsMenuOpen(false); };
-
-  const renderContent = () => {
-    if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={tickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={setCurrentPath} onDeleteReport={async (id) => { await supabase.from('reports').delete().eq('id', id); setReports(prev => prev.filter(r => r.id !== id)); }} />;
-    if (currentPath === '/synthesis') return <DetailedSynthesis data={stats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={setCurrentPath} onViewReport={() => {}} />;
+// --- EBF Vector Logo (Globe + Plug) ---
+const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
+    const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
+    const width = 200 * scale;
+    const height = 100 * scale;
     
-    const section = currentPath.substring(1);
-    if (MODULE_ACTIONS[section]) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-          {MODULE_ACTIONS[section].map((a: any) => (
-            <button key={a.id} onClick={() => handleNavigate(a.path)} className="bg-white p-6 rounded-xl shadow-sm border hover:border-ebf-orange transition text-left group">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${a.color} text-white`}><a.icon size={24} /></div>
-              <h3 className="font-bold text-lg group-hover:text-ebf-orange">{a.label}</h3>
-              <p className="text-sm text-gray-500">{a.description}</p>
-            </button>
-          ))}
-        </div>
-      );
-    }
+    return (
+        <svg width={width} height={height} viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{stopColor:'#3b82f6', stopOpacity:1}} />
+                    <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
+                </linearGradient>
+            </defs>
+            <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
+            <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
+            <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
+            <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
+            <rect x="70" y="20" width="20" height="25" rx="0" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
+            <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
+            <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
+            <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
+            <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
+            <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
+            <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
+            <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
+                Electricité - Bâtiment - Froid
+            </text>
+        </svg>
+    );
+};
 
-    const subSection = currentPath.split('/').pop() || '';
-    if (FORM_CONFIGS[subSection]) {
-        let items: any[] = [];
-        if (subSection === 'interventions') items = interventions;
-        else if (subSection === 'stocks') items = stock;
-        else if (subSection === 'materiel') items = materials;
-        else if (subSection === 'rapports') items = reports;
-        else if (subSection === 'chantiers') items = chantiers;
-        else if (subSection === 'bilan') items = transactions;
-
-        return <ModulePlaceholder title={FORM_CONFIGS[subSection].title} subtitle="Gestion" items={items} onBack={() => handleNavigate('/' + currentPath.split('/')[1])} color="bg-ebf-orange" currentSite={currentSite} onAdd={() => { setCrudTarget(subSection === 'bilan' ? 'transactions' : subSection === 'materiel' ? 'materials' : subSection); setIsAddOpen(true); }} onDelete={(i:any) => { setItemToDelete(i); setCrudTarget(subSection === 'bilan' ? 'transactions' : subSection === 'materiel' ? 'materials' : subSection); setIsDeleteOpen(true); }} />;
-    }
-    return <div className="text-center py-20 text-gray-400">Section en construction...</div>;
-  };
-
+const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
+  const [imgError, setImgError] = useState(false);
+  if (imgError) return <EbfSvgLogo size={size} />;
   return (
-    <div className={`flex h-screen bg-gray-50 ${darkMode ? 'dark bg-gray-900' : ''}`}>
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform transition-transform lg:translate-x-0 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full shadow-2xl'}`}>
-        <div className="h-20 flex items-center px-6 bg-white border-b"><EbfLogo size="small"/></div>
-        <nav className="p-4 space-y-1">
-          {MAIN_MENU.map(m => (
-            <button key={m.id} onClick={() => handleNavigate(m.path)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${currentPath === m.path || currentPath.startsWith(m.path + '/') ? 'bg-ebf-orange font-bold shadow-lg' : 'text-gray-300 hover:bg-green-900'}`}>
-              <m.icon size={20} /><span>{m.label}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 flex flex-col lg:ml-64">
-        <HeaderWithNotif 
-            title="EBF Manager" 
-            onMenuClick={() => setIsMenuOpen(true)} 
-            onLogout={onLogout} 
-            notifications={notifications} 
-            userProfile={userProfile} 
-            userRole={userRole} 
-            onOpenProfile={() => setIsProfileOpen(true)}
-            onOpenFlashInfo={() => setIsFlashInfoOpen(true)}
-            onOpenHelp={() => setIsHelpOpen(true)}
-            darkMode={darkMode}
-            onToggleTheme={() => setDarkMode(!darkMode)}
+    <div className="flex items-center justify-center">
+        <img 
+            src="/logo.png" 
+            alt="EBF Logo" 
+            className={`${size === 'small' ? 'h-10' : size === 'large' ? 'h-32' : 'h-16'} w-auto object-contain transition-transform duration-300 hover:scale-105`}
+            onError={() => setImgError(true)} 
         />
-        <main className="p-6 flex-1 overflow-y-auto">{renderContent()}</main>
-      </div>
-
-      {/* Modals */}
-      {isAddOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl animate-fade-in">
-          <h3 className="text-xl font-bold mb-6">{FORM_CONFIGS[crudTarget === 'transactions' ? 'bilan' : crudTarget === 'materials' ? 'materiel' : crudTarget]?.title || 'Ajouter'}</h3>
-          <form onSubmit={(e: any) => { e.preventDefault(); confirmAdd(Object.fromEntries(new FormData(e.target))); }} className="space-y-4">
-            {FORM_CONFIGS[crudTarget === 'transactions' ? 'bilan' : crudTarget === 'materials' ? 'materiel' : crudTarget]?.fields.map((f: any) => (
-              <div key={f.name}>
-                <label className="block text-sm font-bold mb-1">{f.label}</label>
-                {f.type === 'select' ? <select name={f.name} className="w-full p-2 border rounded-lg" required>{f.options.map((o:any)=><option key={o} value={o}>{o}</option>)}</select> : <input name={f.name} type={f.type} className="w-full p-2 border rounded-lg" required/>}
-              </div>
-            ))}
-            <div className="flex gap-2 pt-4">
-              <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-2 border rounded-lg">Annuler</button>
-              <button type="submit" className="flex-1 py-2 bg-ebf-orange text-white rounded-lg font-bold">{crudLoading ? '...' : 'Valider'}</button>
-            </div>
-          </form>
-        </div>
-      </div>}
-
-      {isDeleteOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-        <div className="bg-white p-6 rounded-xl text-center max-w-sm">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500"><AlertTriangle size={32}/></div>
-          <h3 className="text-xl font-bold mb-2">Supprimer cet élément ?</h3>
-          <div className="flex gap-2 mt-6">
-            <button onClick={() => setIsDeleteOpen(false)} className="flex-1 py-2 border rounded-lg">Non</button>
-            <button onClick={confirmDelete} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-bold">{crudLoading ? '...' : 'Oui'}</button>
-          </div>
-        </div>
-      </div>}
-      
-      {/* Modals Informations */}
-      {isProfileOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl relative">
-          <button onClick={() => setIsProfileOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X/></button>
-          <h3 className="text-xl font-bold mb-6">Mon Profil</h3>
-          <div className="space-y-4">
-            <div className="flex flex-col items-center mb-6">
-                <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center text-ebf-orange font-bold text-3xl mb-2">{userProfile?.full_name?.charAt(0) || 'U'}</div>
-                <p className="font-bold text-lg">{userProfile?.full_name}</p>
-                <p className="text-gray-500 text-sm">{userRole}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><label className="text-gray-400">Email</label><p className="font-medium">{session?.user?.email}</p></div>
-                <div><label className="text-gray-400">Site</label><p className="font-medium">{userProfile?.site || 'Non défini'}</p></div>
-            </div>
-          </div>
-        </div>
-      </div>}
-      
-      {isHelpOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white p-6 rounded-xl w-full max-w-lg shadow-2xl relative">
-          <button onClick={() => setIsHelpOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X/></button>
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-green-700"><HelpCircle/> Aide & Support</h3>
-          <div className="space-y-4 text-sm">
-            <p className="font-bold">Comment utiliser EBF Manager ?</p>
-            <p className="text-gray-600">Naviguez via le menu latéral pour accéder aux différents modules. Le dashboard accueil vous donne une vue temps réel sur la rentabilité.</p>
-            <p className="bg-orange-50 p-3 rounded-lg border border-orange-100">Contact technique : <strong>support@ebf.ci</strong></p>
-          </div>
-        </div>
-      </div>}
-      
-      {isFlashInfoOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white p-6 rounded-xl w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-          <button onClick={() => setIsFlashInfoOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X/></button>
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Megaphone className="text-ebf-orange"/> Gestion Flash Info</h3>
-          <div className="space-y-4">
-             <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-2">Ajouter un message</p>
-                <div className="flex gap-2">
-                   <input id="ticker-input" placeholder="Texte du message..." className="flex-1 p-2 border rounded-lg"/>
-                   <button onClick={async () => {
-                       const el = document.getElementById('ticker-input') as HTMLInputElement;
-                       if (el.value) {
-                           await supabase.from('ticker_messages').insert([{ text: el.value, type: 'info', display_order: tickerMessages.length + 1 }]);
-                           el.value = '';
-                       }
-                   }} className="bg-ebf-orange text-white px-4 rounded-lg font-bold">Publier</button>
-                </div>
-             </div>
-             <div className="space-y-2">
-                {tickerMessages.map((m: any) => (
-                    <div key={m.id} className="p-3 border rounded-lg flex justify-between items-center group">
-                        <span className="text-sm">{m.text}</span>
-                        <button onClick={async () => await supabase.from('ticker_messages').delete().eq('id', m.id)} className="text-red-400 opacity-0 group-hover:opacity-100 transition"><Trash2 size={16}/></button>
-                    </div>
-                ))}
-             </div>
-          </div>
-        </div>
-      </div>}
     </div>
   );
 };
 
-export default function App() {
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any>(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        if (session) {
-            supabase.from('profiles').select('*').eq('id', session.user.id).single()
-                .then(({data}) => { setUserProfile(data); setLoading(false); });
-        } else {
-            setLoading(false);
-        }
+// --- Module Placeholder (Generic List View) ---
+const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
+    const filteredItems = items.filter((item: any) => {
+        if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
+        if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
+        return true;
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        if (session) {
-            supabase.from('profiles').select('*').eq('id', session.user.id).single()
-                .then(({data}) => setUserProfile(data));
-        }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm transition border border-gray-100"><ArrowLeft size={20} className="text-gray-600 hover:text-ebf-orange"/></button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            {title}
+                            {readOnly && <span className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 ml-2"><Lock size={12}/> Lecture Seule</span>}
+                        </h2>
+                        <p className="text-gray-500">{subtitle}</p>
+                    </div>
+                </div>
+                {!readOnly && onAdd && (
+                    <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow-md hover:opacity-90 transition flex items-center gap-2 transform hover:-translate-y-0.5`}>
+                        <Plus size={18}/> Ajouter
+                    </button>
+                )}
+            </div>
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-green-950 text-white flex-col gap-4 animate-pulse"><EbfLogo size="large"/><p className="font-bold">EBF Manager...</p></div>;
-  if (!session) return <div className="h-screen flex items-center justify-center bg-ebf-pattern p-4">
-    <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border text-center relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-ebf-orange"></div>
-      <EbfLogo size="large" /><p className="text-gray-500 mb-8 font-medium">Gestion Technique & Immobilière</p>
-      <form onSubmit={async (e: any) => { e.preventDefault(); const { error } = await supabase.auth.signInWithPassword({ email: e.target.email.value, password: e.target.password.value }); if (error) alert("Email ou mot de passe invalide."); }} className="space-y-4 text-left">
-        <div><label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Adresse Email</label><div className="relative"><Mail className="absolute left-3 top-3 text-gray-300" size={18}/><input name="email" type="email" className="w-full pl-10 p-2.5 border rounded-xl bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-ebf-orange transition" placeholder="votre@email.com" required/></div></div>
-        <div><label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Mot de passe</label><div className="relative"><Lock className="absolute left-3 top-3 text-gray-300" size={18}/><input name="password" type="password" className="w-full pl-10 p-2.5 border rounded-xl bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-ebf-orange transition" placeholder="••••••••" required/></div></div>
-        <button type="submit" className="w-full bg-ebf-green text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition transform hover:-translate-y-0.5 mt-2">Accéder à mon espace</button>
-      </form>
-      <p className="mt-8 text-xs text-gray-400">© 2024 E.B.F - Tous droits réservés</p>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-100 dark:border-gray-600">
+                            <tr>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">ID</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Nom / Libellé</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Détails</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Site</th>
+                                <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Statut / Montant</th>
+                                {!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                            {filteredItems.length === 0 ? (
+                                <tr><td colSpan={6} className="p-8 text-center text-gray-400">Aucune donnée trouvée.</td></tr>
+                            ) : (
+                                filteredItems.map((item: any) => (
+                                    <tr key={item.id} className="hover:bg-orange-50/30 dark:hover:bg-gray-750 transition">
+                                        <td className="p-4 text-sm font-mono text-gray-400">#{item.id.substring(0, 4)}</td>
+                                        <td className="p-4">
+                                            <p className="font-bold text-gray-800 dark:text-white">
+                                                {item.name || item.client || item.full_name || item.label || item.item_name || item.employee_name || 'Sans Nom'}
+                                            </p>
+                                            {item.clientPhone && <p className="text-xs text-gray-500">{item.clientPhone}</p>}
+                                            {item.role && <p className="text-xs text-gray-500">{item.role}</p>}
+                                        </td>
+                                        <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
+                                            {item.description || item.specialty || item.unit || item.category || item.supplier || '-'}
+                                            {item.date && <span className="block text-xs text-gray-400">{item.date}</span>}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.site === 'Abidjan' ? 'bg-orange-100 text-orange-700 border border-orange-200' : item.site === 'Bouaké' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                {item.site || 'Global'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            {item.amount !== undefined || item.cost !== undefined || item.salary !== undefined ? (
+                                                 <span className={`font-bold font-mono ${(item.type === 'Dépense' || item.type === 'Sortie') ? 'text-red-600' : 'text-green-700'}`}>
+                                                    {(item.amount || item.cost || item.salary).toLocaleString()} F
+                                                 </span>
+                                            ) : item.status ? (
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Available' || item.status === 'Completed' || item.status === 'Payé' || item.status === 'Terminé' ? 'bg-green-100 text-green-700' : item.status === 'Busy' || item.status === 'In Progress' || item.status === 'En cours' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {item.status}
+                                                </span>
+                                            ) : (
+                                                <span className={`font-bold ${item.quantity <= (item.threshold || 0) ? 'text-red-500' : 'text-gray-800'}`}>
+                                                    {item.quantity} {item.unit}
+                                                </span>
+                                            )}
+                                        </td>
+                                        {!readOnly && onDelete && (
+                                            <td className="p-4 text-right">
+                                                <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Missing Components Implementation ---
+
+const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
+  return (
+    <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+             <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm transition border border-gray-100"><ArrowLeft size={20} className="text-gray-600 hover:text-ebf-orange"/></button>
+             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Rapports Journaliers</h2>
+        </div>
+        
+        {!readOnly && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button onClick={() => onSelectMode('form')} className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-md border-2 border-transparent hover:border-ebf-orange transition group flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <FileText size={32} className="text-ebf-orange"/>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Rapport Formulaire</h3>
+                    <p className="text-gray-500 mt-2">Saisie détaillée textuelle</p>
+                </button>
+                <button onClick={() => onSelectMode('voice')} className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-md border-2 border-transparent hover:border-blue-500 transition group flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Mic size={32} className="text-blue-600"/>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Rapport Vocal</h3>
+                    <p className="text-gray-500 mt-2">Dictée rapide assistée par IA</p>
+                </button>
+            </div>
+        )}
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                <h3 className="font-bold text-gray-700 dark:text-gray-200">Historique des Rapports</h3>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {reports.map((r: DailyReport) => (
+                    <div key={r.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer" onClick={() => onViewReport(r)}>
+                        <div className="flex items-center gap-4">
+                             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${r.method === 'Voice' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-ebf-orange'}`}>
+                                 {r.method === 'Voice' ? <Mic size={18} /> : <FileText size={18} />}
+                             </div>
+                             <div>
+                                 <p className="font-bold text-gray-800 dark:text-white">{r.technicianName}</p>
+                                 <p className="text-xs text-gray-500">{r.date} • {r.site}</p>
+                             </div>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </div>
+                ))}
+            </div>
+        </div>
     </div>
-  </div>;
+  );
+};
 
-  return <AppContent session={session} onLogout={() => supabase.auth.signOut()} userRole={userProfile?.role || 'Collaborateur'} userProfile={userProfile} />;
-}
+const HeaderWithNotif = ({ title, onMenuClick, onLogout, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenFlashInfo, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics }: any) => {
+    return (
+        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-100 dark:border-gray-700 h-16 flex items-center justify-between px-4 sticky top-0 z-30">
+            <div className="flex items-center">
+                <button onClick={onMenuClick} className="mr-4 lg:hidden text-gray-500 hover:text-ebf-orange transition"><Menu /></button>
+                <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-green-500 hidden md:block">{title}</h1>
+            </div>
+            <div className="flex items-center space-x-2 md:space-x-4">
+                <button onClick={onToggleTheme} className="p-2 text-gray-400 hover:text-ebf-orange hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition">
+                    {darkMode ? <Sparkles size={20} /> : <Moon size={20} />}
+                </button>
+                <button onClick={onOpenHelp} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-full transition hidden sm:block">
+                    <HelpCircle size={20} />
+                </button>
+                {/* Notification Dropdown */}
+                <div className="relative group">
+                    <button className="p-2 text-gray-400 hover:text-ebf-orange hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition relative">
+                        <Bell size={20} />
+                        {notifications.filter((n: Notification) => !n.read).length > 0 && (
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+                        )}
+                    </button>
+                    <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right z-50">
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                            <h3 className="font-bold text-gray-800 dark:text-white">Notifications</h3>
+                            <span className="text-xs text-gray-400">{notifications.length} recents</span>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                            {notifications.length === 0 ? <div className="p-4 text-center text-gray-400 text-sm">Aucune notification</div> : notifications.map((n: Notification) => (
+                                <div key={n.id} onClick={() => markNotificationAsRead(n)} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer ${!n.read ? 'bg-orange-50/50 dark:bg-gray-700/50' : ''}`}>
+                                    <div className="flex gap-3">
+                                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'alert' ? 'bg-red-500' : n.type === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                                        <div>
+                                            <p className={`text-sm ${!n.read ? 'font-bold text-gray-800 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>{n.title}</p>
+                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{n.message}</p>
+                                            <p className="text-[10px] text-gray-400 mt-2">{new Date(n.created_at).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Profile Dropdown */}
+                <div className="relative group pl-2 border-l border-gray-200 dark:border-gray-700">
+                    <button className="flex items-center space-x-2 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-ebf-green to-emerald-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                            {userProfile?.full_name?.charAt(0) || <User size={16} />}
+                        </div>
+                        <div className="text-left hidden md:block">
+                             <p className="text-xs font-bold text-gray-800 dark:text-white">{userProfile?.full_name || 'Utilisateur'}</p>
+                             <p className="text-[10px] text-gray-500">{userRole}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-400" />
+                    </button>
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right z-50 p-2">
+                        <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-2">
+                            <p className="font-bold text-gray-800 dark:text-white">{userProfile?.full_name}</p>
+                            <p className="text-xs text-gray-500">{userProfile?.email}</p>
+                        </div>
+                        <button onClick={onOpenProfile} className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2"><User size={16}/> Mon Profil</button>
+                        {(userRole === 'Admin' || userRole === 'DG') && (
+                            <button onClick={onOpenFlashInfo} className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2"><Megaphone size={16}/> Flash Info</button>
+                        )}
+                         <button onClick={onResetBiometrics} className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2"><Fingerprint size={16}/> Reset Biométrie</button>
+                        <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
+                        <button onClick={onLogout} className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-sm text-red-600 flex items-center gap-2"><LogOut size={16}/> Déconnexion</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+    );
+};
+
+const ProfileModal = ({ isOpen, onClose, profile }: any) => {
+    if(!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                <div className="h-24 bg-gradient-to-r from-ebf-green to-emerald-600 relative">
+                     <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white"><X size={20}/></button>
+                     <div className="absolute -bottom-10 left-6 w-20 h-20 rounded-full border-4 border-white dark:border-gray-800 bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-600">
+                         {profile?.full_name?.charAt(0)}
+                     </div>
+                </div>
+                <div className="pt-12 pb-6 px-6">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">{profile?.full_name}</h2>
+                    <p className="text-sm text-gray-500 mb-6">{profile?.email} • {profile?.role}</p>
+                    <div className="space-y-3">
+                         <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                             <span className="text-sm text-gray-500 dark:text-gray-400">Site</span>
+                             <span className="text-sm font-bold text-gray-800 dark:text-white">{profile?.site}</span>
+                         </div>
+                         <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                             <span className="text-sm text-gray-500 dark:text-gray-400">Téléphone</span>
+                             <span className="text-sm font-bold text-gray-800 dark:text-white">{profile?.phone || 'N/A'}</span>
+                         </div>
+                         <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                             <span className="text-sm text-gray-500 dark:text-gray-400">Date embauche</span>
+                             <span className="text-sm font-bold text-gray-800 dark:text-white">{profile?.date_hired || 'N/A'}</span>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const HelpModal = ({ isOpen, onClose }: any) => {
+    if(!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 relative">
+                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20}/></button>
+                 <div className="flex items-center gap-3 mb-4">
+                     <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><HelpCircle size={24}/></div>
+                     <h2 className="text-xl font-bold text-gray-800 dark:text-white">Aide & Support</h2>
+                 </div>
+                 <p className="text-gray-600 dark:text-gray-300 mb-4">Bienvenue sur EBF Manager. Voici quelques conseils pour démarrer :</p>
+                 <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300 list-disc list-inside mb-6">
+                     <li>Utilisez le menu latéral pour naviguer entre les modules.</li>
+                     <li>La synthèse détaillée offre des graphiques avancés.</li>
+                     <li>En cas de problème technique, contactez le support IT au 0707070707.</li>
+                 </ul>
+                 <button onClick={onClose} className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-lg transition">Fermer</button>
+            </div>
+        </div>
+    );
+};
+
+const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMessage }: any) => {
+    const [text, setText] = useState('');
+    const [type, setType] = useState('info');
+    if(!isOpen) return null;
+    
+    const handleSave = () => {
+        if(text) { onSaveMessage(text, type); setText(''); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 relative max-h-[80vh] flex flex-col">
+                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20}/></button>
+                 <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2"><Megaphone size={20} className="text-ebf-orange"/> Gestion Flash Info</h2>
+                 
+                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4">
+                     <div className="flex gap-2 mb-2">
+                         <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Nouveau message..." className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ebf-orange outline-none" />
+                         <select value={type} onChange={(e) => setType(e.target.value)} className="p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ebf-orange outline-none">
+                             <option value="info">Info</option>
+                             <option value="alert">Alerte</option>
+                             <option value="success">Succès</option>
+                         </select>
+                         <button onClick={handleSave} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 transition">Ajouter</button>
+                     </div>
+                 </div>
+
+                 <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                     {messages.filter((m: any) => m.isManual).length === 0 ? <p className="text-gray-400 text-center italic">Aucun message manuel configuré.</p> : messages.filter((m: any) => m.isManual).map((m: any) => (
+                         <div key={m.id} className="flex justify-between items-center p-3 bg-white border border-gray-200 rounded shadow-sm">
+                             <div className="flex items-center gap-3">
+                                 <span className={`w-2 h-2 rounded-full ${m.type === 'alert' ? 'bg-red-500' : m.type === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
+                                 <span className="text-sm font-medium text-gray-800">{m.text}</span>
+                             </div>
+                             <button onClick={() => onDeleteMessage(m.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                         </div>
+                     ))}
+                 </div>
+            </div>
+        </div>
+    );
+};
+
+const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
+    const [formData, setFormData] = useState<any>({});
+    
+    useEffect(() => {
+        setFormData({});
+    }, [isOpen]);
+
+    if(!isOpen || !config) return null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(formData);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-
