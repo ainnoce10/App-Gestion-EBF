@@ -1,9 +1,9 @@
 
 import React, { useMemo, useState } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X, Download } from 'lucide-react';
+import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X, Download, Calendar } from 'lucide-react';
 import { StatData, Site, Period, TickerMessage, DailyReport, StockItem } from '../types';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -46,6 +46,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   data, reports, tickerMessages, stock, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate, onDeleteReport 
 }) => {
   const [reportToDelete, setReportToDelete] = useState<DailyReport | null>(null);
+  
+  // États pour le filtre de date personnalisé
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   // --- LOGIC: SCAN STOCK FOR ALERTS ---
   // Analyse des stocks en temps réel pour injecter des alertes dans le ticker
@@ -79,56 +83,66 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const matchSite = currentSite === Site.GLOBAL || d.site === currentSite;
       
       // 2. Date Filter
-      const date = new Date(d.date);
-      const now = new Date();
       let matchPeriod = true;
 
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      if (useCustomDate) {
+        if (dateRange.start && d.date < dateRange.start) matchPeriod = false;
+        if (dateRange.end && d.date > dateRange.end) matchPeriod = false;
+      } else {
+        const date = new Date(d.date);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-      if (currentPeriod === Period.DAY) {
-        matchPeriod = itemDate.getTime() === today.getTime();
-      } else if (currentPeriod === Period.WEEK) {
-        const oneWeekAgo = new Date(today);
-        oneWeekAgo.setDate(today.getDate() - 7);
-        matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
-      } else if (currentPeriod === Period.MONTH) {
-        matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      } else if (currentPeriod === Period.YEAR) {
-        matchPeriod = date.getFullYear() === now.getFullYear();
+        if (currentPeriod === Period.DAY) {
+          matchPeriod = itemDate.getTime() === today.getTime();
+        } else if (currentPeriod === Period.WEEK) {
+          const oneWeekAgo = new Date(today);
+          oneWeekAgo.setDate(today.getDate() - 7);
+          matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
+        } else if (currentPeriod === Period.MONTH) {
+          matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        } else if (currentPeriod === Period.YEAR) {
+          matchPeriod = date.getFullYear() === now.getFullYear();
+        }
       }
 
       return matchSite && matchPeriod;
     });
-  }, [data, currentSite, currentPeriod]);
+  }, [data, currentSite, currentPeriod, useCustomDate, dateRange]);
 
   // Filter Reports Logic
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
       const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
       
-      const date = new Date(r.date);
-      const now = new Date();
       let matchPeriod = true;
 
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      if (useCustomDate) {
+        if (dateRange.start && r.date < dateRange.start) matchPeriod = false;
+        if (dateRange.end && r.date > dateRange.end) matchPeriod = false;
+      } else {
+        const date = new Date(r.date);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-      if (currentPeriod === Period.DAY) {
-        matchPeriod = itemDate.getTime() === today.getTime();
-      } else if (currentPeriod === Period.WEEK) {
-        const oneWeekAgo = new Date(today);
-        oneWeekAgo.setDate(today.getDate() - 7);
-        matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
-      } else if (currentPeriod === Period.MONTH) {
-        matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      } else if (currentPeriod === Period.YEAR) {
-        matchPeriod = date.getFullYear() === now.getFullYear();
+        if (currentPeriod === Period.DAY) {
+          matchPeriod = itemDate.getTime() === today.getTime();
+        } else if (currentPeriod === Period.WEEK) {
+          const oneWeekAgo = new Date(today);
+          oneWeekAgo.setDate(today.getDate() - 7);
+          matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
+        } else if (currentPeriod === Period.MONTH) {
+          matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        } else if (currentPeriod === Period.YEAR) {
+          matchPeriod = date.getFullYear() === now.getFullYear();
+        }
       }
 
       return matchSite && matchPeriod;
     });
-  }, [reports, currentSite, currentPeriod]);
+  }, [reports, currentSite, currentPeriod, useCustomDate, dateRange]);
 
   // Aggregated totals for the cards
   const totals = useMemo(() => {
@@ -155,6 +169,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleExportPDF = () => {
     const doc = new jsPDF();
     const todayStr = new Date().toLocaleDateString('fr-FR');
+    const periodStr = useCustomDate 
+        ? `Du ${dateRange.start || '...'} au ${dateRange.end || '...'}` 
+        : currentPeriod;
 
     // -- Header --
     doc.setFillColor(255, 140, 0); // EBF Orange
@@ -170,7 +187,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     doc.setFont('helvetica', 'normal');
     doc.text(`Généré le : ${todayStr}`, 14, 30);
     doc.text(`Site concerné : ${currentSite}`, 14, 35);
-    doc.text(`Période : ${currentPeriod}`, 14, 40);
+    doc.text(`Période : ${periodStr}`, 14, 40);
 
     // -- Financial Summary Box --
     doc.setDrawColor(34, 139, 34); // EBF Green
@@ -283,11 +300,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Filters & Actions */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center bg-white dark:bg-gray-800 p-3 md:p-4 rounded-xl shadow-sm border-l-4 border-ebf-orange border-y border-r border-orange-100 dark:border-gray-700 gap-3 md:gap-4">
-        <div className="flex flex-wrap items-center gap-2 md:gap-4">
+        <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
           <div className="flex items-center space-x-2 bg-orange-50 dark:bg-gray-700 px-2 py-1.5 rounded-lg border border-orange-200 dark:border-gray-600">
             <Filter size={16} className="text-ebf-orange" />
             <span className="font-bold text-ebf-orange text-xs md:text-sm">Filtres</span>
           </div>
+          
           <select 
             className="bg-white border-orange-200 border rounded-lg px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-green-900 font-medium focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none shadow-sm cursor-pointer"
             value={currentSite}
@@ -297,29 +315,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <option value={Site.ABIDJAN}>🇨🇮 Abidjan</option>
             <option value={Site.BOUAKE}>🇨🇮 Bouaké</option>
           </select>
-          <select 
-            className="bg-white border-orange-200 border rounded-lg px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-green-900 font-medium focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none shadow-sm cursor-pointer"
-            value={currentPeriod}
-            onChange={(e) => onPeriodChange(e.target.value as Period)}
-          >
-            <option value={Period.DAY}>Aujourd'hui</option>
-            <option value={Period.WEEK}>Cette Semaine</option>
-            <option value={Period.MONTH}>Ce Mois</option>
-            <option value={Period.YEAR}>Cette Année</option>
-          </select>
+
+          {/* Toggle pour Dates Précises */}
+           <div className="flex items-center gap-2 border-l border-gray-200 pl-2 md:pl-4">
+              <label className="flex items-center cursor-pointer relative select-none">
+                <input type="checkbox" checked={useCustomDate} onChange={() => setUseCustomDate(!useCustomDate)} className="sr-only peer" />
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-ebf-orange"></div>
+                <span className="ml-2 text-xs md:text-sm font-medium text-green-900 dark:text-gray-300 hidden sm:inline">Dates précises</span>
+              </label>
+           </div>
+
+          {!useCustomDate ? (
+            <select 
+                className="bg-white border-orange-200 border rounded-lg px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-green-900 font-medium focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none shadow-sm cursor-pointer min-w-[140px]"
+                value={currentPeriod}
+                onChange={(e) => onPeriodChange(e.target.value as Period)}
+            >
+                <option value={Period.DAY}>Aujourd'hui</option>
+                <option value={Period.WEEK}>Cette Semaine</option>
+                <option value={Period.MONTH}>Ce Mois</option>
+                <option value={Period.YEAR}>Cette Année</option>
+            </select>
+          ) : (
+             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <div className="relative">
+                    <Calendar className="absolute left-2 top-1.5 text-ebf-orange" size={14} />
+                    <input 
+                    type="date" 
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                    className="pl-7 pr-2 border-orange-200 border rounded-lg py-1.5 text-xs md:text-sm text-green-900 bg-white focus:ring-2 focus:ring-ebf-orange outline-none w-32"
+                    />
+                </div>
+                <span className="text-gray-400 font-bold hidden sm:inline">-</span>
+                <div className="relative">
+                    <Calendar className="absolute left-2 top-1.5 text-ebf-orange" size={14} />
+                    <input 
+                    type="date" 
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                    className="pl-7 pr-2 border-orange-200 border rounded-lg py-1.5 text-xs md:text-sm text-green-900 bg-white focus:ring-2 focus:ring-ebf-orange outline-none w-32"
+                    />
+                </div>
+             </div>
+          )}
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full md:w-auto justify-end">
             <button 
                 onClick={handleExportPDF}
-                className="flex items-center justify-center space-x-2 bg-white border border-ebf-orange text-ebf-orange px-3 py-2 md:px-4 md:py-2.5 rounded-lg hover:bg-orange-50 transition transform hover:-translate-y-0.5 text-sm md:text-base font-medium shadow-sm"
+                className="flex items-center justify-center space-x-2 bg-white border border-ebf-orange text-ebf-orange px-3 py-2 md:px-4 md:py-2.5 rounded-lg hover:bg-orange-50 transition transform hover:-translate-y-0.5 text-sm md:text-base font-medium shadow-sm flex-1 md:flex-initial"
             >
                 <Download size={16} className="md:w-5 md:h-5" />
                 <span className="hidden sm:inline">Export PDF</span>
             </button>
             <button 
             onClick={() => onNavigate('/synthesis')}
-            className="flex items-center justify-center space-x-2 bg-gradient-to-r from-ebf-green to-emerald-600 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg hover:shadow-lg hover:shadow-green-200 transition transform hover:-translate-y-0.5 text-sm md:text-base"
+            className="flex items-center justify-center space-x-2 bg-gradient-to-r from-ebf-green to-emerald-600 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg hover:shadow-lg hover:shadow-green-200 transition transform hover:-translate-y-0.5 text-sm md:text-base flex-1 md:flex-initial"
             >
             <Maximize2 size={16} className="md:w-5 md:h-5" />
             <span className="font-medium">Synthèse Détaillée</span>
@@ -344,9 +396,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           subtext="Total sur la période"
           icon={DollarSign}
           trend={12.5}
-          colorClass="text-ebf-orange"
-          bgClass="bg-orange-50 dark:bg-gray-700"
-          borderClass="border-ebf-orange"
+          colorClass="text-blue-600"
+          bgClass="bg-blue-50 dark:bg-gray-700"
+          borderClass="border-blue-500"
         />
         <KPICard 
           title="Dépenses" 
@@ -386,17 +438,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <BarChart data={filteredData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="date" tick={{fontSize: 12, fill: '#14532d'}} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" orientation="left" stroke="#14532d" tickFormatter={(value) => `${value / 1000}k`} axisLine={false} tickLine={false} />
-                  {/* Plus besoin d'axe de droite pour interventions car tout est en monnaie maintenant */}
+                  <YAxis yAxisId="left" orientation="left" stroke="#14532d" tickFormatter={(value) => `${(value / 1000).toFixed(0)}k F`} axisLine={false} tickLine={false} />
                   <Tooltip 
                     cursor={{fill: '#fff7ed'}}
                     contentStyle={{ borderRadius: '12px', border: '1px solid #fed7aa', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', color: '#14532d' }}
-                    formatter={(value: number) => value.toLocaleString()}
+                    formatter={(value: number) => [`${value.toLocaleString()} FCFA`]}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#FF8C00" radius={[4, 4, 0, 0]} barSize={25} />
+                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25} />
                   <Bar yAxisId="left" dataKey="expenses" name="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={25} />
-                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={25} />
+                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={25}>
+                     {filteredData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#228B22' : '#ef4444'} />
+                     ))}
+                  </Bar>
                 </BarChart>
               ) : (
                 <div className="flex h-full items-center justify-center text-gray-400 flex-col">
