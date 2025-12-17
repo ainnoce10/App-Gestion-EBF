@@ -1,30 +1,14 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { StatData, DailyReport } from '../types';
 
-// Fonction utilitaire pour accéder aux variables d'environnement de manière sécurisée
-const getEnv = (key: string) => {
-  try {
-    // @ts-ignore
-    const env = import.meta.env;
-    return env ? env[key] : '';
-  } catch (e) {
-    return '';
-  }
-};
-
-const getAiClient = () => {
-  const apiKey = getEnv('VITE_GOOGLE_API_KEY');
-  
-  if (!apiKey) {
-    console.warn("VITE_GOOGLE_API_KEY non trouvée. L'IA ne fonctionnera pas.");
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
+/**
+ * Analyse les données financières globales via Gemini.
+ * Utilise gemini-3-flash-preview pour une analyse rapide et efficace.
+ */
 export const analyzeBusinessData = async (data: StatData[], site: string): Promise<string> => {
-  const ai = getAiClient();
-  if (!ai) return "Clé API manquante ou invalide. Configurez VITE_GOOGLE_API_KEY dans Vercel.";
+  // Toujours utiliser process.env.API_KEY directement dans l'initialisation.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const prompt = `
     Tu es un expert en business intelligence pour l'entreprise EBF.
@@ -37,19 +21,22 @@ export const analyzeBusinessData = async (data: StatData[], site: string): Promi
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
+    // Accès direct à la propriété .text comme recommandé.
     return response.text || "Analyse indisponible.";
   } catch (error) {
     console.error("Gemini analysis failed", error);
-    return "Erreur lors de l'analyse des données (Vérifiez les quotas API).";
+    return "Erreur lors de l'analyse des données.";
   }
 };
 
+/**
+ * Synthétise les rapports techniques journaliers via Gemini.
+ */
 export const analyzeReports = async (reports: DailyReport[], period: string): Promise<string> => {
-  const ai = getAiClient();
-  if (!ai) return "Clé API manquante.";
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const prompt = `
     Tu es le superviseur technique de EBF. Voici les rapports des techniciens pour la période : ${period}.
@@ -63,7 +50,7 @@ export const analyzeReports = async (reports: DailyReport[], period: string): Pr
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
     return response.text || "Synthèse indisponible.";
