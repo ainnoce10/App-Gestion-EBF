@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -278,23 +277,11 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
   return true;
 };
 
-// --- Helper: Permission Check (STRICT) ---
+// --- Helper: Permission Check (UNRESTRICTED) ---
 const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  if (role === 'Admin') return { canWrite: true }; // Admin a tous les droits
-  if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
-
-  // Rôles internes spécifiques
-  // Technicien écrit UNIQUEMENT dans /techniciens
-  if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
-  
-  // Magasinier écrit UNIQUEMENT dans /quincaillerie
-  if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
-  
-  // Secrétaire écrit UNIQUEMENT dans /secretariat
-  if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
-  
-  // TOUT LE RESTE (y compris /equipe, /comptabilite pour les non-admins) est strictement Lecture Seule
-  return { canWrite: false };
+  // RESTRICTIONS LEVÉES : TOUT LE MONDE A TOUS LES DROITS
+  // Cela permet à tous les utilisateurs (y compris "Visiteur") d'écrire partout.
+  return { canWrite: true };
 };
 
 // --- EBF Vector Logo (Globe + Plug) ---
@@ -615,7 +602,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         } else {
              // NO SESSION = CONFIRMATION REQUIRED BY SERVER
              setIsSignUp(false);
-             setSuccessMsg("Inscription réussie ! Vérifiez vos emails pour valider le compte avant de vous connecter.");
+             setSuccessMsg("Inscription réussie ! Vérifiez vos emails pour valider le compte.");
         }
 
       } else {
