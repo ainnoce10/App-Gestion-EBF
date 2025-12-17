@@ -61,15 +61,23 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
   const [useCustomDate, setUseCustomDate] = useState(false);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  // Filter Stat Data Logic (Uses standard period)
+  // Filter Stat Data Logic
   const filteredData = useMemo(() => {
     return data.filter(d => {
       const siteMatch = currentSite === Site.GLOBAL || d.site === currentSite;
-      // Pour les stats globales, on garde la logique standard des props
-      const periodMatch = isInPeriod(d.date, currentPeriod);
-      return siteMatch && periodMatch;
+      
+      // Logique de filtrage date
+      let dateMatch = true;
+      if (useCustomDate) {
+        if (dateRange.start && d.date < dateRange.start) dateMatch = false;
+        if (dateRange.end && d.date > dateRange.end) dateMatch = false;
+      } else {
+        dateMatch = isInPeriod(d.date, currentPeriod);
+      }
+
+      return siteMatch && dateMatch;
     });
-  }, [data, currentSite, currentPeriod]);
+  }, [data, currentSite, currentPeriod, useCustomDate, dateRange]);
 
   // Filter Reports Logic (Supports Custom Dates)
   const filteredReports = useMemo(() => {
@@ -107,8 +115,7 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
       if (r.domain && counts.hasOwnProperty(r.domain)) {
         counts[r.domain]++;
       } else if (r.domain) {
-        // Handle variations or 'Autres' if necessary, but focusing on main 4
-        // If domain is not in list, ignore or add to other logic
+        // Handle variations or 'Autres' if necessary
       }
     });
 
@@ -162,7 +169,7 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
     setLoadingReportAi(true);
     // Note: We pass a string description of the period to the AI
     const periodDesc = useCustomDate 
-      ? `du ${dateRange.start} au ${dateRange.end}` 
+      ? `du ${dateRange.start || 'début'} au ${dateRange.end || 'fin'}` 
       : currentPeriod;
       
     analyzeReports(filteredReports, periodDesc)
@@ -206,7 +213,7 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
           {/* Period Filter (Standard vs Custom) */}
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
              <div className="flex items-center gap-2">
-                <label className="flex items-center cursor-pointer relative">
+                <label className="flex items-center cursor-pointer relative select-none">
                   <input type="checkbox" checked={useCustomDate} onChange={() => setUseCustomDate(!useCustomDate)} className="sr-only peer" />
                   <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-ebf-orange"></div>
                   <span className="ml-2 text-sm font-medium text-green-900 dark:text-gray-300">Dates précises</span>
@@ -235,7 +242,7 @@ export const DetailedSynthesis: React.FC<DetailedSynthesisProps> = ({
                         className="pl-8 border-orange-200 border rounded-md p-1.5 text-sm text-green-900 bg-white focus:ring-ebf-orange outline-none"
                       />
                    </div>
-                   <span className="text-gray-400">-</span>
+                   <span className="text-gray-400 font-bold">-</span>
                    <div className="relative">
                       <Calendar className="absolute left-2 top-2.5 text-ebf-orange" size={14} />
                       <input 
