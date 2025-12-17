@@ -1,30 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { StatData, DailyReport } from '../types';
 
-// Fonction utilitaire pour accéder aux variables d'environnement de manière sécurisée
-const getEnv = (key: string) => {
-  try {
-    // @ts-ignore
-    const env = import.meta.env;
-    return env ? env[key] : '';
-  } catch (e) {
-    return '';
-  }
-};
-
-const getAiClient = () => {
-  const apiKey = getEnv('VITE_GOOGLE_API_KEY');
+export const analyzeBusinessData = async (data: StatData[], site: string): Promise<string> => {
+  const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
-    console.warn("VITE_GOOGLE_API_KEY non trouvée. L'IA ne fonctionnera pas.");
-    return null;
+    console.warn("API_KEY not found in environment variables.");
+    return "Clé API manquante ou invalide.";
   }
-  return new GoogleGenAI({ apiKey });
-};
-
-export const analyzeBusinessData = async (data: StatData[], site: string): Promise<string> => {
-  const ai = getAiClient();
-  if (!ai) return "Clé API manquante ou invalide. Configurez VITE_GOOGLE_API_KEY dans Vercel.";
+  
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
     Tu es un expert en business intelligence pour l'entreprise EBF.
@@ -48,8 +33,10 @@ export const analyzeBusinessData = async (data: StatData[], site: string): Promi
 };
 
 export const analyzeReports = async (reports: DailyReport[], period: string): Promise<string> => {
-  const ai = getAiClient();
-  if (!ai) return "Clé API manquante.";
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return "Clé API manquante.";
+
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
     Tu es le superviseur technique de EBF. Voici les rapports des techniciens pour la période : ${period}.
