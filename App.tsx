@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -60,12 +61,22 @@ const FORM_CONFIGS: Record<string, FormConfig> = {
     ]
   },
   stocks: {
-    title: 'Ajouter au Stock',
+    title: 'Ajouter au Stock (Consommable)',
     fields: [
       { name: 'name', label: 'Nom Article', type: 'text' },
       { name: 'quantity', label: 'Quantité', type: 'number' },
       { name: 'unit', label: 'Unité (ex: pcs, m)', type: 'text' },
       { name: 'threshold', label: 'Seuil Alerte', type: 'number' },
+      { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
+    ]
+  },
+  materials: {
+    title: 'Nouveau Matériel (Outillage)',
+    fields: [
+      { name: 'name', label: 'Nom de l\'outil', type: 'text' },
+      { name: 'serialNumber', label: 'N° Série / Réf', type: 'text' },
+      { name: 'condition', label: 'État', type: 'select', options: ['Neuf', 'Bon', 'Usé', 'Panne'] },
+      { name: 'assignedTo', label: 'Affecté à (Technicien)', type: 'text' },
       { name: 'site', label: 'Site', type: 'select', options: ['Abidjan', 'Bouaké'] }
     ]
   },
@@ -213,7 +224,7 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
     },
     { 
       id: 'materiel', 
-      label: 'Matériel', 
+      label: 'Matériel & Outils', 
       description: 'Inventaire & Affectation', 
       managedBy: 'Géré par le Magasinier',
       icon: Truck, 
@@ -279,14 +290,11 @@ const isInPeriod = (dateStr: string, period: Period): boolean => {
 
 // --- Helper: Permission Check (UNRESTRICTED) ---
 const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  // RESTRICTIONS LEVÉES : TOUT LE MONDE A TOUS LES DROITS
-  // Cela permet à tous les utilisateurs (y compris "Visiteur") d'écrire partout.
   return { canWrite: true };
 };
 
 // --- EBF Vector Logo (Globe + Plug) ---
 const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
-    // Scaling factor
     const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
     const width = 200 * scale;
     const height = 100 * scale;
@@ -299,30 +307,18 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
                     <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
                 </linearGradient>
             </defs>
-            {/* Globe */}
             <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
-            {/* Continents (Stylized) */}
             <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
             <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
-            
-            {/* Cord */}
             <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
-            
-            {/* Plug - SQUARE (rx=0) */}
             <rect x="70" y="20" width="20" height="25" rx="0" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
             <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
-            
-            {/* Cord Line */}
             <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
-            
-            {/* E.B.F Letters */}
             <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
             <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
             <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
             <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
             <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
-            
-            {/* Banner Text */}
             <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
             <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
                 Electricité - Bâtiment - Froid
@@ -333,12 +329,9 @@ const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
 
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
   const [imgError, setImgError] = useState(false);
-  
-  // Fallback to SVG if image fails
   if (imgError) {
       return <EbfSvgLogo size={size} />;
   }
-
   return (
     <div className="flex items-center justify-center">
         <img 
@@ -355,9 +348,7 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
 const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
     // Basic filtering based on Site and Date if available in items
     const filteredItems = items.filter((item: any) => {
-        // Site filter
         if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
-        // Period filter (only if item has a date)
         if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
         return true;
     });
@@ -408,9 +399,10 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                             </p>
                                             {item.clientPhone && <p className="text-xs text-gray-500">{item.clientPhone}</p>}
                                             {item.role && <p className="text-xs text-gray-500">{item.role}</p>}
+                                            {item.serialNumber && <p className="text-xs text-gray-500 font-mono">S/N: {item.serialNumber}</p>}
                                         </td>
                                         <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
-                                            {item.description || item.specialty || item.unit || item.category || item.supplier || '-'}
+                                            {item.description || item.specialty || item.unit || item.category || item.supplier || item.condition || '-'}
                                             {item.date && <span className="block text-xs text-gray-400">{item.date}</span>}
                                         </td>
                                         <td className="p-4">
@@ -428,8 +420,8 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                                     {item.status}
                                                 </span>
                                             ) : (
-                                                <span className={`font-bold ${item.quantity <= (item.threshold || 0) ? 'text-red-500' : 'text-gray-800'}`}>
-                                                    {item.quantity} {item.unit}
+                                                <span className={`font-bold ${(item.quantity !== undefined && item.quantity <= (item.threshold || 0)) ? 'text-red-500' : 'text-gray-800'}`}>
+                                                    {item.quantity !== undefined ? `${item.quantity} ${item.unit}` : (item.assignedTo || 'Non affecté')}
                                                 </span>
                                             )}
                                         </td>
@@ -449,7 +441,9 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
     );
 };
 
-// --- Report Mode Selector ---
+// ... ReportModeSelector, HelpModal, LoginScreen, OnboardingFlow, LoadingScreen, ConfirmationModal, AddModal, FlashInfoModal, ProfileModal, HeaderWithNotif components remain unchanged ...
+// (Omitting for brevity as they don't change, but in a real file update, they would be here or imported)
+
 const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readOnly }: any) => {
     return (
         <div className="space-y-8 animate-fade-in">
@@ -507,7 +501,6 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     );
 };
 
-// --- Help Modal ---
 const HelpModal = ({ isOpen, onClose }: any) => {
     if (!isOpen) return null;
     return (
@@ -529,7 +522,6 @@ const HelpModal = ({ isOpen, onClose }: any) => {
     );
 };
 
-// --- Login Screen (Redesigned - Rich & Vibrant) ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
@@ -571,7 +563,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
         if (signUpResp.error) throw signUpResp.error;
 
-        // CRITICAL: Check if we have a session immediately
         if (signUpResp.data.session) {
              const userId = signUpResp.data.user?.id;
              if (userId) {
@@ -596,11 +587,9 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      }]);
                  }
              }
-             // DIRECT SUCCESS LOGIN
              onLoginSuccess();
              return; 
         } else {
-             // NO SESSION = CONFIRMATION REQUIRED BY SERVER
              setIsSignUp(false);
              setSuccessMsg("Inscription réussie ! Vérifiez vos emails pour valider le compte.");
         }
@@ -616,7 +605,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
     } catch (err: any) {
         console.error("Auth Error:", err);
         let userMsg = "Une erreur technique est survenue.";
-        // Normalize error message
         const msg = err.message || err.error_description || JSON.stringify(err);
 
         if (msg.includes("Invalid login credentials") || msg.includes("invalid_grant")) {
@@ -637,7 +625,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
 
         setError(userMsg);
     } finally {
-      setLoading(false); // STOP LOADING IN ALL CASES
+      setLoading(false);
     }
   };
 
@@ -646,7 +634,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-orange-500/10 pointer-events-none"></div>
        <div className="glass-panel p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md relative overflow-hidden animate-fade-in border-t-4 border-ebf-orange">
           <div className="flex flex-col items-center mb-8">
-             {/* Logo SANS rounded-full - Square container */}
              <div className="bg-white p-4 shadow-lg mb-4">
                  <EbfLogo size="normal" />
              </div>
@@ -727,7 +714,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
                      setIsSignUp(false);
                  } else if (successMsg && successMsg.includes("Inscription réussie")) {
                      setSuccessMsg('');
-                     // Keep on login screen
                  } else {
                      setIsSignUp(!isSignUp); 
                      setIsResetMode(false); 
@@ -744,7 +730,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
   );
 };
 
-// --- Onboarding Flow ---
 const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => void }) => {
   const [step, setStep] = useState<'message' | 'biometric'>('message');
   const [error, setError] = useState('');
@@ -818,7 +803,6 @@ const OnboardingFlow = ({ role, onComplete }: { role: string, onComplete: () => 
   );
 };
 
-// --- Loading Screen ---
 const LoadingScreen = () => (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-ebf-pattern">
         <div className="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center backdrop-blur-sm border border-gray-100">
@@ -828,7 +812,6 @@ const LoadingScreen = () => (
     </div>
 );
 
-// --- Confirmation Modal ---
 const ConfirmationModal = ({ 
   isOpen, onClose, onConfirm, title, message 
 }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, title: string, message: string }) => {
@@ -851,7 +834,6 @@ const ConfirmationModal = ({
   );
 };
 
-// --- Add Item Modal (Generic) ---
 const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
   const [formData, setFormData] = useState<any>({});
 
@@ -909,7 +891,6 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
   );
 };
 
-// --- Flash Info Configuration Modal ---
 const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMessage }: any) => {
     const [newMessage, setNewMessage] = useState({ text: '', type: 'info' });
     
@@ -984,7 +965,6 @@ const FlashInfoModal = ({ isOpen, onClose, messages, onSaveMessage, onDeleteMess
     );
 };
 
-// --- Profile Modal ---
 const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   const [formData, setFormData] = useState({ full_name: '', email: '', phone: '' });
   const [loading, setLoading] = useState(false);
@@ -1022,7 +1002,6 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   );
 };
 
-// --- HEADER WITH NOTIFICATIONS ---
 const HeaderWithNotif = ({ 
   title, onMenuClick, onLogout, onOpenFlashInfo, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
 }: any) => {
@@ -1151,6 +1130,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [stats, setStats] = useState<StatData[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]); // New State for Tools
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -1217,6 +1197,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       if (intervData) setInterventions(intervData);
       const { data: stockData } = await supabase.from('stocks').select('*');
       if (stockData) setStock(stockData);
+      const { data: matData } = await supabase.from('materials').select('*');
+      if (matData) setMaterials(matData);
       const { data: techData } = await supabase.from('technicians').select('*');
       if (techData) setTechnicians(techData);
       const { data: reportsData } = await supabase.from('reports').select('*');
@@ -1266,6 +1248,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     const channels = supabase.channel('realtime-ebf')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, (payload) => updateState(setInterventions, payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stocks' }, (payload) => updateState(setStock, payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, (payload) => updateState(setMaterials, payload))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technicians' }, (payload) => updateState(setTechnicians, payload))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
           updateState(setReports, payload);
       })
@@ -1296,11 +1280,9 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   }, []);
 
   // --- REAL-TIME AGGREGATION LOGIC ---
-  // Calculates stats dynamically from Reports and Transactions
   const realTimeStats = useMemo(() => {
     const statsMap = new Map<string, StatData>();
 
-    // 1. Process Reports (Revenue/Expenses/Interventions)
     reports.forEach(report => {
         if (!report.date) return;
         const key = `${report.date}_${report.site || 'Global'}`;
@@ -1323,7 +1305,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         stat.interventions += 1;
     });
 
-    // 2. Process Transactions (Revenue/Expenses from Accounting)
     transactions.forEach(trans => {
         if (!trans.date) return;
         const key = `${trans.date}_${trans.site || 'Global'}`;
@@ -1348,7 +1329,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         }
     });
 
-    // 3. Finalize Profit Calculation & Sort
     return Array.from(statsMap.values()).map(stat => ({
         ...stat,
         profit: stat.revenue - stat.expenses
@@ -1413,7 +1393,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const renderContent = () => {
-     // MODIFICATION CRITIQUE: On passe 'realTimeStats' au lieu de 'stats' (qui venait de la table daily_stats)
      if (currentPath === '/') return <Dashboard data={realTimeStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
      if (currentPath === '/synthesis') return <DetailedSynthesis data={realTimeStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
      
@@ -1437,8 +1416,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      // Existing Routes
      if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} readOnly={!canWrite} />;
      if (currentPath === '/techniciens/rapports') return <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else alert("Rapport vocal pas encore disponible."); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />;
-     if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
+     if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel & Outils" subtitle="Inventaire Outillage" items={materials} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" currentSite={currentSite} onAdd={() => handleOpenAdd('materials')} onDelete={(item: any) => handleOpenDelete(item, 'materials')} readOnly={!canWrite} />;
+     if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire Consommables" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
      if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} readOnly={!canWrite} />;
 
      // NEWLY CONFIGURED ROUTES (ACTIVE)
