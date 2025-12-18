@@ -205,70 +205,12 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
     { 
       id: 'rapports', 
       label: 'Rapports Journaliers', 
-      // --- Profile Modal ---
-      const ProfileModal = ({ isOpen, onClose, profile }: any) => {
-        const [formData, setFormData] = useState({ full_name: '', email: '', phone: '' });
-        const [loading, setLoading] = useState(false);
-
-        useEffect(() => {
-          if (isOpen && profile) {
-            setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
-          }
-        }, [isOpen, profile]);
-
-        const saveProfile = async () => {
-          if (!profile || !profile.id) {
-            alert('Profil introuvable.');
-            return;
-          }
-          setLoading(true);
-          try {
-            const up = { id: profile.id, full_name: formData.full_name, email: formData.email, phone: formData.phone };
-            const { error } = await supabase.from('profiles').upsert([up]);
-            if (error) {
-              alert('Erreur sauvegarde profil: ' + error.message);
-            } else {
-              alert('Profil mis à jour.');
-              onClose();
-            }
-          } catch (e: any) {
-            alert('Erreur: ' + (e.message || e));
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        if (!isOpen) return null;
-        return (
-          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/60" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Modifier le profil</h3>
-                <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nom complet</label>
-                  <input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border p-2 rounded" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
-                  <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border p-2 rounded" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Téléphone</label>
-                  <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border p-2 rounded" />
-                </div>
-              </div>
-              <div className="mt-6 flex gap-3">
-                <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
-                <button onClick={saveProfile} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600">{loading ? 'Enregistrement…' : 'Enregistrer'}</button>
-              </div>
-            </div>
-          </div>
-        );
-      };
+      description: 'Vocal ou Formulaire détaillé', 
+      managedBy: 'Géré par les Techniciens',
+      icon: FileText, 
+      path: '/techniciens/rapports', 
+      color: 'bg-gray-700' 
+    },
             <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
             
             {/* E.B.F Letters */}
@@ -1182,77 +1124,64 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (profile) setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
-  }, [profile, isOpen]);
+    if (isOpen && profile) {
+      setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
+    }
+  }, [isOpen, profile]);
 
-  const confirmAdd = async (formData: any) => {
-      if (!crudTarget) return;
-      setCrudLoading(true);
-      if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
-      const config = FORM_CONFIGS[crudTarget];
-      const processedData = { ...formData };
-      if (config) config.fields.forEach(f => { if (f.type === 'number' && processedData[f.name]) processedData[f.name] = Number(processedData[f.name]); });
-      try {
-        if (itemToEdit) {
-          // update
-          const { data, error } = await supabase.from(crudTarget).update(processedData).eq('id', itemToEdit.id).select().single();
-          setCrudLoading(false);
-          if (error) {
-            console.error('Update error', error);
-            alert('Erreur mise à jour: ' + (error.message || JSON.stringify(error)));
-          } else {
-            // update local state for immediate UI feedback
-            switch (crudTarget) {
-              case 'stocks': setStock(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'technicians': setTechnicians(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'interventions': setInterventions(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'reports': setReports(prev => [data, ...prev.filter((r:any)=>r.id!==data.id)]); break;
-              case 'chantiers': setChantiers(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'transactions': setTransactions(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'employees': setEmployees(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'payrolls': setPayrolls(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'clients': setClients(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'caisse': setCaisse(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'suppliers': setSuppliers(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              case 'purchases': setPurchases(prev => prev.map(s => s.id === data.id ? data : s)); break;
-              default: break;
-            }
-            setIsAddOpen(false);
-            setItemToEdit(null);
-          }
-        } else {
-          const { data, error } = await supabase.from(crudTarget).insert([processedData]).select().single();
-          setCrudLoading(false);
-          if (error) {
-            console.error('Insert error', error);
-            alert('Erreur insertion: ' + (error.message || JSON.stringify(error)));
-          } else {
-            // add to local state for immediate UI feedback
-            switch (crudTarget) {
-              case 'stocks': setStock(prev => [data, ...prev]); break;
-              case 'technicians': setTechnicians(prev => [data, ...prev]); break;
-              case 'interventions': setInterventions(prev => [data, ...prev]); break;
-              case 'reports': setReports(prev => [data, ...prev]); break;
-              case 'chantiers': setChantiers(prev => [data, ...prev]); break;
-              case 'transactions': setTransactions(prev => [data, ...prev]); break;
-              case 'employees': setEmployees(prev => [data, ...prev]); break;
-              case 'payrolls': setPayrolls(prev => [data, ...prev]); break;
-              case 'clients': setClients(prev => [data, ...prev]); break;
-              case 'caisse': setCaisse(prev => [data, ...prev]); break;
-              case 'suppliers': setSuppliers(prev => [data, ...prev]); break;
-              case 'purchases': setPurchases(prev => [data, ...prev]); break;
-              default: break;
-            }
-            setIsAddOpen(false);
-            setItemToEdit(null);
-          }
-        }
-      } catch (e: any) {
-        setCrudLoading(false);
-        console.error('confirmAdd error', e);
-        alert('Erreur inattendue: ' + (e.message || JSON.stringify(e)));
+  const saveProfile = async () => {
+    if (!profile || !profile.id) {
+      alert('Profil introuvable.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const up = { id: profile.id, full_name: formData.full_name, email: formData.email, phone: formData.phone };
+      const { error } = await supabase.from('profiles').upsert([up]);
+      if (error) {
+        alert('Erreur sauvegarde profil: ' + error.message);
+      } else {
+        alert('Profil mis à jour.');
+        onClose();
       }
+    } catch (e: any) {
+      alert('Erreur: ' + (e.message || e));
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gray-900/60" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Modifier le profil</h3>
+          <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Nom complet</label>
+            <input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border p-2 rounded" />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+            <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border p-2 rounded" />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Téléphone</label>
+            <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border p-2 rounded" />
+          </div>
+        </div>
+        <div className="mt-6 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
+          <button onClick={saveProfile} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600">{loading ? 'Enregistrement…' : 'Enregistrer'}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
                      <Bell />
                      {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-sm">{unreadCount}</span>}
                  </button>
