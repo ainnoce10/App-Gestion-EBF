@@ -52,24 +52,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   // --- LOGIC: SCAN STOCK FOR ALERTS ---
+  // Analyse des stocks en temps réel pour injecter des alertes dans le ticker
   const combinedTickerMessages = useMemo(() => {
+    // 1. Identifier les stocks critiques
     const stockAlerts: TickerMessage[] = stock
       .filter(item => {
+        // Filtre par site si nécessaire : Global voit tout, sinon filtre par site
         const isSiteRelevant = currentSite === Site.GLOBAL || item.site === currentSite;
+        // Condition d'alerte : Quantité <= Seuil
         return isSiteRelevant && item.quantity <= item.threshold;
       })
       .map(item => ({
         id: `stock-alert-${item.id}`,
+        // Message clair avec icône alerte
         text: `⚠️ STOCK CRITIQUE : ${item.name} (${item.quantity} ${item.unit} restants) à ${item.site}`,
         type: 'alert',
-        display_order: 0,
+        display_order: 0, // Priorité haute pour apparaître en premier
         isManual: false
       }));
 
+    // 2. Fusionner avec les messages existants (Flash Info Auto & Manuel passés via props)
+    // Les alertes stock sont placées en premier
     return [...stockAlerts, ...tickerMessages];
   }, [stock, tickerMessages, currentSite]);
 
-  // Filter Data Logic (Robust Date Handling)
+  // Filter Data Logic
   const filteredData = useMemo(() => {
     return data.filter(d => {
       // 1. Site Filter
@@ -82,30 +89,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (dateRange.start && d.date < dateRange.start) matchPeriod = false;
         if (dateRange.end && d.date > dateRange.end) matchPeriod = false;
       } else {
-        // Use String comparison to avoid Timezone issues (YYYY-MM-DD)
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0]; 
-        const currentMonthPrefix = todayStr.substring(0, 7); 
-        const currentYearPrefix = todayStr.substring(0, 4);
+        const date = new Date(d.date);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
         if (currentPeriod === Period.DAY) {
-           matchPeriod = d.date === todayStr;
+          matchPeriod = itemDate.getTime() === today.getTime();
         } else if (currentPeriod === Period.WEEK) {
-           const dDate = new Date(d.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay(); // 0 (Sun) to 6 (Sat)
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           
-           // Normalize comparison
-           matchPeriod = dDate >= monday && dDate <= sunday;
+          const oneWeekAgo = new Date(today);
+          oneWeekAgo.setDate(today.getDate() - 7);
+          matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
         } else if (currentPeriod === Period.MONTH) {
-           matchPeriod = d.date.startsWith(currentMonthPrefix);
+          matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         } else if (currentPeriod === Period.YEAR) {
-           matchPeriod = d.date.startsWith(currentYearPrefix);
+          matchPeriod = date.getFullYear() === now.getFullYear();
         }
       }
 
@@ -113,48 +111,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [data, currentSite, currentPeriod, useCustomDate, dateRange]);
 
-  // --- CHART AGGREGATION LOGIC ---
-  // Transforme les données filtrées en une seule entrée globale pour la période sélectionnée
-  const aggregatedChartData = useMemo(() => {
-    if (filteredData.length === 0) return [];
-
-    const totals = filteredData.reduce((acc, curr) => ({
-      revenue: acc.revenue + curr.revenue,
-      expenses: acc.expenses + curr.expenses,
-      profit: acc.profit + curr.profit,
-      interventions: acc.interventions + curr.interventions
-    }), { revenue: 0, expenses: 0, profit: 0, interventions: 0 });
-
-    let label = "";
-    
-    if (useCustomDate) {
-       const startStr = dateRange.start ? new Date(dateRange.start).toLocaleDateString('fr-FR') : '?';
-       const endStr = dateRange.end ? new Date(dateRange.end).toLocaleDateString('fr-FR') : '?';
-       label = `Période (${startStr} - ${endStr})`;
-    } else {
-        const today = new Date();
-        if (currentPeriod === Period.DAY) {
-            // Pour le jour, on affiche la date exacte
-            label = today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-        } else if (currentPeriod === Period.WEEK) {
-            label = "Cette Semaine";
-        } else if (currentPeriod === Period.MONTH) {
-            label = today.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-            // Capitalize Month
-            label = label.charAt(0).toUpperCase() + label.slice(1);
-        } else if (currentPeriod === Period.YEAR) {
-            label = `Année ${today.getFullYear()}`;
-        }
-    }
-
-    return [{
-        date: label, // Clé utilisée par le XAxis
-        ...totals
-    }];
-  }, [filteredData, currentPeriod, useCustomDate, dateRange]);
-
-
-  // Filter Reports Logic (Robust Date Handling)
+  // Filter Reports Logic
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
       const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
@@ -165,27 +122,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
         if (dateRange.start && r.date < dateRange.start) matchPeriod = false;
         if (dateRange.end && r.date > dateRange.end) matchPeriod = false;
       } else {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const currentMonthPrefix = todayStr.substring(0, 7);
-        const currentYearPrefix = todayStr.substring(0, 4);
+        const date = new Date(r.date);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
         if (currentPeriod === Period.DAY) {
-           matchPeriod = r.date === todayStr;
+          matchPeriod = itemDate.getTime() === today.getTime();
         } else if (currentPeriod === Period.WEEK) {
-           const rDate = new Date(r.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay();
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           matchPeriod = rDate >= monday && rDate <= sunday;
+          const oneWeekAgo = new Date(today);
+          oneWeekAgo.setDate(today.getDate() - 7);
+          matchPeriod = itemDate >= oneWeekAgo && itemDate <= today;
         } else if (currentPeriod === Period.MONTH) {
-           matchPeriod = r.date.startsWith(currentMonthPrefix);
+          matchPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         } else if (currentPeriod === Period.YEAR) {
-           matchPeriod = r.date.startsWith(currentYearPrefix);
+          matchPeriod = date.getFullYear() === now.getFullYear();
         }
       }
 
@@ -472,32 +423,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {/* Main Single Histogram - AGGREGATED VIEW */}
+        {/* Main Single Histogram - MIS À JOUR: CA vs Dépenses vs Bénéfice */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-orange-100 dark:border-gray-700 border-t-4 border-gray-500">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-green-900 dark:text-white flex items-center">
               <TrendingUp className="mr-2 text-ebf-orange" size={20} />
               Performance Globale (CA vs Dépenses vs Bénéfice)
             </h3>
-            <span className="text-xs text-orange-600 font-bold bg-orange-50 border border-orange-100 px-2 py-1 rounded">Vue globale</span>
+            <span className="text-xs text-orange-600 font-bold bg-orange-50 border border-orange-100 px-2 py-1 rounded">Vue temps réel</span>
           </div>
           <div className="h-96 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              {aggregatedChartData.length > 0 ? (
-                <BarChart data={aggregatedChartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+              {filteredData.length > 0 ? (
+                <BarChart data={filteredData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="date" tick={{fontSize: 12, fill: '#14532d'}} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" orientation="left" stroke="#14532d" tickFormatter={(value) => `${(value / 1000).toFixed(0)}k F`} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" orientation="left" stroke="#14532d" tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
                   <Tooltip 
                     cursor={{fill: '#fff7ed'}}
                     contentStyle={{ borderRadius: '12px', border: '1px solid #fed7aa', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', color: '#14532d' }}
                     formatter={(value: number) => [`${value.toLocaleString()} FCFA`]}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={50} />
-                  <Bar yAxisId="left" dataKey="expenses" name="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={50} />
-                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={50}>
-                     {aggregatedChartData.map((entry, index) => (
+                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25} />
+                  <Bar yAxisId="left" dataKey="expenses" name="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={25} />
+                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={25}>
+                     {filteredData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#228B22' : '#ef4444'} />
                      ))}
                   </Bar>
