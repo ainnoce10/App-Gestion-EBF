@@ -507,6 +507,79 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     );
 };
 
+// --- Voice Recorder Modal ---
+const VoiceRecorderModal = ({ isOpen, onClose }: any) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    let streamRef: MediaStream | null = null;
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef = stream;
+        const mr = new MediaRecorder(stream as MediaStream);
+        mediaRecorderRef.current = mr;
+        audioChunksRef.current = [];
+        mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+        mr.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const url = URL.createObjectURL(blob);
+          setAudioUrl(url);
+        };
+        mr.start();
+        setIsRecording(true);
+      } catch (err: any) {
+        alert("Impossible d'accéder au microphone : " + (err && err.message ? err.message : err));
+        onClose();
+      }
+    };
+    start();
+    return () => {
+      try {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+        if (streamRef) streamRef.getTracks().forEach(t => t.stop());
+      } catch (e) {}
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={() => {
+        if (isRecording) {
+          // Ask before closing while recording
+          if (confirm("Arrêter l'enregistrement et fermer ?")) {
+            mediaRecorderRef.current?.stop();
+            setIsRecording(false);
+            onClose();
+          }
+        } else {
+          onClose();
+        }
+      }} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-blue-500">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold flex items-center gap-2"><Mic className="text-blue-500"/> Enregistrement Vocal</h3>
+          <button onClick={() => { if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); } else onClose(); }}><X className="text-gray-400 hover:text-red-500"/></button>
+        </div>
+        <div className="text-center py-6">
+          <p className="font-bold text-lg">{isRecording ? 'Enregistrement en cours…' : 'Enregistrement arrêté'}</p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            {isRecording ? (
+              <button onClick={() => { mediaRecorderRef.current?.stop(); setIsRecording(false); }} className="px-4 py-2 bg-red-500 text-white rounded">Arrêter</button>
+            ) : (
+              <button onClick={() => { setIsRecording(false); setAudioUrl(null); /* reopen to restart */ setTimeout(() => setIsVoiceOpen(true), 50); onClose(); }} className="px-4 py-2 bg-green-500 text-white rounded">Relancer</button>
+            )}
+            <a className={`${audioUrl ? '' : 'hidden'}`} href={audioUrl || '#'} download="rapport.webm"><button className="px-4 py-2 bg-gray-100 rounded border">Télécharger</button></a>
+          </div>
+          {audioUrl && <audio className="mt-4 w-full" controls src={audioUrl} />}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Help Modal ---
 const HelpModal = ({ isOpen, onClose }: any) => {
     if (!isOpen) return null;
@@ -1172,6 +1245,11 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [crudTarget, setCrudTarget] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
@@ -1436,7 +1514,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
      // Existing Routes
      if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} readOnly={!canWrite} />;
-     if (currentPath === '/techniciens/rapports') return <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else alert("Rapport vocal pas encore disponible."); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />;
+     if (currentPath === '/techniciens/rapports') return <>
+       <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else setIsVoiceOpen(true); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />
+       <VoiceRecorderModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} />
+     </>;
      if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
      if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
      if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} readOnly={!canWrite} />;
