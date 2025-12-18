@@ -205,114 +205,70 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
     { 
       id: 'rapports', 
       label: 'Rapports Journaliers', 
-      description: 'Vocal ou Formulaire détaillé', 
-      managedBy: 'Géré par les Techniciens',
-      icon: FileText, 
-      path: '/techniciens/rapports', 
-      color: 'bg-gray-700' 
-    },
-    { 
-      id: 'materiel', 
-      label: 'Matériel', 
-      description: 'Inventaire & Affectation', 
-      managedBy: 'Géré par le Magasinier',
-      icon: Truck, 
-      path: '/techniciens/materiel', 
-      color: 'bg-blue-600' 
-    },
-    { 
-      id: 'chantiers', 
-      label: 'Chantiers', 
-      description: 'Suivi & Exécution', 
-      managedBy: 'Géré par le Chef de Chantier',
-      icon: ShieldCheck, 
-      path: '/techniciens/chantiers', 
-      color: 'bg-green-600' 
-    },
-  ],
-  comptabilite: [
-    { id: 'bilan', label: 'Bilan Financier', description: 'Journal des transactions', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600' },
-    { id: 'rh', label: 'Ressources Humaines', description: 'Dossiers du personnel', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600' },
-    { id: 'paie', label: 'Paie & Salaires', description: 'Gestion des virements mensuels', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500' },
-  ],
-  secretariat: [
-    { id: 'planning', label: 'Planning', description: 'Agenda des équipes et rdv', icon: Calendar, path: '/secretariat/planning', color: 'bg-indigo-500' },
-    { id: 'clients', label: 'Gestion Clients', description: 'Base de données CRM', icon: UserCheck, path: '/secretariat/clients', color: 'bg-blue-500' },
-    { id: 'caisse', label: 'Caisse Menu', description: 'Suivi de la petite caisse', icon: Archive, path: '/secretariat/caisse', color: 'bg-gray-600' },
-  ],
-  quincaillerie: [
-    { id: 'stocks', label: 'Stocks', description: 'État des stocks en temps réel', icon: ClipboardList, path: '/quincaillerie/stocks', color: 'bg-orange-600' },
-    { id: 'fournisseurs', label: 'Fournisseurs', description: 'Liste et contacts partenaires', icon: Truck, path: '/quincaillerie/fournisseurs', color: 'bg-green-600' },
-    { id: 'achats', label: 'Bons d\'achat', description: 'Historique des commandes', icon: FileText, path: '/quincaillerie/achats', color: 'bg-red-500' },
-  ]
-};
+      // --- Profile Modal ---
+      const ProfileModal = ({ isOpen, onClose, profile }: any) => {
+        const [formData, setFormData] = useState({ full_name: '', email: '', phone: '' });
+        const [loading, setLoading] = useState(false);
 
-// --- Helper: Date Filter ---
-const isInPeriod = (dateStr: string, period: Period): boolean => {
-  if (!dateStr) return false;
-  const date = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        useEffect(() => {
+          if (isOpen && profile) {
+            setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
+          }
+        }, [isOpen, profile]);
 
-  if (period === Period.DAY) {
-    return itemDate.getTime() === today.getTime();
-  } else if (period === Period.WEEK) {
-    const day = today.getDay();
-    const diffToMonday = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today);
-    monday.setDate(diffToMonday);
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-    monday.setHours(0,0,0,0);
-    friday.setHours(23,59,59,999);
-    const itemDay = date.getDay();
-    if (itemDay === 0 || itemDay === 6) return false;
-    return itemDate >= monday && itemDate <= friday;
-  } else if (period === Period.MONTH) {
-    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-  } else if (period === Period.YEAR) {
-    return date.getFullYear() === now.getFullYear();
-  }
-  return true;
-};
+        const saveProfile = async () => {
+          if (!profile || !profile.id) {
+            alert('Profil introuvable.');
+            return;
+          }
+          setLoading(true);
+          try {
+            const up = { id: profile.id, full_name: formData.full_name, email: formData.email, phone: formData.phone };
+            const { error } = await supabase.from('profiles').upsert([up]);
+            if (error) {
+              alert('Erreur sauvegarde profil: ' + error.message);
+            } else {
+              alert('Profil mis à jour.');
+              onClose();
+            }
+          } catch (e: any) {
+            alert('Erreur: ' + (e.message || e));
+          } finally {
+            setLoading(false);
+          }
+        };
 
-// --- Helper: Permission Check (UNRESTRICTED) ---
-const getPermission = (path: string, role: Role): { canWrite: boolean } => {
-  // RESTRICTIONS LEVÉES : TOUT LE MONDE A TOUS LES DROITS
-  // Cela permet à tous les utilisateurs (y compris "Visiteur") d'écrire partout.
-  return { canWrite: true };
-};
-
-// --- EBF Vector Logo (Globe + Plug) ---
-const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
-    // Scaling factor
-    const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
-    const width = 200 * scale;
-    const height = 100 * scale;
-    
-    return (
-        <svg width={width} height={height} viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{stopColor:'#3b82f6', stopOpacity:1}} />
-                    <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
-                </linearGradient>
-            </defs>
-            {/* Globe */}
-            <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
-            {/* Continents (Stylized) */}
-            <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
-            <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
-            
-            {/* Cord */}
-            <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
-            
-            {/* Plug - SQUARE (rx=0) */}
-            <rect x="70" y="20" width="20" height="25" rx="0" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
-            <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
-            
-            {/* Cord Line */}
+        if (!isOpen) return null;
+        return (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/60" onClick={onClose} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Modifier le profil</h3>
+                <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Nom complet</label>
+                  <input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border p-2 rounded" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                  <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border p-2 rounded" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Téléphone</label>
+                  <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border p-2 rounded" />
+                </div>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
+                <button onClick={saveProfile} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600">{loading ? 'Enregistrement…' : 'Enregistrer'}</button>
+              </div>
+            </div>
+          </div>
+        );
+      };
             <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
             
             {/* E.B.F Letters */}
