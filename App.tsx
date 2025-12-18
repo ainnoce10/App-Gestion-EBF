@@ -507,51 +507,87 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     );
 };
 
-// --- Voice Recorder Modal ---
+// --- Voice Recorder Modal (self-contained) ---
 const VoiceRecorderModal = ({ isOpen, onClose }: any) => {
+  const [isRecordingLocal, setIsRecordingLocal] = useState(false);
+  const mediaRecorderLocal = useRef<MediaRecorder | null>(null);
+  const audioChunksLocal = useRef<Blob[]>([]);
+  const [audioUrlLocal, setAudioUrlLocal] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     let streamRef: MediaStream | null = null;
-    const start = async () => {
+
+    const startRecording = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef = stream;
         const mr = new MediaRecorder(stream as MediaStream);
-        mediaRecorderRef.current = mr;
-        audioChunksRef.current = [];
-        mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data); };
+        mediaRecorderLocal.current = mr;
+        audioChunksLocal.current = [];
+        mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) audioChunksLocal.current.push(e.data); };
         mr.onstop = () => {
-          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const blob = new Blob(audioChunksLocal.current, { type: 'audio/webm' });
           const url = URL.createObjectURL(blob);
-          setAudioUrl(url);
+          setAudioUrlLocal(url);
         };
         mr.start();
-        setIsRecording(true);
+        setIsRecordingLocal(true);
       } catch (err: any) {
         alert("Impossible d'accéder au microphone : " + (err && err.message ? err.message : err));
         onClose();
       }
     };
-    start();
+
+    startRecording();
+
     return () => {
       try {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+        if (mediaRecorderLocal.current && mediaRecorderLocal.current.state !== 'inactive') mediaRecorderLocal.current.stop();
         if (streamRef) streamRef.getTracks().forEach(t => t.stop());
       } catch (e) {}
-      mediaRecorderRef.current = null;
-      setIsRecording(false);
+      mediaRecorderLocal.current = null;
+      setIsRecordingLocal(false);
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
+
+  const stopRecording = () => {
+    if (mediaRecorderLocal.current && mediaRecorderLocal.current.state !== 'inactive') {
+      mediaRecorderLocal.current.stop();
+    }
+    setIsRecordingLocal(false);
+  };
+
+  const restartRecording = async () => {
+    // stop existing
+    try { if (mediaRecorderLocal.current && mediaRecorderLocal.current.state !== 'inactive') mediaRecorderLocal.current.stop(); } catch (e) {}
+    setAudioUrlLocal(null);
+    // start again by simulating unmount/mount: call getUserMedia again
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream as MediaStream);
+      mediaRecorderLocal.current = mr;
+      audioChunksLocal.current = [];
+      mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) audioChunksLocal.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksLocal.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setAudioUrlLocal(url);
+      };
+      mr.start();
+      setIsRecordingLocal(true);
+    } catch (err: any) {
+      alert("Impossible de relancer l'enregistrement : " + (err && err.message ? err.message : err));
+    }
+  };
 
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={() => {
-        if (isRecording) {
-          // Ask before closing while recording
+        if (isRecordingLocal) {
           if (confirm("Arrêter l'enregistrement et fermer ?")) {
-            mediaRecorderRef.current?.stop();
-            setIsRecording(false);
+            stopRecording();
             onClose();
           }
         } else {
@@ -561,19 +597,19 @@ const VoiceRecorderModal = ({ isOpen, onClose }: any) => {
       <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-blue-500">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold flex items-center gap-2"><Mic className="text-blue-500"/> Enregistrement Vocal</h3>
-          <button onClick={() => { if (isRecording) { mediaRecorderRef.current?.stop(); setIsRecording(false); } else onClose(); }}><X className="text-gray-400 hover:text-red-500"/></button>
+          <button onClick={() => { if (isRecordingLocal) { stopRecording(); } else onClose(); }}><X className="text-gray-400 hover:text-red-500"/></button>
         </div>
         <div className="text-center py-6">
-          <p className="font-bold text-lg">{isRecording ? 'Enregistrement en cours…' : 'Enregistrement arrêté'}</p>
+          <p className="font-bold text-lg">{isRecordingLocal ? 'Enregistrement en cours…' : 'Enregistrement arrêté'}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            {isRecording ? (
-              <button onClick={() => { mediaRecorderRef.current?.stop(); setIsRecording(false); }} className="px-4 py-2 bg-red-500 text-white rounded">Arrêter</button>
+            {isRecordingLocal ? (
+              <button onClick={stopRecording} className="px-4 py-2 bg-red-500 text-white rounded">Arrêter</button>
             ) : (
-              <button onClick={() => { setIsRecording(false); setAudioUrl(null); /* reopen to restart */ setTimeout(() => setIsVoiceOpen(true), 50); onClose(); }} className="px-4 py-2 bg-green-500 text-white rounded">Relancer</button>
+              <button onClick={restartRecording} className="px-4 py-2 bg-green-500 text-white rounded">Relancer</button>
             )}
-            <a className={`${audioUrl ? '' : 'hidden'}`} href={audioUrl || '#'} download="rapport.webm"><button className="px-4 py-2 bg-gray-100 rounded border">Télécharger</button></a>
+            <a className={`${audioUrlLocal ? '' : 'hidden'}`} href={audioUrlLocal || '#'} download="rapport.webm"><button className="px-4 py-2 bg-gray-100 rounded border">Télécharger</button></a>
           </div>
-          {audioUrl && <audio className="mt-4 w-full" controls src={audioUrl} />}
+          {audioUrlLocal && <audio className="mt-4 w-full" controls src={audioUrlLocal} />}
         </div>
       </div>
     </div>
@@ -1246,10 +1282,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [crudTarget, setCrudTarget] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
