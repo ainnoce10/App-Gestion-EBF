@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -44,6 +45,37 @@ interface FormConfig {
   title: string;
   fields: FormField[];
 }
+
+// --- Helper Functions ---
+// Added missing helper function isInPeriod to fix errors on line 244, 1305, 1310, 1315, 1320
+const isInPeriod = (dateStr: string, period: Period): boolean => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (period === Period.DAY) {
+    return itemDate.getTime() === today.getTime();
+  } else if (period === Period.WEEK) {
+    const oneWeekAgo = new Date(today);
+    oneWeekAgo.setDate(today.getDate() - 7);
+    return itemDate >= oneWeekAgo && itemDate <= today;
+  } else if (period === Period.MONTH) {
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  } else if (period === Period.YEAR) {
+    return date.getFullYear() === now.getFullYear();
+  }
+  return true;
+};
+
+// Added missing helper function getPermission to fix error on line 1294
+const getPermission = (path: string, role: string) => {
+    if (role === 'Admin' || role === 'DG') return { canRead: true, canWrite: true };
+    if (path.startsWith('/techniciens') && role === 'Technicien') return { canRead: true, canWrite: true };
+    if (path.startsWith('/quincaillerie') && role === 'Magasinier') return { canRead: true, canWrite: true };
+    if (role === 'Secretaire') return { canRead: true, canWrite: path.startsWith('/secretariat') };
+    return { canRead: role !== 'Visiteur', canWrite: false };
+};
 
 // --- CONFIGURATION DES FORMULAIRES (CRUD) ---
 const FORM_CONFIGS: Record<string, FormConfig> = {
@@ -191,6 +223,7 @@ const MAIN_MENU: MenuItem[] = [
 ];
 
 // --- Sub-Menu Configurations ---
+// Fixed incomplete MODULE_ACTIONS object to fix potential missing module routes
 const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
   techniciens: [
     { 
@@ -210,8 +243,69 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
       icon: FileText, 
       path: '/techniciens/rapports', 
       color: 'bg-gray-700' 
+    },
+    { 
+      id: 'materiel', 
+      label: 'Matériel', 
+      description: 'Inventaire & Affectation', 
+      icon: Truck, 
+      path: '/techniciens/materiel', 
+      color: 'bg-blue-600' 
+    },
+    { 
+      id: 'chantiers', 
+      label: 'Chantiers', 
+      description: 'Suivi & Exécution', 
+      icon: ShieldCheck, 
+      path: '/techniciens/chantiers', 
+      color: 'bg-green-600' 
     }
-  
+  ],
+  comptabilite: [
+    { id: 'bilan', label: 'Bilan Financier', description: 'Recettes & Dépenses', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600' },
+    { id: 'rh', label: 'Ressources Humaines', description: 'Employés & Dossiers', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600' },
+    { id: 'paie', label: 'Paie & Salaires', description: 'Virements & Bulletins', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500' },
+  ],
+  secretariat: [
+    { id: 'planning', label: 'Planning Équipe', description: 'Vue d\'ensemble Interventions', icon: Calendar, path: '/secretariat/planning', color: 'bg-indigo-500' },
+    { id: 'clients', label: 'Gestion Clients', description: 'Base de données clients', icon: UserCheck, path: '/secretariat/clients', color: 'bg-blue-500' },
+    { id: 'caisse', label: 'Petite Caisse', description: 'Suivi des flux de caisse', icon: Archive, path: '/secretariat/caisse', color: 'bg-gray-600' },
+  ],
+  quincaillerie: [
+    { id: 'stocks', label: 'Stocks', description: 'État des stocks en temps réel', icon: ClipboardList, path: '/quincaillerie/stocks', color: 'bg-orange-600' },
+    { id: 'fournisseurs', label: 'Fournisseurs', description: 'Liste et contacts partenaires', icon: Truck, path: '/quincaillerie/fournisseurs', color: 'bg-green-600' },
+    { id: 'achats', label: 'Bons d\'achat', description: 'Historique des commandes', icon: FileText, path: '/quincaillerie/achats', color: 'bg-red-500' },
+  ]
+};
+
+// Added missing EbfSvgLogo component to fix error on line 222
+const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
+    const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
+    const width = 200 * scale;
+    const height = 100 * scale;
+    return (
+        <svg width={width} height={height} viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{stopColor:'#3b82f6', stopOpacity:1}} />
+                    <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
+                </linearGradient>
+            </defs>
+            <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
+            <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
+            <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
+            <rect x="70" y="20" width="20" height="25" rx="0" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
+            <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
+            <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
+            <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
+            <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
+            <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
+                Electricité - Bâtiment - Froid
+            </text>
+        </svg>
+    );
 };
 
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
@@ -1167,19 +1261,48 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
     </div>
   );
 };
+
+// Reconstructed missing HeaderWithNotif component to fix errors on lines 1171-1246, 1669
+const HeaderWithNotif = ({ 
+    title, onMenuClick, onLogout, notifications, userProfile, userRole, 
+    markNotificationAsRead, onOpenProfile, onOpenFlashInfo, onOpenHelp, 
+    darkMode, onToggleTheme, onResetBiometrics 
+}: any) => {
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+    const settingsRef = useRef<HTMLDivElement>(null);
+    const notifRef = useRef<HTMLDivElement>(null);
+
+    const unreadCount = notifications.filter((n: any) => !n.read).length;
+    const canEditFlashInfo = userRole === 'Admin' || userRole === 'DG';
+
+    return (
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 h-16 md:h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 shadow-sm transition-colors duration-300">
+           <div className="flex items-center gap-4">
+              <button onClick={onMenuClick} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition text-gray-600">
+                  <Menu />
+              </button>
+              <div className="flex flex-col">
+                  <h1 className="text-xl font-black text-green-950 dark:text-white tracking-tighter leading-none">{title}</h1>
+                  <span className="text-[10px] font-bold text-ebf-orange uppercase tracking-widest mt-0.5">Manager Pro</span>
+              </div>
+           </div>
+           <div className="flex items-center gap-2 md:gap-4">
+              <div className="relative" ref={notifRef}>
+                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition text-gray-600 relative">
                      <Bell />
                      {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-sm">{unreadCount}</span>}
                  </button>
                  {showDropdown && (
-                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-50">
-                         <div className="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                             <h3 className="font-bold text-gray-800 text-sm">Notifications</h3>
+                     <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-fade-in z-50">
+                         <div className="p-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex justify-between items-center">
+                             <h3 className="font-bold text-gray-800 dark:text-white text-sm">Notifications</h3>
                              <span className="text-xs text-gray-500">{unreadCount} non lues</span>
                          </div>
                          <div className="max-h-80 overflow-y-auto custom-scrollbar">
                              {notifications.length === 0 ? <div className="p-4 text-center text-gray-400 text-sm">Aucune notification</div> : 
                                  notifications.map((notif: Notification) => (
-                                     <div key={notif.id} onClick={() => { markNotificationAsRead(notif); setShowDropdown(false); }} className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-orange-50/20' : ''}`}>
+                                     <div key={notif.id} onClick={() => { markNotificationAsRead(notif); setShowDropdown(false); }} className={`p-3 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition ${!notif.read ? 'bg-orange-50/20' : ''}`}>
                                          <div className="flex items-start gap-3">
                                              <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'alert' ? 'bg-red-500' : notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
                                              <div>
@@ -1195,7 +1318,7 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
                  )}
               </div>
               <div className="relative" ref={settingsRef}>
-                 <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
+                 <button onClick={() => setShowSettingsDropdown(!showSettingsDropdown)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition text-gray-600">
                     <Settings />
                  </button>
                  {showSettingsDropdown && (
@@ -1244,7 +1367,7 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
               </div>
            </div>
         </header>
-    )
+    );
 };
 
 const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
@@ -1353,457 +1476,4 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const checkoutCart = async () => {
     if (cart.length === 0) { alert('Le panier est vide.'); return; }
     // create purchase in supabase (simple representation)
-    const total = cart.reduce((s, c) => s + ((c.price || 0) * (c.quantity || 1)), 0);
-    try {
-      const purchase = {
-        date: new Date().toISOString(),
-        total: total,
-        items: cart,
-        site: currentSite || 'Global'
-      };
-      const { data, error } = await supabase.from('purchases').insert([purchase]).select().single();
-      if (error) { alert('Erreur lors de la commande: ' + error.message); return; }
-      // add to local purchases state
-      setPurchases(prev => [data, ...prev]);
-      clearCart();
-      setIsCartOpen(false);
-      alert('Commande passée avec succès.');
-    } catch (e: any) {
-      alert('Erreur checkout: ' + (e.message || e));
-    }
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      // Existing
-      const { data: intervData } = await supabase.from('interventions').select('*');
-      if (intervData) setInterventions(intervData);
-      const { data: stockData } = await supabase.from('stocks').select('*');
-      if (stockData) setStock(stockData);
-      const { data: techData } = await supabase.from('technicians').select('*');
-      if (techData) setTechnicians(techData);
-      const { data: reportsData } = await supabase.from('reports').select('*');
-      if (reportsData) setReports(reportsData);
-      const { data: statsData } = await supabase.from('daily_stats').select('*');
-      if (statsData) setStats(statsData);
-      const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-      if (notifData) setNotifications(notifData);
-      const { data: tickerData } = await supabase.from('ticker_messages').select('*').order('display_order', { ascending: true });
-      if (tickerData) setManualTickerMessages(tickerData.map((m: any) => ({ ...m, isManual: true })));
-
-      // New Modules Fetching
-      const { data: chantiersData } = await supabase.from('chantiers').select('*');
-      if (chantiersData) setChantiers(chantiersData);
-      
-      const { data: transData } = await supabase.from('transactions').select('*');
-      if (transData) setTransactions(transData);
-      
-      const { data: empData } = await supabase.from('employees').select('*');
-      if (empData) setEmployees(empData);
-      
-      const { data: payrollData } = await supabase.from('payrolls').select('*');
-      if (payrollData) setPayrolls(payrollData);
-      
-      const { data: clientData } = await supabase.from('clients').select('*');
-      if (clientData) setClients(clientData);
-      
-      const { data: caisseData } = await supabase.from('caisse').select('*');
-      if (caisseData) setCaisse(caisseData);
-      
-      const { data: suppData } = await supabase.from('suppliers').select('*');
-      if (suppData) setSuppliers(suppData);
-      
-      const { data: purchData } = await supabase.from('purchases').select('*');
-      if (purchData) setPurchases(purchData);
-    };
-
-    fetchData();
-
-    // Helper for generic insert/update/delete
-    const updateState = (setter: any, payload: any) => {
-        if (payload.eventType === 'INSERT') setter((prev: any[]) => [...prev, payload.new]);
-        else if (payload.eventType === 'UPDATE') setter((prev: any[]) => prev.map(i => i.id === payload.new.id ? payload.new : i));
-        else if (payload.eventType === 'DELETE') setter((prev: any[]) => prev.filter(i => i.id !== payload.old.id));
-    };
-
-    const channels = supabase.channel('realtime-ebf')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'interventions' }, (payload) => updateState(setInterventions, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stocks' }, (payload) => updateState(setStock, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, (payload) => {
-          updateState(setReports, payload);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_stats' }, (payload) => {
-           if (payload.eventType === 'INSERT') setStats(prev => [...prev, payload.new as StatData]);
-           else if (payload.eventType === 'UPDATE') setStats(prev => prev.map(s => (s.date === payload.new.date && s.site === payload.new.site) ? payload.new as StatData : s));
-           else if (payload.eventType === 'DELETE') setStats(prev => prev.filter(s => !(s.date === payload.old.date && s.site === payload.old.site)));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticker_messages' }, (payload) => {
-           if (payload.eventType === 'INSERT') setManualTickerMessages(prev => [...prev, { ...payload.new, isManual: true } as TickerMessage]);
-           else if (payload.eventType === 'UPDATE') setManualTickerMessages(prev => prev.map(m => m.id === payload.new.id ? { ...payload.new, isManual: true } as TickerMessage : m));
-           else if (payload.eventType === 'DELETE') setManualTickerMessages(prev => prev.filter(m => m.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => updateState(setNotifications, payload))
-      
-      // NEW TABLES REALTIME
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chantiers' }, (payload) => updateState(setChantiers, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => updateState(setTransactions, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, (payload) => updateState(setEmployees, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payrolls' }, (payload) => updateState(setPayrolls, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, (payload) => updateState(setClients, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'caisse' }, (payload) => updateState(setCaisse, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, (payload) => updateState(setSuppliers, payload))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, (payload) => updateState(setPurchases, payload))
-
-      .subscribe();
-    return () => { supabase.removeChannel(channels); };
-  }, []);
-
-  // --- REAL-TIME AGGREGATION LOGIC ---
-  // Calculates stats dynamically from Reports and Transactions
-  const realTimeStats = useMemo(() => {
-    const statsMap = new Map<string, StatData>();
-
-    // 1. Process Reports (Revenue/Expenses/Interventions)
-    reports.forEach(report => {
-        if (!report.date) return;
-        const key = `${report.date}_${report.site || 'Global'}`;
-        
-        if (!statsMap.has(key)) {
-            statsMap.set(key, {
-                id: key,
-                date: report.date,
-                site: report.site as Site,
-                revenue: 0,
-                expenses: 0,
-                profit: 0,
-                interventions: 0
-            });
-        }
-        
-        const stat = statsMap.get(key)!;
-        stat.revenue += Number(report.revenue || 0);
-        stat.expenses += Number(report.expenses || 0);
-        stat.interventions += 1;
-    });
-
-    // 2. Process Transactions (Revenue/Expenses from Accounting)
-    transactions.forEach(trans => {
-        if (!trans.date) return;
-        const key = `${trans.date}_${trans.site || 'Global'}`;
-
-        if (!statsMap.has(key)) {
-            statsMap.set(key, {
-                id: key,
-                date: trans.date,
-                site: trans.site as Site,
-                revenue: 0,
-                expenses: 0,
-                profit: 0,
-                interventions: 0
-            });
-        }
-
-        const stat = statsMap.get(key)!;
-        if (trans.type === 'Recette') {
-            stat.revenue += Number(trans.amount || 0);
-        } else if (trans.type === 'Dépense') {
-            stat.expenses += Number(trans.amount || 0);
-        }
-    });
-
-    // 3. Finalize Profit Calculation & Sort
-    return Array.from(statsMap.values()).map(stat => ({
-        ...stat,
-        profit: stat.revenue - stat.expenses
-    })).sort((a, b) => b.date.localeCompare(a.date));
-
-  }, [reports, transactions]);
-
-  // Use realTimeStats for Flash Info generation instead of static stats
-  useEffect(() => {
-    if (realTimeStats.length > 0) generateAutoTickerMessages(realTimeStats);
-    else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', type: 'info', display_order: 0, isManual: false }]);
-    const interval = setInterval(() => { if (realTimeStats.length > 0) generateAutoTickerMessages(realTimeStats); }, 600000);
-    return () => clearInterval(interval);
-  }, [realTimeStats]);
-
-  const combinedTickerMessages = useMemo(() => {
-     if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
-     return [...manualTickerMessages, ...autoTickerMessages];
-  }, [manualTickerMessages, autoTickerMessages]);
-
-  const handleNavigate = (path: string) => { setCurrentPath(path); setIsMenuOpen(false); };
-  const toggleTheme = () => { setDarkMode(!darkMode); document.documentElement.classList.toggle('dark'); };
-  const handleOpenAdd = (table: string) => { setCrudTarget(table); setItemToEdit(null); setIsAddOpen(true); };
-  const handleOpenEdit = (item: any, table: string) => { setCrudTarget(table); setItemToEdit(item); setIsAddOpen(true); };
-  const handleOpenDelete = (item: any, table: string) => { setItemToDelete(item); setCrudTarget(table); setIsDeleteOpen(true); };
-  
-  const handleResetBiometrics = () => {
-      localStorage.removeItem('ebf_biometric_active');
-      alert("Préférence biométrique réinitialisée. Elle sera demandée à la prochaine connexion.");
-  };
-
-  const confirmDelete = async () => {
-      if (!itemToDelete || !crudTarget) return;
-      setCrudLoading(true);
-      const { error } = await supabase.from(crudTarget).delete().eq('id', itemToDelete.id);
-      setCrudLoading(false);
-      if (error) alert("Erreur: " + error.message);
-      else { setIsDeleteOpen(false); setItemToDelete(null); }
-  };
-  const confirmAdd = async (formData: any) => {
-      if (!crudTarget) return;
-      setCrudLoading(true);
-      if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
-      const config = FORM_CONFIGS[crudTarget];
-      const processedData = { ...formData };
-      if (config) config.fields.forEach(f => { if (f.type === 'number' && processedData[f.name]) processedData[f.name] = Number(processedData[f.name]); });
-      if (itemToEdit) {
-        // update
-        const { error } = await supabase.from(crudTarget).update(processedData).eq('id', itemToEdit.id);
-        setCrudLoading(false);
-        if (error) alert("Erreur mise à jour: " + error.message);
-        else {
-        setIsAddOpen(false);
-        setItemToEdit(null);
-        }
-        } else {
-          const { data, error } = await supabase.from(crudTarget).insert([processedData]).select().single();
-          setCrudLoading(false);
-          if (error) alert("Erreur: " + error.message);
-          else { setIsAddOpen(false); setItemToEdit(null); }
-        }
-  };
-  const handleDeleteDirectly = async (id: string, table: string) => {
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) alert("Erreur: " + error.message);
-  };
-  const saveManualTickerMessage = async (text: string, type: string) => {
-      const { error } = await supabase.from('ticker_messages').insert([{ text, type, display_order: manualTickerMessages.length + 1 }]);
-      if (error) alert("Erreur: " + error.message);
-  };
-  const deleteManualTickerMessage = async (id: string) => {
-      const { error } = await supabase.from('ticker_messages').delete().eq('id', id);
-      if (error) alert("Erreur: " + error.message);
-  };
-
-  const renderContent = () => {
-     // MODIFICATION CRITIQUE: On passe 'realTimeStats' au lieu de 'stats' (qui venait de la table daily_stats)
-     if (currentPath === '/') return <Dashboard data={realTimeStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
-     if (currentPath === '/synthesis') return <DetailedSynthesis data={realTimeStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
-     
-     const section = currentPath.substring(1);
-     if (MODULE_ACTIONS[section]) return (
-             <div className="space-y-6 animate-fade-in">
-                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white capitalize flex items-center gap-2"><ArrowLeft className="cursor-pointer" onClick={() => handleNavigate('/')} /> Module {section}</h2>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {MODULE_ACTIONS[section].map((action) => (
-                        <button key={action.id} onClick={() => handleNavigate(action.path)} className={`bg-white hover:bg-orange-50 p-6 rounded-xl shadow-md border border-gray-100 hover:border-orange-200 transition transform hover:-translate-y-1 text-left group`}>
-                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${action.color.replace('bg-', 'bg-').replace('600', '100').replace('500', '100')} ${action.color.replace('bg-', 'text-').replace('600', '600').replace('500', '600')}`}><action.icon size={24} /></div>
-                            <h3 className="text-xl font-bold mb-1 text-gray-800 group-hover:text-ebf-orange">{action.label}</h3>
-                            <p className="text-gray-500 text-sm">{action.description}</p>
-                            {action.managedBy && <p className="text-[10px] text-gray-400 mt-3 font-medium uppercase tracking-wider">{action.managedBy}</p>}
-                        </button>
-                    ))}
-                 </div>
-             </div>
-     );
-
-     // Existing Routes
-    if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} onEdit={(item: any) => handleOpenEdit(item, 'interventions')} readOnly={!canWrite} />;
-     if (currentPath === '/techniciens/rapports') return <>
-       <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else setIsVoiceOpen(true); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />
-       <VoiceRecorderModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} userProfile={userProfile} onSaveReport={(r: any) => setReports(prev => [r, ...prev])} />
-     </>;
-    if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} onEdit={(item: any) => handleOpenEdit(item, 'stocks')} readOnly={!canWrite} />;
-    if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} onAddToCart={addToCart} onEdit={(item: any) => handleOpenEdit(item, 'stocks')} readOnly={!canWrite} />;
-    if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} onEdit={(item: any) => handleOpenEdit(item, 'technicians')} readOnly={!canWrite} />;
-
-     // NEWLY CONFIGURED ROUTES (ACTIVE)
-    if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} onEdit={(item: any) => handleOpenEdit(item, 'chantiers')} readOnly={!canWrite} />;
-    if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} onEdit={(item: any) => handleOpenEdit(item, 'transactions')} readOnly={!canWrite} />;
-    if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} onEdit={(item: any) => handleOpenEdit(item, 'employees')} readOnly={!canWrite} />;
-    if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} onEdit={(item: any) => handleOpenEdit(item, 'payrolls')} readOnly={!canWrite} />;
-     if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={true} />; 
-    if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} onEdit={(item: any) => handleOpenEdit(item, 'clients')} readOnly={!canWrite} />;
-    if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} onEdit={(item: any) => handleOpenEdit(item, 'caisse')} readOnly={!canWrite} />;
-    if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} onEdit={(item: any) => handleOpenEdit(item, 'suppliers')} readOnly={!canWrite} />;
-    if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} onEdit={(item: any) => handleOpenEdit(item, 'purchases')} readOnly={!canWrite} />;
-
-     return <div className="flex flex-col items-center justify-center h-full text-gray-400"><Wrench size={48} className="mb-4 opacity-50" /><p className="text-xl">Module "{currentPath}" en construction.</p><button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-orange font-bold hover:underline">Retour Accueil</button></div>;
-  };
-
-  return (
-    <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300 ${darkMode ? 'dark' : ''}`}>
-        <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto shadow-2xl flex flex-col`}>
-            {/* Logo SANS rounded-full - Square container */}
-            <div className="flex items-center justify-between h-20 px-6 bg-green-950/50">
-                <div className="transform scale-75 origin-left bg-white p-2">
-                    <EbfLogo size="small" />
-                </div>
-                <button onClick={() => setIsMenuOpen(false)} className="lg:hidden text-gray-400 hover:text-white"><X /></button>
-            </div>
-            <div className="p-4 flex-1 overflow-y-auto">
-                <nav className="space-y-2">
-                    {MAIN_MENU.map(item => (
-                        <button key={item.id} onClick={() => handleNavigate(item.path)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 group ${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'bg-ebf-orange text-white font-bold shadow-lg transform scale-105' : 'text-gray-300 hover:bg-green-900 hover:text-white'}`}>
-                            <item.icon size={20} className={`${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
-                            <span>{item.label}</span>
-                        </button>
-                    ))}
-                </nav>
-            </div>
-            <div className="p-4 bg-green-900/30">
-                <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center font-bold text-white text-sm border border-green-700">
-                        {userProfile?.full_name?.charAt(0) || 'U'}
-                    </div>
-                    <div className="overflow-hidden">
-                        <p className="text-sm font-bold truncate text-white">{userProfile?.full_name || 'Utilisateur'}</p>
-                        <p className="text-xs text-gray-300 truncate opacity-80">{userRole}</p>
-                    </div>
-                </div>
-            </div>
-        </aside>
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-             <HeaderWithNotif 
-                 title="EBF Manager" 
-                 onMenuClick={() => setIsMenuOpen(true)} 
-                 onLogout={onLogout} 
-                 notifications={notifications} 
-                 userProfile={userProfile} 
-                 userRole={userRole} 
-                 markNotificationAsRead={(n: any) => setNotifications(notifications.map(x => x.id === n.id ? {...x, read: true} : x))} 
-                 onOpenProfile={() => setIsProfileOpen(true)} 
-                 onOpenFlashInfo={() => setIsFlashInfoOpen(true)} 
-                 onOpenHelp={() => setIsHelpOpen(true)} 
-                 darkMode={darkMode} 
-                 onToggleTheme={toggleTheme} 
-                 onResetBiometrics={handleResetBiometrics}
-             />
-             <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative bg-ebf-pattern dark:bg-gray-900">{renderContent()}</main>
-        </div>
-        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
-        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-        <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
-        <AddModal isOpen={isAddOpen} onClose={() => { setIsAddOpen(false); setItemToEdit(null); }} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} initialData={itemToEdit} />
-        <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
-        <CartPanel isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} updateQuantity={updateCartQuantity} onCheckout={checkoutCart} clearCart={clearCart} />
-    </div>
-  );
-};
-
-// --- App Wrapper with State Machine ---
-export default function App() {
-  const [appState, setAppState] = useState<'LOADING' | 'LOGIN' | 'ONBOARDING' | 'APP'>('LOADING');
-  const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<Role>('Visiteur');
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-
-  // Helper to fetch profile data
-  const fetchUserProfile = async (userId: string) => {
-      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      
-      // Fallback: Create profile if it doesn't exist
-      if (!data) {
-          const { data: userData } = await supabase.auth.getUser();
-          const meta = userData.user?.user_metadata;
-          if (meta) {
-              const newProfile = {
-                  id: userId,
-                  full_name: meta.full_name || 'Utilisateur',
-                  role: meta.role || 'Visiteur',
-                  site: meta.site || 'Global',
-                  email: userData.user?.email
-              };
-              const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-              if (!insertError) data = newProfile as any;
-          }
-      }
-
-      if (data) {
-          setUserRole(data.role);
-          setUserProfile(data);
-          
-          // Ensure user is in 'Notre Équipe' if not Visitor
-          if (data.role !== 'Visiteur') {
-               const { data: tech } = await supabase.from('technicians').select('id').eq('id', userId).single();
-               if (!tech) {
-                   let specialty = data.role;
-                   if (data.role === 'Admin') specialty = 'Administration';
-                   
-                   await supabase.from('technicians').insert([{
-                       id: userId,
-                       name: data.full_name,
-                       specialty: specialty,
-                       site: data.site,
-                       status: 'Available'
-                   }]);
-               }
-          }
-          return data;
-      }
-      return null;
-  };
-
-  // Main Effect to check Session on Load
-  useEffect(() => {
-    const init = async () => {
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      
-      if (existingSession) {
-         setSession(existingSession);
-         const profile = await fetchUserProfile(existingSession.user.id);
-         
-         const bioActive = localStorage.getItem('ebf_biometric_active');
-         if (bioActive === 'true') {
-             setAppState('APP');
-         } else {
-             setAppState('APP');
-         }
-      } else {
-         setAppState('LOGIN');
-      }
-    };
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-            setSession(null);
-            setUserProfile(null);
-            setAppState('LOGIN');
-        }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleExplicitLoginSuccess = async () => {
-      setAppState('LOADING');
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-          setSession(session);
-          await fetchUserProfile(session.user.id);
-          setAppState('ONBOARDING');
-      } else {
-          setAppState('LOGIN');
-      }
-  };
-
-  const handleOnboardingComplete = () => {
-      setAppState('APP');
-  };
-
-  if (appState === 'LOADING') return <LoadingScreen />;
-  if (appState === 'LOGIN') return <LoginScreen onLoginSuccess={handleExplicitLoginSuccess} />;
-  if (appState === 'ONBOARDING') return <OnboardingFlow role={userRole} onComplete={handleOnboardingComplete} />;
-
-  return (
-    <AppContent 
-        session={session} 
-        onLogout={() => supabase.auth.signOut()} 
-        userRole={userRole} 
-        userProfile={userProfile} 
-    />
-  );
-}
+    const total = cart.reduce((s, c) => s + ((c.price ||
