@@ -87,16 +87,27 @@ export const processVoiceReport = async (base64Audio: string, mimeType: string):
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-        { inlineData: { data: base64Audio, mimeType: mimeType } },
-        { text: prompt }
-      ],
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64Audio,
+              mimeType: mimeType
+            }
+          },
+          {
+            text: prompt
+          }
+        ]
+      },
       config: {
         responseMimeType: "application/json"
       }
     });
 
-    const result = JSON.parse(response.text);
+    const jsonStr = response.text?.trim();
+    if (!jsonStr) throw new Error("Réponse vide de l'IA.");
+    const result = JSON.parse(jsonStr);
     return result;
   } catch (error) {
     console.error("Gemini voice processing failed", error);
