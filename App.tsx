@@ -11,7 +11,7 @@ import { DetailedSynthesis } from './components/DetailedSynthesis';
 import { Site, Period, TickerMessage, StatData, DailyReport, StockItem, Profile, CartItem } from './types';
 import { supabase } from './services/supabaseClient';
 import { processVoiceReport } from './services/geminiService';
-import { DEFAULT_TICKER_MESSAGES, MOCK_STATS } from './constants';
+import { DEFAULT_TICKER_MESSAGES, MOCK_STATS, MOCK_STOCK } from './constants';
 
 // --- Helper: Blob to Base64 ---
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -74,6 +74,7 @@ const VoiceRecorderModal = ({ isOpen, onClose, onFinish }: { isOpen: boolean, on
           const report = await processVoiceReport(base64, 'audio/webm');
           onFinish(report);
         } catch (err) {
+          console.error(err);
           alert("L'IA n'a pas pu analyser l'audio.");
         } finally {
           setIsProcessing(false);
@@ -85,7 +86,8 @@ const VoiceRecorderModal = ({ isOpen, onClose, onFinish }: { isOpen: boolean, on
       setDuration(0);
       timerRef.current = window.setInterval(() => setDuration(d => d + 1), 1000);
     } catch (err) {
-      alert("Erreur microphone.");
+      console.error(err);
+      alert("Erreur microphone. Vérifiez les permissions.");
       onClose();
     }
   };
@@ -105,6 +107,7 @@ const VoiceRecorderModal = ({ isOpen, onClose, onFinish }: { isOpen: boolean, on
           <div className="space-y-6">
             <Loader2 size={64} className="text-ebf-orange animate-spin mx-auto" />
             <h3 className="text-xl font-bold">Analyse Gemini en cours...</h3>
+            <p className="text-gray-500 text-sm">Nous extrayons les données de votre rapport.</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -116,10 +119,10 @@ const VoiceRecorderModal = ({ isOpen, onClose, onFinish }: { isOpen: boolean, on
             <p className="text-4xl font-mono font-bold text-ebf-orange">
               {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
             </p>
-            <button onClick={stopRecording} className="w-full bg-red-600 text-white font-bold py-4 rounded-2xl hover:bg-red-700 transition flex items-center justify-center gap-2">
-              <StopCircle size={24} /> Terminer
+            <button onClick={stopRecording} className="w-full bg-red-600 text-white font-bold py-4 rounded-2xl hover:bg-red-700 transition flex items-center justify-center gap-2 shadow-lg">
+              <StopCircle size={24} /> Terminer et Envoyer
             </button>
-            <button onClick={onClose} className="text-gray-400 font-bold">Annuler</button>
+            <button onClick={onClose} className="text-gray-400 font-bold hover:text-gray-600 transition">Annuler</button>
           </div>
         )}
       </div>
@@ -136,13 +139,18 @@ export default function App() {
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [userProfile] = useState<Profile>({ id: '1', full_name: 'Admin EBF', email: 'admin@ebf.ci', role: 'Admin', site: Site.ABIDJAN });
   
-  const [stock, setStock] = useState<StockItem[]>([]);
+  const [stock, setStock] = useState<StockItem[]>(MOCK_STOCK);
   const [reports, setReports] = useState<DailyReport[]>([]);
 
   useEffect(() => {
     const init = async () => {
-      const { data: s } = await supabase.from('stocks').select('*'); if (s) setStock(s);
-      const { data: r } = await supabase.from('reports').select('*').order('date', { ascending: false }); if (r) setReports(r);
+      // Chargement depuis Supabase (ou fallback sur Mock si erreur)
+      try {
+        const { data: s } = await supabase.from('stocks').select('*'); if (s && s.length > 0) setStock(s);
+        const { data: r } = await supabase.from('reports').select('*').order('date', { ascending: false }); if (r) setReports(r);
+      } catch (e) {
+        console.warn("Utilisation des données locales (Supabase non connecté)");
+      }
     };
     init();
   }, []);
@@ -152,14 +160,20 @@ export default function App() {
       id: crypto.randomUUID(), 
       technicianName: processed.technicianName || userProfile.full_name,
       date: new Date().toISOString().split('T')[0],
-      method: 'Voice',
+      method: 'Voice' as const,
       site: userProfile.site,
       ...processed 
     };
-    const { error } = await supabase.from('reports').insert([report]);
-    if (!error) {
-      setReports(prev => [report as DailyReport, ...prev]);
-      alert("Rapport enregistré !");
+    
+    try {
+        const { error } = await supabase.from('reports').insert([report]);
+        if (!error) {
+          setReports(prev => [report as DailyReport, ...prev]);
+          alert("Rapport enregistré avec succès !");
+        }
+    } catch (e) {
+        setReports(prev => [report as DailyReport, ...prev]);
+        alert("Rapport enregistré localement.");
     }
   };
 
@@ -169,21 +183,21 @@ export default function App() {
         data={MOCK_STATS} reports={reports} tickerMessages={DEFAULT_TICKER_MESSAGES} stock={stock} 
         currentSite={currentSite} currentPeriod={currentPeriod} 
         onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} 
-        onNavigate={setCurrentPath} onDeleteReport={() => {}} 
+        onNavigate={setCurrentPath} onDeleteReport={(id) => setReports(prev => prev.filter(r => r.id !== id))} 
       />
     );
     if (currentPath === '/synthesis') return (
       <DetailedSynthesis 
         data={MOCK_STATS} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod}
         onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={setCurrentPath}
-        onViewReport={() => {}}
+        onViewReport={(r) => alert(JSON.stringify(r, null, 2))}
       />
     );
     if (currentPath === '/techniciens') return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {MODULE_ACTIONS.techniciens.map(a => (
-          <button key={a.id} onClick={() => setCurrentPath(a.path)} className="bg-white p-6 rounded-2xl shadow hover:shadow-xl transition flex items-center gap-6">
-            <div className={`${a.color} p-4 rounded-xl text-white`}><a.icon size={32}/></div>
+          <button key={a.id} onClick={() => setCurrentPath(a.path)} className="bg-white p-6 rounded-2xl shadow hover:shadow-xl transition flex items-center gap-6 group">
+            <div className={`${a.color} p-4 rounded-xl text-white group-hover:scale-110 transition`}><a.icon size={32}/></div>
             <div className="text-left"><h3 className="font-bold text-xl">{a.label}</h3><p className="text-gray-500 text-sm">{a.description}</p></div>
           </button>
         ))}
@@ -191,43 +205,66 @@ export default function App() {
     );
     if (currentPath === '/techniciens/rapports') return (
       <div className="space-y-8">
-        <h2 className="text-2xl font-bold">Rapports Journaliers</h2>
+        <div className="flex items-center gap-4">
+            <button onClick={() => setCurrentPath('/techniciens')} className="p-2 bg-white rounded-full border shadow-sm"><ArrowLeft size={20}/></button>
+            <h2 className="text-2xl font-bold">Rapports Journaliers</h2>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button onClick={() => setIsVoiceOpen(true)} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-10 rounded-3xl shadow-lg flex flex-col items-center gap-4 hover:scale-105 transition">
-            <Mic size={48} /> <div className="text-center"><h3 className="text-2xl font-bold">Rapport Vocal</h3><p>Dictée intelligente via Gemini</p></div>
+          <button onClick={() => setIsVoiceOpen(true)} className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-10 rounded-3xl shadow-lg flex flex-col items-center gap-4 hover:scale-105 transition border border-blue-400">
+            <Mic size={48} /> <div className="text-center"><h3 className="text-2xl font-bold">Rapport Vocal</h3><p className="opacity-90">Dictée intelligente via Gemini</p></div>
           </button>
-          <button className="bg-gradient-to-br from-ebf-orange to-orange-600 text-white p-10 rounded-3xl shadow-lg flex flex-col items-center gap-4 hover:scale-105 transition">
-            <FileText size={48} /> <div className="text-center"><h3 className="text-2xl font-bold">Formulaire</h3><p>Saisie manuelle détaillée</p></div>
+          <button onClick={() => alert("Formulaire en cours")} className="bg-gradient-to-br from-ebf-orange to-orange-600 text-white p-10 rounded-3xl shadow-lg flex flex-col items-center gap-4 hover:scale-105 transition border border-orange-400">
+            <FileText size={48} /> <div className="text-center"><h3 className="text-2xl font-bold">Formulaire</h3><p className="opacity-90">Saisie manuelle détaillée</p></div>
           </button>
         </div>
       </div>
     );
-    return <div className="text-center py-20 text-gray-400 font-bold">Module en développement...</div>;
+    return <div className="text-center py-20 text-gray-400 font-bold italic">Module en développement...</div>;
   };
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform transition lg:translate-x-0 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 text-2xl font-bold border-b border-white/10">EBF Manager</div>
+      {/* Sidebar Mobile Overlay */}
+      {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setIsMenuOpen(false)} />}
+      
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform transition-transform duration-300 lg:translate-x-0 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 text-2xl font-black border-b border-white/10 tracking-tighter">EBF MANAGER</div>
         <nav className="p-4 space-y-2">
           {MAIN_MENU.map(m => (
-            <button key={m.id} onClick={() => { setCurrentPath(m.path); setIsMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${currentPath === m.path ? 'bg-ebf-orange' : 'hover:bg-green-900'}`}>
+            <button key={m.id} onClick={() => { setCurrentPath(m.path); setIsMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${currentPath === m.path ? 'bg-ebf-orange text-white shadow-lg' : 'text-gray-300 hover:bg-green-900'}`}>
               <m.icon size={20}/> {m.label}
             </button>
           ))}
         </nav>
+        <div className="absolute bottom-0 w-full p-4 border-t border-white/10">
+            <button className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition">
+                <LogOut size={20}/> Déconnexion
+            </button>
+        </div>
       </aside>
 
-      <div className="flex-1 flex flex-col lg:ml-64">
-        <header className="h-16 bg-white border-b flex items-center justify-between px-6">
-          <button onClick={() => setIsMenuOpen(true)} className="lg:hidden p-2"><Menu/></button>
-          <div className="font-extrabold text-green-950">EBF MANAGER</div>
-          <div className="flex items-center gap-3">
-             <div className="text-right hidden sm:block"><p className="text-sm font-bold">{userProfile.full_name}</p><p className="text-xs text-ebf-orange uppercase font-bold">{userProfile.role}</p></div>
-             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700"><User/></div>
+      <div className="flex-1 flex flex-col lg:ml-64 relative overflow-hidden">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-20">
+          <button onClick={() => setIsMenuOpen(true)} className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"><Menu/></button>
+          <div className="font-black text-green-950 text-lg hidden sm:block">EBF MANAGER</div>
+          <div className="flex items-center gap-4">
+             <div className="relative">
+                 <Bell size={22} className="text-gray-400"/>
+                 <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full border-2 border-white"></span>
+             </div>
+             <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
+             <div className="flex items-center gap-3">
+                 <div className="text-right hidden sm:block">
+                    <p className="text-sm font-bold text-gray-800 leading-none">{userProfile.full_name}</p>
+                    <p className="text-[10px] text-ebf-orange uppercase font-black tracking-widest mt-1">{userProfile.role}</p>
+                 </div>
+                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-700 border-2 border-green-200 shadow-sm"><User size={20}/></div>
+             </div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 bg-ebf-pattern">{renderContent()}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-ebf-pattern">
+            {renderContent()}
+        </main>
       </div>
 
       <VoiceRecorderModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} onFinish={handleVoiceFinish} />
