@@ -352,7 +352,7 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
 };
 
 // --- Module Placeholder (Generic List View) ---
-const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
+const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, onAddToCart, onEdit, readOnly }: any) => {
     // Basic filtering based on Site and Date if available in items
     const filteredItems = items.filter((item: any) => {
         // Site filter
@@ -392,7 +392,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Détails</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Site</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Statut / Montant</th>
-                                {!readOnly && (onDelete || onAddToCart) && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
+                                {!readOnly && (onDelete || onAddToCart || onEdit) && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -433,9 +433,10 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                                 </span>
                                             )}
                                         </td>
-                                        {!readOnly && (onDelete || onAddToCart) && (
+                                        {!readOnly && (onDelete || onAddToCart || onEdit) && (
                                           <td className="p-4 text-right flex items-center justify-end gap-2">
                                             {onAddToCart && <button onClick={() => onAddToCart(item)} title="Ajouter au panier" className="p-2 bg-green-50 text-green-600 hover:bg-green-100 rounded transition flex items-center gap-2"><ShoppingCart size={16}/> <span className="sr-only">Ajouter au panier</span></button>}
+                                            {onEdit && <button onClick={() => onEdit(item)} title="Modifier" className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded transition"><Edit size={16}/></button>}
                                             {onDelete && <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>}
                                           </td>
                                         )}
@@ -1633,7 +1634,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   const handleNavigate = (path: string) => { setCurrentPath(path); setIsMenuOpen(false); };
   const toggleTheme = () => { setDarkMode(!darkMode); document.documentElement.classList.toggle('dark'); };
-  const handleOpenAdd = (table: string) => { setCrudTarget(table); setIsAddOpen(true); };
+  const handleOpenAdd = (table: string) => { setCrudTarget(table); setItemToEdit(null); setIsAddOpen(true); };
   const handleOpenEdit = (item: any, table: string) => { setCrudTarget(table); setItemToEdit(item); setIsAddOpen(true); };
   const handleOpenDelete = (item: any, table: string) => { setItemToDelete(item); setCrudTarget(table); setIsDeleteOpen(true); };
   
@@ -1666,12 +1667,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         setIsAddOpen(false);
         setItemToEdit(null);
         }
-      } else {
-        const { error } = await supabase.from(crudTarget).insert([processedData]);
-        setCrudLoading(false);
-        if (error) alert("Erreur: " + error.message);
-        else setIsAddOpen(false);
-      }
+        } else {
+          const { data, error } = await supabase.from(crudTarget).insert([processedData]).select().single();
+          setCrudLoading(false);
+          if (error) alert("Erreur: " + error.message);
+          else { setIsAddOpen(false); setItemToEdit(null); }
+        }
   };
   const handleDeleteDirectly = async (id: string, table: string) => {
       const { error } = await supabase.from(table).delete().eq('id', id);
@@ -1785,7 +1786,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
-        <AddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} />
+        <AddModal isOpen={isAddOpen} onClose={() => { setIsAddOpen(false); setItemToEdit(null); }} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} initialData={itemToEdit} />
         <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
         <CartPanel isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} updateQuantity={updateCartQuantity} onCheckout={checkoutCart} clearCart={clearCart} />
     </div>
