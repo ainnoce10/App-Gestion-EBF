@@ -1,5 +1,4 @@
 
-
 export enum Site {
   ABIDJAN = 'Abidjan',
   BOUAKE = 'Bouaké',
@@ -60,6 +59,10 @@ export interface StockItem {
   threshold: number;
   unit: string;
   site: Site;
+}
+
+export interface CartItem extends StockItem {
+  requestedQuantity: number;
 }
 
 export interface Intervention {
