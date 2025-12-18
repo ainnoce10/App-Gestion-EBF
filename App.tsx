@@ -210,23 +210,8 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
       icon: FileText, 
       path: '/techniciens/rapports', 
       color: 'bg-gray-700' 
-    },
-            <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
-            
-            {/* E.B.F Letters */}
-            <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
-            <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
-            <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
-            <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
-            <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
-            
-            {/* Banner Text */}
-            <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
-            <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
-                Electricité - Bâtiment - Froid
-            </text>
-        </svg>
-    );
+    }
+  
 };
 
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
