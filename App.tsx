@@ -1058,17 +1058,46 @@ const ConfirmationModal = ({
 // --- Add Item Modal (Generic) ---
 const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: any) => {
   const [formData, setFormData] = useState<any>({});
+  const [errors, setErrors] = useState<Record<string,string>>({});
 
   useEffect(() => {
     if (isOpen) {
       setFormData(initialData ? { ...initialData } : {});
+      setErrors({});
     }
   }, [isOpen, initialData]);
 
+  const validate = (): boolean => {
+    if (!config) return true;
+    const newErrors: Record<string,string> = {};
+    config.fields.forEach((field: FormField) => {
+      const val = formData[field.name];
+      if (field.type === 'email') {
+        if (!val) newErrors[field.name] = 'Email requis.';
+        else {
+          const re = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+          if (!re.test(val)) newErrors[field.name] = 'Email invalide.';
+        }
+      } else if (field.type === 'number') {
+        if (val === undefined || val === null || val === '') newErrors[field.name] = 'Champ numérique requis.';
+        else if (isNaN(Number(val))) newErrors[field.name] = 'Valeur numérique attendue.';
+      } else if (field.type === 'select') {
+        if (!val) newErrors[field.name] = 'Sélection requise.';
+      } else {
+        // text, date
+        if (val === undefined || val === null || String(val).trim() === '') newErrors[field.name] = 'Champ requis.';
+      }
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = () => {
+    if (!config) return;
     if (config.title.includes('Rapport') && !formData.method) {
-        formData.method = 'Form';
+      formData.method = 'Form';
     }
+    if (!validate()) return;
     onSubmit(formData);
   };
 
@@ -1086,8 +1115,8 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: a
                 {field.type === 'select' ? (
                    <select 
                      className="w-full border border-gray-200 p-2.5 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none"
-                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
-                     value={formData[field.name] || ''}
+                    onChange={e => { setFormData({...formData, [field.name]: e.target.value}); setErrors(prev => { const c = {...prev}; delete c[field.name]; return c; }); }}
+                    value={formData[field.name] || ''}
                    >
                      <option value="">Sélectionner...</option>
                      {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1096,11 +1125,12 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: a
                    <input 
                      type={field.type} 
                      className="w-full border border-gray-200 p-2.5 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none"
-                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
+                     onChange={e => { setFormData({...formData, [field.name]: e.target.value}); setErrors(prev => { const c = {...prev}; delete c[field.name]; return c; }); }}
                      value={formData[field.name] || ''}
                      placeholder={field.placeholder || ''}
                    />
                 )}
+                {errors[field.name] && <p className="text-xs text-red-500 mt-1">{errors[field.name]}</p>}
              </div>
           ))}
         </div>
@@ -1199,74 +1229,74 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
     if (profile) setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
   }, [profile, isOpen]);
 
-  const handleUpdate = async () => {
-    setLoading(true);
-    const { error } = await supabase.from('profiles').update({ full_name: formData.full_name, phone: formData.phone }).eq('id', profile.id);
-    if (!error && profile.role !== 'Visiteur') {
-       await supabase.from('technicians').update({ name: formData.full_name }).eq('id', profile.id);
-    }
-    setLoading(false);
-    if (error) alert("Erreur mise à jour profil");
-    else { alert("Profil mis à jour !"); onClose(); window.location.reload(); }
+  const confirmAdd = async (formData: any) => {
+      if (!crudTarget) return;
+      setCrudLoading(true);
+      if (!formData.site) formData.site = currentSite !== Site.GLOBAL ? currentSite : Site.ABIDJAN;
+      const config = FORM_CONFIGS[crudTarget];
+      const processedData = { ...formData };
+      if (config) config.fields.forEach(f => { if (f.type === 'number' && processedData[f.name]) processedData[f.name] = Number(processedData[f.name]); });
+      try {
+        if (itemToEdit) {
+          // update
+          const { data, error } = await supabase.from(crudTarget).update(processedData).eq('id', itemToEdit.id).select().single();
+          setCrudLoading(false);
+          if (error) {
+            console.error('Update error', error);
+            alert('Erreur mise à jour: ' + (error.message || JSON.stringify(error)));
+          } else {
+            // update local state for immediate UI feedback
+            switch (crudTarget) {
+              case 'stocks': setStock(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'technicians': setTechnicians(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'interventions': setInterventions(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'reports': setReports(prev => [data, ...prev.filter((r:any)=>r.id!==data.id)]); break;
+              case 'chantiers': setChantiers(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'transactions': setTransactions(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'employees': setEmployees(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'payrolls': setPayrolls(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'clients': setClients(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'caisse': setCaisse(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'suppliers': setSuppliers(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              case 'purchases': setPurchases(prev => prev.map(s => s.id === data.id ? data : s)); break;
+              default: break;
+            }
+            setIsAddOpen(false);
+            setItemToEdit(null);
+          }
+        } else {
+          const { data, error } = await supabase.from(crudTarget).insert([processedData]).select().single();
+          setCrudLoading(false);
+          if (error) {
+            console.error('Insert error', error);
+            alert('Erreur insertion: ' + (error.message || JSON.stringify(error)));
+          } else {
+            // add to local state for immediate UI feedback
+            switch (crudTarget) {
+              case 'stocks': setStock(prev => [data, ...prev]); break;
+              case 'technicians': setTechnicians(prev => [data, ...prev]); break;
+              case 'interventions': setInterventions(prev => [data, ...prev]); break;
+              case 'reports': setReports(prev => [data, ...prev]); break;
+              case 'chantiers': setChantiers(prev => [data, ...prev]); break;
+              case 'transactions': setTransactions(prev => [data, ...prev]); break;
+              case 'employees': setEmployees(prev => [data, ...prev]); break;
+              case 'payrolls': setPayrolls(prev => [data, ...prev]); break;
+              case 'clients': setClients(prev => [data, ...prev]); break;
+              case 'caisse': setCaisse(prev => [data, ...prev]); break;
+              case 'suppliers': setSuppliers(prev => [data, ...prev]); break;
+              case 'purchases': setPurchases(prev => [data, ...prev]); break;
+              default: break;
+            }
+            setIsAddOpen(false);
+            setItemToEdit(null);
+          }
+        }
+      } catch (e: any) {
+        setCrudLoading(false);
+        console.error('confirmAdd error', e);
+        alert('Erreur inattendue: ' + (e.message || JSON.stringify(e)));
+      }
   };
-
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-purple-500">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Mon Profil</h3>
-        <div className="space-y-4">
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Email (Lecture seule)</label><input value={formData.email} disabled className="w-full border border-gray-200 p-2 rounded-lg bg-gray-100 text-gray-500" /></div>
-           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
-           <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-orange text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 shadow-md">{loading ? '...' : 'Enregistrer'}</button>
-        </div>
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
-      </div>
-    </div>
-  );
-};
-
-// --- HEADER WITH NOTIFICATIONS ---
-const HeaderWithNotif = ({ 
-  title, onMenuClick, onLogout, onOpenFlashInfo, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
-}: any) => {
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
-    const unreadCount = notifications.filter((n: Notification) => !n.read).length;
-    const notifRef = useRef<HTMLDivElement>(null);
-    const settingsRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: any) => {
-            if (notifRef.current && !notifRef.current.contains(event.target)) setShowDropdown(false);
-            if (settingsRef.current && !settingsRef.current.contains(event.target)) setShowSettingsDropdown(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const canEditFlashInfo = userRole === 'Admin' || userRole === 'Administrateur';
-
-    return (
-        <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
-           <div className="flex items-center gap-4">
-              <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-600"><Menu/></button>
-              <h2 className="text-lg font-extrabold text-green-950 hidden md:block tracking-tight">{title}</h2>
-           </div>
-           <div className="flex items-center gap-3">
-               <div className="flex items-center gap-3 border-l pl-4 ml-2 border-gray-200">
-                  <div className="hidden md:block text-right">
-                     <p className="text-sm font-bold text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
-                     <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg shadow-inner border border-green-200">
-                      {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
-                  </div>
-               </div>
-              <div className="relative ml-2" ref={notifRef}>
-                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-gray-100 rounded-full transition text-gray-600">
                      <Bell />
                      {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-sm">{unreadCount}</span>}
                  </button>
