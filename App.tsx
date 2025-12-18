@@ -392,7 +392,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Détails</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Site</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Statut / Montant</th>
-                                {!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
+                                {!readOnly && (onDelete || onAddToCart) && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -433,10 +433,11 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                                 </span>
                                             )}
                                         </td>
-                                        {!readOnly && onDelete && (
-                                            <td className="p-4 text-right">
-                                                <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>
-                                            </td>
+                                        {!readOnly && (onDelete || onAddToCart) && (
+                                          <td className="p-4 text-right flex items-center justify-end gap-2">
+                                            {onAddToCart && <button onClick={() => onAddToCart(item)} title="Ajouter au panier" className="p-2 bg-green-50 text-green-600 hover:bg-green-100 rounded transition flex items-center gap-2"><ShoppingCart size={16}/> <span className="sr-only">Ajouter au panier</span></button>}
+                                            {onDelete && <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>}
+                                          </td>
                                         )}
                                     </tr>
                                 ))
@@ -508,7 +509,7 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
 };
 
 // --- Voice Recorder Modal (self-contained) ---
-const VoiceRecorderModal = ({ isOpen, onClose }: any) => {
+const VoiceRecorderModal = ({ isOpen, onClose, userProfile, onSaveReport }: any) => {
   const [isRecordingLocal, setIsRecordingLocal] = useState(false);
   const mediaRecorderLocal = useRef<MediaRecorder | null>(null);
   const audioChunksLocal = useRef<Blob[]>([]);
@@ -607,12 +608,61 @@ const VoiceRecorderModal = ({ isOpen, onClose }: any) => {
             ) : (
               <button onClick={restartRecording} className="px-4 py-2 bg-green-500 text-white rounded">Relancer</button>
             )}
-            <a className={`${audioUrlLocal ? '' : 'hidden'}`} href={audioUrlLocal || '#'} download="rapport.webm"><button className="px-4 py-2 bg-gray-100 rounded border">Télécharger</button></a>
+            {/* Remplacer téléchargement par soumission vers Supabase */}
+            <div className={`${audioUrlLocal ? '' : 'hidden'}`}>
+              <SubmitAudioButton audioChunksRef={audioChunksLocal} userProfile={userProfile} onSaveReport={onSaveReport} onClose={onClose} />
+            </div>
           </div>
           {audioUrlLocal && <audio className="mt-4 w-full" controls src={audioUrlLocal} />}
         </div>
       </div>
     </div>
+  );
+};
+
+// --- SubmitAudioButton ---
+const SubmitAudioButton = ({ audioChunksRef, userProfile, onSaveReport, onClose }: any) => {
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    setLoading(true);
+    try {
+      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      const fileName = `reports/${(userProfile && userProfile.id) ? userProfile.id : 'anon'}_${Date.now()}.webm`;
+      // Upload to Supabase Storage (bucket: 'reports')
+      const { data: uploadData, error: uploadError } = await supabase.storage.from('reports').upload(fileName, blob, { contentType: 'audio/webm' });
+      if (uploadError) {
+        alert('Erreur upload audio: ' + uploadError.message);
+        setLoading(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('reports').getPublicUrl(fileName);
+      const publicUrl = urlData?.publicUrl || '';
+
+      const newReport: any = {
+        technicianName: (userProfile && userProfile.full_name) ? userProfile.full_name : 'Technicien',
+        date: new Date().toISOString(),
+        content: '',
+        method: 'Voice',
+        audio_url: publicUrl
+      };
+
+      const { data: insertData, error: insertError } = await supabase.from('reports').insert([newReport]).select().single();
+      if (insertError) {
+        alert('Erreur sauvegarde rapport: ' + insertError.message);
+        setLoading(false);
+        return;
+      }
+      try { if (onSaveReport) onSaveReport(insertData); } catch (e) {}
+      alert('Rapport vocal soumis avec succès.');
+      onClose();
+    } catch (e: any) {
+      alert('Erreur lors de la soumission: ' + (e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <button onClick={submit} disabled={loading} className={`px-4 py-2 ${loading ? 'bg-gray-300' : 'bg-blue-600'} text-white rounded`}>{loading ? 'Envoi…' : 'Soumettre'}</button>
   );
 };
 
@@ -636,6 +686,50 @@ const HelpModal = ({ isOpen, onClose }: any) => {
             </div>
         </div>
     );
+};
+
+// --- Cart Panel ---
+const CartPanel = ({ isOpen, onClose, cart, updateQuantity, onCheckout, clearCart }: any) => {
+  if (!isOpen) return null;
+  const total = (cart || []).reduce((s: number, c: any) => s + ((c.price || 0) * (c.quantity || 1)), 0);
+  return (
+    <div className="fixed right-4 bottom-4 z-50 w-full max-w-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="font-bold">Panier</h4>
+          <div className="flex items-center gap-2">
+            <button onClick={clearCart} className="text-xs text-red-500">Vider</button>
+            <button onClick={onClose} className="text-xs text-gray-500">Fermer</button>
+          </div>
+        </div>
+        <div className="max-h-56 overflow-y-auto space-y-2">
+          {(cart || []).map((c: any) => (
+            <div key={c.id} className="flex items-center justify-between gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded">
+              <div>
+                <div className="font-bold text-sm">{c.name}</div>
+                <div className="text-xs text-gray-500">{c.unit} • {c.price?.toLocaleString?.() || c.price} F</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => updateQuantity(c.id, (c.quantity || 1) - 1)} className="px-2 py-1 bg-gray-100 rounded">-</button>
+                <div className="w-6 text-center">{c.quantity}</div>
+                <button onClick={() => updateQuantity(c.id, (c.quantity || 1) + 1)} className="px-2 py-1 bg-gray-100 rounded">+</button>
+              </div>
+            </div>
+          ))}
+          {(!cart || cart.length === 0) && <p className="text-center text-sm text-gray-400">Aucun article dans le panier.</p>}
+        </div>
+        <div className="mt-3 flex items-center justify-between">
+          <div>
+            <div className="text-xs text-gray-500">Total</div>
+            <div className="font-bold text-lg">{total.toLocaleString()} F</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onCheckout} className="px-4 py-2 bg-green-600 text-white rounded">Commander</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // --- Login Screen (Redesigned - Rich & Vibrant) ---
@@ -961,12 +1055,14 @@ const ConfirmationModal = ({
 };
 
 // --- Add Item Modal (Generic) ---
-const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
+const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: any) => {
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    if (isOpen) setFormData({}); 
-  }, [isOpen]);
+    if (isOpen) {
+      setFormData(initialData ? { ...initialData } : {});
+    }
+  }, [isOpen, initialData]);
 
   const handleSubmit = () => {
     if (config.title.includes('Rapport') && !formData.method) {
@@ -1010,7 +1106,7 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
         <div className="mt-6 flex gap-3">
            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
            <button onClick={handleSubmit} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600 transition shadow-md">
-             {loading ? <Loader2 className="animate-spin mx-auto"/> : "Ajouter"}
+             {loading ? <Loader2 className="animate-spin mx-auto"/> : (initialData ? 'Enregistrer' : 'Ajouter')}
            </button>
         </div>
       </div>
@@ -1282,6 +1378,14 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<any>(null);
+  const [cart, setCart] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem('ebf_cart');
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [crudTarget, setCrudTarget] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
@@ -1318,6 +1422,54 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
            if (percent !== 0) messages.push({ id: 'auto-year', text: `Bilan Annuel Global : ${percent > 0 ? '+' : ''}${percent.toFixed(1)}% de marge.`, type: percent > 0 ? 'info' : 'alert', display_order: 103, isManual: false });
       }
       setAutoTickerMessages(messages);
+  };
+
+  // CART helpers
+  const persistCart = (next: any[]) => {
+    setCart(next);
+    try { localStorage.setItem('ebf_cart', JSON.stringify(next)); } catch(e){}
+  };
+
+  const addToCart = (item: any) => {
+    const next = [...cart];
+    const idx = next.findIndex(i => i.id === item.id);
+    if (idx >= 0) {
+      next[idx].quantity = (next[idx].quantity || 1) + 1;
+    } else {
+      next.push({ id: item.id, name: item.name || item.label || 'Article', unit: item.unit || '', price: item.cost || item.amount || 0, quantity: 1 });
+    }
+    persistCart(next);
+    alert(`${item.name || item.label || 'Article'} ajouté au panier.`);
+  };
+
+  const updateCartQuantity = (id: string, qty: number) => {
+    const next = cart.map(c => c.id === id ? { ...c, quantity: Math.max(0, qty) } : c).filter(c => c.quantity > 0);
+    persistCart(next);
+  };
+
+  const clearCart = () => { persistCart([]); };
+
+  const checkoutCart = async () => {
+    if (cart.length === 0) { alert('Le panier est vide.'); return; }
+    // create purchase in supabase (simple representation)
+    const total = cart.reduce((s, c) => s + ((c.price || 0) * (c.quantity || 1)), 0);
+    try {
+      const purchase = {
+        date: new Date().toISOString(),
+        total: total,
+        items: cart,
+        site: currentSite || 'Global'
+      };
+      const { data, error } = await supabase.from('purchases').insert([purchase]).select().single();
+      if (error) { alert('Erreur lors de la commande: ' + error.message); return; }
+      // add to local purchases state
+      setPurchases(prev => [data, ...prev]);
+      clearCart();
+      setIsCartOpen(false);
+      alert('Commande passée avec succès.');
+    } catch (e: any) {
+      alert('Erreur checkout: ' + (e.message || e));
+    }
   };
 
   useEffect(() => {
@@ -1482,6 +1634,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const handleNavigate = (path: string) => { setCurrentPath(path); setIsMenuOpen(false); };
   const toggleTheme = () => { setDarkMode(!darkMode); document.documentElement.classList.toggle('dark'); };
   const handleOpenAdd = (table: string) => { setCrudTarget(table); setIsAddOpen(true); };
+  const handleOpenEdit = (item: any, table: string) => { setCrudTarget(table); setItemToEdit(item); setIsAddOpen(true); };
   const handleOpenDelete = (item: any, table: string) => { setItemToDelete(item); setCrudTarget(table); setIsDeleteOpen(true); };
   
   const handleResetBiometrics = () => {
@@ -1504,10 +1657,21 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       const config = FORM_CONFIGS[crudTarget];
       const processedData = { ...formData };
       if (config) config.fields.forEach(f => { if (f.type === 'number' && processedData[f.name]) processedData[f.name] = Number(processedData[f.name]); });
-      const { error } = await supabase.from(crudTarget).insert([processedData]);
-      setCrudLoading(false);
-      if (error) alert("Erreur: " + error.message);
-      else setIsAddOpen(false);
+      if (itemToEdit) {
+        // update
+        const { error } = await supabase.from(crudTarget).update(processedData).eq('id', itemToEdit.id);
+        setCrudLoading(false);
+        if (error) alert("Erreur mise à jour: " + error.message);
+        else {
+        setIsAddOpen(false);
+        setItemToEdit(null);
+        }
+      } else {
+        const { error } = await supabase.from(crudTarget).insert([processedData]);
+        setCrudLoading(false);
+        if (error) alert("Erreur: " + error.message);
+        else setIsAddOpen(false);
+      }
   };
   const handleDeleteDirectly = async (id: string, table: string) => {
       const { error } = await supabase.from(table).delete().eq('id', id);
@@ -1545,25 +1709,25 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      );
 
      // Existing Routes
-     if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} readOnly={!canWrite} />;
+    if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} onEdit={(item: any) => handleOpenEdit(item, 'interventions')} readOnly={!canWrite} />;
      if (currentPath === '/techniciens/rapports') return <>
        <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else setIsVoiceOpen(true); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />
-       <VoiceRecorderModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} />
+       <VoiceRecorderModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} userProfile={userProfile} onSaveReport={(r: any) => setReports(prev => [r, ...prev])} />
      </>;
-     if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} readOnly={!canWrite} />;
+    if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} onEdit={(item: any) => handleOpenEdit(item, 'stocks')} readOnly={!canWrite} />;
+    if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} onAddToCart={addToCart} onEdit={(item: any) => handleOpenEdit(item, 'stocks')} readOnly={!canWrite} />;
+    if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} onEdit={(item: any) => handleOpenEdit(item, 'technicians')} readOnly={!canWrite} />;
 
      // NEWLY CONFIGURED ROUTES (ACTIVE)
-     if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} readOnly={!canWrite} />;
-     if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} readOnly={!canWrite} />;
-     if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} readOnly={!canWrite} />;
-     if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} readOnly={!canWrite} />;
+    if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} onEdit={(item: any) => handleOpenEdit(item, 'chantiers')} readOnly={!canWrite} />;
+    if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} onEdit={(item: any) => handleOpenEdit(item, 'transactions')} readOnly={!canWrite} />;
+    if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} onEdit={(item: any) => handleOpenEdit(item, 'employees')} readOnly={!canWrite} />;
+    if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} onEdit={(item: any) => handleOpenEdit(item, 'payrolls')} readOnly={!canWrite} />;
      if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={true} />; 
-     if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} readOnly={!canWrite} />;
-     if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} readOnly={!canWrite} />;
+    if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} onEdit={(item: any) => handleOpenEdit(item, 'clients')} readOnly={!canWrite} />;
+    if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} onEdit={(item: any) => handleOpenEdit(item, 'caisse')} readOnly={!canWrite} />;
+    if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} onEdit={(item: any) => handleOpenEdit(item, 'suppliers')} readOnly={!canWrite} />;
+    if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} onEdit={(item: any) => handleOpenEdit(item, 'purchases')} readOnly={!canWrite} />;
 
      return <div className="flex flex-col items-center justify-center h-full text-gray-400"><Wrench size={48} className="mb-4 opacity-50" /><p className="text-xl">Module "{currentPath}" en construction.</p><button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-orange font-bold hover:underline">Retour Accueil</button></div>;
   };
@@ -1623,6 +1787,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
         <AddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} />
         <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
+        <CartPanel isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} updateQuantity={updateCartQuantity} onCheckout={checkoutCart} clearCart={clearCart} />
     </div>
   );
 };
