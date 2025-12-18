@@ -1,0 +1,10 @@
+
+-- CORRECTION DE L'ERREUR "null value in column id" --
+-- Copiez et exécutez ce code dans l'éditeur SQL de Supabase --
+
+-- 1. On supprime la contrainte qui oblige un technicien à avoir un compte utilisateur (Auth)
+-- Cela permet d'ajouter manuellement des employés qui ne se connectent pas à l'app.
+ALTER TABLE public.technicians DROP CONSTRAINT IF EXISTS technicians_id_fkey;
+
+-- 2. On configure la colonne ID pour qu'elle se génère toute seule (Auto-increment UUID)
+ALTER TABLE public.technicians ALTER COLUMN id SET DEFAULT gen_random_uuid();
