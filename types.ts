@@ -47,6 +47,11 @@ export interface StockItem {
   threshold: number;
   unit: string;
   site: Site;
+  price: number;
+  imageUrl?: string;
+  category: string;
+  specsUrl?: string;
+  description?: string;
 }
 
 export interface Intervention {
