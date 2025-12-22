@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
@@ -210,8 +211,137 @@ const MODULE_ACTIONS: Record<string, ModuleAction[]> = {
       icon: FileText, 
       path: '/techniciens/rapports', 
       color: 'bg-gray-700' 
-    }
+    },
+    { 
+      id: 'materiel', 
+      label: 'Matériel', 
+      description: 'Inventaire & Affectation', 
+      managedBy: 'Géré par le Magasinier',
+      icon: Truck, 
+      path: '/techniciens/materiel', 
+      color: 'bg-blue-600' 
+    },
+    { 
+      id: 'chantiers', 
+      label: 'Chantiers', 
+      description: 'Suivi & Exécution', 
+      managedBy: 'Géré par le Chef de Chantier',
+      icon: ShieldCheck, 
+      path: '/techniciens/chantiers', 
+      color: 'bg-green-600' 
+    },
+  ],
+  comptabilite: [
+    { id: 'bilan', label: 'Bilan Financier', description: 'Journal des transactions', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600' },
+    { id: 'rh', label: 'Ressources Humaines', description: 'Dossiers du personnel', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600' },
+    { id: 'paie', label: 'Paie & Salaires', description: 'Gestion des virements mensuels', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500' },
+  ],
+  secretariat: [
+    { id: 'planning', label: 'Planning', description: 'Agenda des équipes et rdv', icon: Calendar, path: '/secretariat/planning', color: 'bg-indigo-500' },
+    { id: 'clients', label: 'Gestion Clients', description: 'Base de données CRM', icon: UserCheck, path: '/secretariat/clients', color: 'bg-blue-500' },
+    { id: 'caisse', label: 'Caisse Menu', description: 'Suivi de la petite caisse', icon: Archive, path: '/secretariat/caisse', color: 'bg-gray-600' },
+  ],
+  quincaillerie: [
+    { id: 'stocks', label: 'Stocks', description: 'État des stocks en temps réel', icon: ClipboardList, path: '/quincaillerie/stocks', color: 'bg-orange-600' },
+    { id: 'fournisseurs', label: 'Fournisseurs', description: 'Liste et contacts partenaires', icon: Truck, path: '/quincaillerie/fournisseurs', color: 'bg-green-600' },
+    { id: 'achats', label: 'Bons d\'achat', description: 'Historique des commandes', icon: FileText, path: '/quincaillerie/achats', color: 'bg-red-500' },
+  ]
+};
+
+// --- Helper: Date Filter ---
+const isInPeriod = (dateStr: string, period: Period): boolean => {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (period === Period.DAY) {
+    return itemDate.getTime() === today.getTime();
+  } else if (period === Period.WEEK) {
+    const day = today.getDay();
+    const diffToMonday = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(diffToMonday);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    monday.setHours(0,0,0,0);
+    friday.setHours(23,59,59,999);
+    const itemDay = date.getDay();
+    if (itemDay === 0 || itemDay === 6) return false;
+    return itemDate >= monday && itemDate <= friday;
+  } else if (period === Period.MONTH) {
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  } else if (period === Period.YEAR) {
+    return date.getFullYear() === now.getFullYear();
+  }
+  return true;
+};
+
+// --- Helper: Permission Check (STRICT) ---
+const getPermission = (path: string, role: Role): { canWrite: boolean } => {
+  if (role === 'Admin') return { canWrite: true }; // Admin a tous les droits
+  if (role === 'Visiteur') return { canWrite: false }; // Visiteur n'a aucun droit d'écriture
+
+  // Rôles internes spécifiques
+  // Technicien écrit UNIQUEMENT dans /techniciens
+  if (role === 'Technicien' && path.startsWith('/techniciens')) return { canWrite: true };
   
+  // Magasinier écrit UNIQUEMENT dans /quincaillerie
+  if (role === 'Magasinier' && path.startsWith('/quincaillerie')) return { canWrite: true };
+  
+  // Secrétaire écrit UNIQUEMENT dans /secretariat
+  if (role === 'Secretaire' && path.startsWith('/secretariat')) return { canWrite: true };
+  
+  // TOUT LE RESTE (y compris /equipe, /comptabilite pour les non-admins) est strictement Lecture Seule
+  return { canWrite: false };
+};
+
+// --- EBF Vector Logo (Globe + Plug) ---
+const EbfSvgLogo = ({ size }: { size: 'small' | 'normal' | 'large' }) => {
+    // Scaling factor
+    const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
+    const width = 200 * scale;
+    const height = 100 * scale;
+    
+    return (
+        <svg width={width} height={height} viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{stopColor:'#3b82f6', stopOpacity:1}} />
+                    <stop offset="100%" style={{stopColor:'#16a34a', stopOpacity:1}} />
+                </linearGradient>
+            </defs>
+            {/* Globe */}
+            <circle cx="40" cy="40" r="30" fill="url(#globeGrad)" />
+            {/* Continents (Stylized) */}
+            <path d="M25,30 Q35,20 45,30 T55,45 T40,60 T25,45" fill="#4ade80" opacity="0.8"/>
+            <path d="M50,20 Q60,15 65,25" fill="none" stroke="#a3e635" strokeWidth="2"/>
+            
+            {/* Cord */}
+            <path d="M40,70 C40,90 80,90 80,50 L80,40" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round"/>
+            
+            {/* Plug - SQUARE (rx=0) */}
+            <rect x="70" y="20" width="20" height="25" rx="0" fill="#e5e5e5" stroke="#9ca3af" strokeWidth="2" />
+            <path d="M75,20 L75,10 M85,20 L85,10" stroke="#374151" strokeWidth="3" />
+            
+            {/* Cord Line */}
+            <line x1="100" y1="10" x2="100" y2="80" stroke="black" strokeWidth="3" />
+            
+            {/* E.B.F Letters */}
+            <text x="110" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">E</text>
+            <text x="135" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="145" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
+            <text x="170" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#000">.</text>
+            <text x="180" y="55" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="40" fill="#008000">F</text>
+            
+            {/* Banner Text */}
+            <rect x="110" y="70" width="90" height="15" fill="#FF0000" />
+            <text x="155" y="81" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="7" fill="white" textAnchor="middle">
+                Electricité - Bâtiment - Froid
+            </text>
+        </svg>
+    );
 };
 
 const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
@@ -235,7 +365,7 @@ const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) =
 };
 
 // --- Module Placeholder (Generic List View) ---
-const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, onAddToCart, onEdit, readOnly }: any) => {
+const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete, readOnly }: any) => {
     // Basic filtering based on Site and Date if available in items
     const filteredItems = items.filter((item: any) => {
         // Site filter
@@ -275,7 +405,7 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Détails</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Site</th>
                                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Statut / Montant</th>
-                                {!readOnly && (onDelete || onAddToCart || onEdit) && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
+                                {!readOnly && onDelete && <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 dark:text-gray-300">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -316,12 +446,10 @@ const ModulePlaceholder = ({ title, subtitle, items = [], onBack, color, current
                                                 </span>
                                             )}
                                         </td>
-                                        {!readOnly && (onDelete || onAddToCart || onEdit) && (
-                                          <td className="p-4 text-right flex items-center justify-end gap-2">
-                                            {onAddToCart && <button onClick={() => onAddToCart(item)} title="Ajouter au panier" className="p-2 bg-green-50 text-green-600 hover:bg-green-100 rounded transition flex items-center gap-2"><ShoppingCart size={16}/> <span className="sr-only">Ajouter au panier</span></button>}
-                                            {onEdit && <button onClick={() => onEdit(item)} title="Modifier" className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded transition"><Edit size={16}/></button>}
-                                            {onDelete && <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>}
-                                          </td>
+                                        {!readOnly && onDelete && (
+                                            <td className="p-4 text-right">
+                                                <button onClick={() => onDelete(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button>
+                                            </td>
                                         )}
                                     </tr>
                                 ))
@@ -392,164 +520,6 @@ const ReportModeSelector = ({ reports, onSelectMode, onBack, onViewReport, readO
     );
 };
 
-// --- Voice Recorder Modal (self-contained) ---
-const VoiceRecorderModal = ({ isOpen, onClose, userProfile, onSaveReport }: any) => {
-  const [isRecordingLocal, setIsRecordingLocal] = useState(false);
-  const mediaRecorderLocal = useRef<MediaRecorder | null>(null);
-  const audioChunksLocal = useRef<Blob[]>([]);
-  const [audioUrlLocal, setAudioUrlLocal] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    let streamRef: MediaStream | null = null;
-
-    const startRecording = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef = stream;
-        const mr = new MediaRecorder(stream as MediaStream);
-        mediaRecorderLocal.current = mr;
-        audioChunksLocal.current = [];
-        mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) audioChunksLocal.current.push(e.data); };
-        mr.onstop = () => {
-          const blob = new Blob(audioChunksLocal.current, { type: 'audio/webm' });
-          const url = URL.createObjectURL(blob);
-          setAudioUrlLocal(url);
-        };
-        mr.start();
-        setIsRecordingLocal(true);
-      } catch (err: any) {
-        alert("Impossible d'accéder au microphone : " + (err && err.message ? err.message : err));
-        onClose();
-      }
-    };
-
-    startRecording();
-
-    return () => {
-      try {
-        if (mediaRecorderLocal.current && mediaRecorderLocal.current.state !== 'inactive') mediaRecorderLocal.current.stop();
-        if (streamRef) streamRef.getTracks().forEach(t => t.stop());
-      } catch (e) {}
-      mediaRecorderLocal.current = null;
-      setIsRecordingLocal(false);
-    };
-  }, [isOpen, onClose]);
-
-  const stopRecording = () => {
-    if (mediaRecorderLocal.current && mediaRecorderLocal.current.state !== 'inactive') {
-      mediaRecorderLocal.current.stop();
-    }
-    setIsRecordingLocal(false);
-  };
-
-  const restartRecording = async () => {
-    // stop existing
-    try { if (mediaRecorderLocal.current && mediaRecorderLocal.current.state !== 'inactive') mediaRecorderLocal.current.stop(); } catch (e) {}
-    setAudioUrlLocal(null);
-    // start again by simulating unmount/mount: call getUserMedia again
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream as MediaStream);
-      mediaRecorderLocal.current = mr;
-      audioChunksLocal.current = [];
-      mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size > 0) audioChunksLocal.current.push(e.data); };
-      mr.onstop = () => {
-        const blob = new Blob(audioChunksLocal.current, { type: 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        setAudioUrlLocal(url);
-      };
-      mr.start();
-      setIsRecordingLocal(true);
-    } catch (err: any) {
-      alert("Impossible de relancer l'enregistrement : " + (err && err.message ? err.message : err));
-    }
-  };
-
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={() => {
-        if (isRecordingLocal) {
-          if (confirm("Arrêter l'enregistrement et fermer ?")) {
-            stopRecording();
-            onClose();
-          }
-        } else {
-          onClose();
-        }
-      }} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-blue-500">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold flex items-center gap-2"><Mic className="text-blue-500"/> Enregistrement Vocal</h3>
-          <button onClick={() => { if (isRecordingLocal) { stopRecording(); } else onClose(); }}><X className="text-gray-400 hover:text-red-500"/></button>
-        </div>
-        <div className="text-center py-6">
-          <p className="font-bold text-lg">{isRecordingLocal ? 'Enregistrement en cours…' : 'Enregistrement arrêté'}</p>
-          <div className="mt-4 flex items-center justify-center gap-3">
-            {isRecordingLocal ? (
-              <button onClick={stopRecording} className="px-4 py-2 bg-red-500 text-white rounded">Arrêter</button>
-            ) : (
-              <button onClick={restartRecording} className="px-4 py-2 bg-green-500 text-white rounded">Relancer</button>
-            )}
-            {/* Remplacer téléchargement par soumission vers Supabase */}
-            <div className={`${audioUrlLocal ? '' : 'hidden'}`}>
-              <SubmitAudioButton audioChunksRef={audioChunksLocal} userProfile={userProfile} onSaveReport={onSaveReport} onClose={onClose} />
-            </div>
-          </div>
-          {audioUrlLocal && <audio className="mt-4 w-full" controls src={audioUrlLocal} />}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- SubmitAudioButton ---
-const SubmitAudioButton = ({ audioChunksRef, userProfile, onSaveReport, onClose }: any) => {
-  const [loading, setLoading] = useState(false);
-  const submit = async () => {
-    setLoading(true);
-    try {
-      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      const fileName = `reports/${(userProfile && userProfile.id) ? userProfile.id : 'anon'}_${Date.now()}.webm`;
-      // Upload to Supabase Storage (bucket: 'reports')
-      const { data: uploadData, error: uploadError } = await supabase.storage.from('reports').upload(fileName, blob, { contentType: 'audio/webm' });
-      if (uploadError) {
-        alert('Erreur upload audio: ' + uploadError.message);
-        setLoading(false);
-        return;
-      }
-      const { data: urlData } = supabase.storage.from('reports').getPublicUrl(fileName);
-      const publicUrl = urlData?.publicUrl || '';
-
-      const newReport: any = {
-        technicianName: (userProfile && userProfile.full_name) ? userProfile.full_name : 'Technicien',
-        date: new Date().toISOString(),
-        content: '',
-        method: 'Voice',
-        audio_url: publicUrl
-      };
-
-      const { data: insertData, error: insertError } = await supabase.from('reports').insert([newReport]).select().single();
-      if (insertError) {
-        alert('Erreur sauvegarde rapport: ' + insertError.message);
-        setLoading(false);
-        return;
-      }
-      try { if (onSaveReport) onSaveReport(insertData); } catch (e) {}
-      alert('Rapport vocal soumis avec succès.');
-      onClose();
-    } catch (e: any) {
-      alert('Erreur lors de la soumission: ' + (e.message || e));
-    } finally {
-      setLoading(false);
-    }
-  };
-  return (
-    <button onClick={submit} disabled={loading} className={`px-4 py-2 ${loading ? 'bg-gray-300' : 'bg-blue-600'} text-white rounded`}>{loading ? 'Envoi…' : 'Soumettre'}</button>
-  );
-};
-
 // --- Help Modal ---
 const HelpModal = ({ isOpen, onClose }: any) => {
     if (!isOpen) return null;
@@ -570,50 +540,6 @@ const HelpModal = ({ isOpen, onClose }: any) => {
             </div>
         </div>
     );
-};
-
-// --- Cart Panel ---
-const CartPanel = ({ isOpen, onClose, cart, updateQuantity, onCheckout, clearCart }: any) => {
-  if (!isOpen) return null;
-  const total = (cart || []).reduce((s: number, c: any) => s + ((c.price || 0) * (c.quantity || 1)), 0);
-  return (
-    <div className="fixed right-4 bottom-4 z-50 w-full max-w-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 p-4">
-        <div className="flex justify-between items-center mb-3">
-          <h4 className="font-bold">Panier</h4>
-          <div className="flex items-center gap-2">
-            <button onClick={clearCart} className="text-xs text-red-500">Vider</button>
-            <button onClick={onClose} className="text-xs text-gray-500">Fermer</button>
-          </div>
-        </div>
-        <div className="max-h-56 overflow-y-auto space-y-2">
-          {(cart || []).map((c: any) => (
-            <div key={c.id} className="flex items-center justify-between gap-3 p-2 bg-gray-50 dark:bg-gray-700 rounded">
-              <div>
-                <div className="font-bold text-sm">{c.name}</div>
-                <div className="text-xs text-gray-500">{c.unit} • {c.price?.toLocaleString?.() || c.price} F</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => updateQuantity(c.id, (c.quantity || 1) - 1)} className="px-2 py-1 bg-gray-100 rounded">-</button>
-                <div className="w-6 text-center">{c.quantity}</div>
-                <button onClick={() => updateQuantity(c.id, (c.quantity || 1) + 1)} className="px-2 py-1 bg-gray-100 rounded">+</button>
-              </div>
-            </div>
-          ))}
-          {(!cart || cart.length === 0) && <p className="text-center text-sm text-gray-400">Aucun article dans le panier.</p>}
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-gray-500">Total</div>
-            <div className="font-bold text-lg">{total.toLocaleString()} F</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onCheckout} className="px-4 py-2 bg-green-600 text-white rounded">Commander</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 // --- Login Screen (Redesigned - Rich & Vibrant) ---
@@ -689,7 +615,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: () => void }) => {
         } else {
              // NO SESSION = CONFIRMATION REQUIRED BY SERVER
              setIsSignUp(false);
-             setSuccessMsg("Inscription réussie ! Vérifiez vos emails pour valider le compte.");
+             setSuccessMsg("Inscription réussie ! Vérifiez vos emails pour valider le compte avant de vous connecter.");
         }
 
       } else {
@@ -939,48 +865,17 @@ const ConfirmationModal = ({
 };
 
 // --- Add Item Modal (Generic) ---
-const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: any) => {
+const AddModal = ({ isOpen, onClose, config, onSubmit, loading }: any) => {
   const [formData, setFormData] = useState<any>({});
-  const [errors, setErrors] = useState<Record<string,string>>({});
 
   useEffect(() => {
-    if (isOpen) {
-      setFormData(initialData ? { ...initialData } : {});
-      setErrors({});
-    }
-  }, [isOpen, initialData]);
-
-  const validate = (): boolean => {
-    if (!config) return true;
-    const newErrors: Record<string,string> = {};
-    config.fields.forEach((field: FormField) => {
-      const val = formData[field.name];
-      if (field.type === 'email') {
-        if (!val) newErrors[field.name] = 'Email requis.';
-        else {
-          const re = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-          if (!re.test(val)) newErrors[field.name] = 'Email invalide.';
-        }
-      } else if (field.type === 'number') {
-        if (val === undefined || val === null || val === '') newErrors[field.name] = 'Champ numérique requis.';
-        else if (isNaN(Number(val))) newErrors[field.name] = 'Valeur numérique attendue.';
-      } else if (field.type === 'select') {
-        if (!val) newErrors[field.name] = 'Sélection requise.';
-      } else {
-        // text, date
-        if (val === undefined || val === null || String(val).trim() === '') newErrors[field.name] = 'Champ requis.';
-      }
-    });
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    if (isOpen) setFormData({}); 
+  }, [isOpen]);
 
   const handleSubmit = () => {
-    if (!config) return;
     if (config.title.includes('Rapport') && !formData.method) {
-      formData.method = 'Form';
+        formData.method = 'Form';
     }
-    if (!validate()) return;
     onSubmit(formData);
   };
 
@@ -998,8 +893,8 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: a
                 {field.type === 'select' ? (
                    <select 
                      className="w-full border border-gray-200 p-2.5 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none"
-                    onChange={e => { setFormData({...formData, [field.name]: e.target.value}); setErrors(prev => { const c = {...prev}; delete c[field.name]; return c; }); }}
-                    value={formData[field.name] || ''}
+                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
+                     value={formData[field.name] || ''}
                    >
                      <option value="">Sélectionner...</option>
                      {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1008,19 +903,18 @@ const AddModal = ({ isOpen, onClose, config, onSubmit, loading, initialData }: a
                    <input 
                      type={field.type} 
                      className="w-full border border-gray-200 p-2.5 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none"
-                     onChange={e => { setFormData({...formData, [field.name]: e.target.value}); setErrors(prev => { const c = {...prev}; delete c[field.name]; return c; }); }}
+                     onChange={e => setFormData({...formData, [field.name]: e.target.value})}
                      value={formData[field.name] || ''}
                      placeholder={field.placeholder || ''}
                    />
                 )}
-                {errors[field.name] && <p className="text-xs text-red-500 mt-1">{errors[field.name]}</p>}
              </div>
           ))}
         </div>
         <div className="mt-6 flex gap-3">
            <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
            <button onClick={handleSubmit} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600 transition shadow-md">
-             {loading ? <Loader2 className="animate-spin mx-auto"/> : (initialData ? 'Enregistrer' : 'Ajouter')}
+             {loading ? <Loader2 className="animate-spin mx-auto"/> : "Ajouter"}
            </button>
         </div>
       </div>
@@ -1109,64 +1003,77 @@ const ProfileModal = ({ isOpen, onClose, profile }: any) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && profile) {
-      setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
-    }
-  }, [isOpen, profile]);
+    if (profile) setFormData({ full_name: profile.full_name || '', email: profile.email || '', phone: profile.phone || '' });
+  }, [profile, isOpen]);
 
-  const saveProfile = async () => {
-    if (!profile || !profile.id) {
-      alert('Profil introuvable.');
-      return;
-    }
+  const handleUpdate = async () => {
     setLoading(true);
-    try {
-      const up = { id: profile.id, full_name: formData.full_name, email: formData.email, phone: formData.phone };
-      const { error } = await supabase.from('profiles').upsert([up]);
-      if (error) {
-        alert('Erreur sauvegarde profil: ' + error.message);
-      } else {
-        alert('Profil mis à jour.');
-        onClose();
-      }
-    } catch (e: any) {
-      alert('Erreur: ' + (e.message || e));
-    } finally {
-      setLoading(false);
+    const { error } = await supabase.from('profiles').update({ full_name: formData.full_name, phone: formData.phone }).eq('id', profile.id);
+    if (!error && profile.role !== 'Visiteur') {
+       await supabase.from('technicians').update({ name: formData.full_name }).eq('id', profile.id);
     }
+    setLoading(false);
+    if (error) alert("Erreur mise à jour profil");
+    else { alert("Profil mis à jour !"); onClose(); window.location.reload(); }
   };
 
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-ebf-orange">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Modifier le profil</h3>
-          <button onClick={onClose}><X className="text-gray-400 hover:text-red-500"/></button>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-md p-6 shadow-2xl animate-fade-in border-t-4 border-purple-500">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Mon Profil</h3>
+        <div className="space-y-4">
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Nom Complet</label><input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Email (Lecture seule)</label><input value={formData.email} disabled className="w-full border border-gray-200 p-2 rounded-lg bg-gray-100 text-gray-500" /></div>
+           <div><label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Téléphone</label><input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-gray-200 p-2 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-ebf-orange outline-none" /></div>
+           <button onClick={handleUpdate} disabled={loading} className="w-full bg-ebf-orange text-white font-bold py-2.5 rounded-lg hover:bg-orange-600 shadow-md">{loading ? '...' : 'Enregistrer'}</button>
         </div>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Nom complet</label>
-            <input value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
-            <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border p-2 rounded" />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Téléphone</label>
-            <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border p-2 rounded" />
-          </div>
-        </div>
-        <div className="mt-6 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Annuler</button>
-          <button onClick={saveProfile} disabled={loading} className="flex-1 py-2.5 bg-ebf-orange text-white rounded-lg font-bold hover:bg-orange-600">{loading ? 'Enregistrement…' : 'Enregistrer'}</button>
-        </div>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
       </div>
     </div>
   );
 };
+
+// --- HEADER WITH NOTIFICATIONS ---
+const HeaderWithNotif = ({ 
+  title, onMenuClick, onLogout, onOpenFlashInfo, notifications, userProfile, userRole, markNotificationAsRead, onOpenProfile, onOpenHelp, darkMode, onToggleTheme, onResetBiometrics
+}: any) => {
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+    const unreadCount = notifications.filter((n: Notification) => !n.read).length;
+    const notifRef = useRef<HTMLDivElement>(null);
+    const settingsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: any) => {
+            if (notifRef.current && !notifRef.current.contains(event.target)) setShowDropdown(false);
+            if (settingsRef.current && !settingsRef.current.contains(event.target)) setShowSettingsDropdown(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const canEditFlashInfo = userRole === 'Admin';
+
+    return (
+        <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sticky top-0 z-30 shadow-sm">
+           <div className="flex items-center gap-4">
+              <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-600"><Menu/></button>
+              <h2 className="text-lg font-extrabold text-green-950 hidden md:block tracking-tight">{title}</h2>
+           </div>
+           <div className="flex items-center gap-3">
+               <div className="flex items-center gap-3 border-l pl-4 ml-2 border-gray-200">
+                  <div className="hidden md:block text-right">
+                     <p className="text-sm font-bold text-gray-800">{userProfile?.full_name || 'Utilisateur'}</p>
+                     <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-full inline-block">Mode: {userRole}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-lg shadow-inner border border-green-200">
+                      {userProfile?.full_name ? userProfile.full_name.charAt(0) : <User size={20}/>}
+                  </div>
+               </div>
+              <div className="relative ml-2" ref={notifRef}>
+                 <button onClick={() => setShowDropdown(!showDropdown)} className="p-2 relative hover:bg-gray-100 rounded-full transition text-gray-600">
                      <Bell />
                      {unreadCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-sm">{unreadCount}</span>}
                  </button>
@@ -1278,15 +1185,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   const [isFlashInfoOpen, setIsFlashInfoOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [itemToEdit, setItemToEdit] = useState<any>(null);
-  const [cart, setCart] = useState<any[]>(() => {
-    try {
-      const raw = localStorage.getItem('ebf_cart');
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) { return []; }
-  });
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [crudTarget, setCrudTarget] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [crudLoading, setCrudLoading] = useState(false);
@@ -1323,54 +1221,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
            if (percent !== 0) messages.push({ id: 'auto-year', text: `Bilan Annuel Global : ${percent > 0 ? '+' : ''}${percent.toFixed(1)}% de marge.`, type: percent > 0 ? 'info' : 'alert', display_order: 103, isManual: false });
       }
       setAutoTickerMessages(messages);
-  };
-
-  // CART helpers
-  const persistCart = (next: any[]) => {
-    setCart(next);
-    try { localStorage.setItem('ebf_cart', JSON.stringify(next)); } catch(e){}
-  };
-
-  const addToCart = (item: any) => {
-    const next = [...cart];
-    const idx = next.findIndex(i => i.id === item.id);
-    if (idx >= 0) {
-      next[idx].quantity = (next[idx].quantity || 1) + 1;
-    } else {
-      next.push({ id: item.id, name: item.name || item.label || 'Article', unit: item.unit || '', price: item.cost || item.amount || 0, quantity: 1 });
-    }
-    persistCart(next);
-    alert(`${item.name || item.label || 'Article'} ajouté au panier.`);
-  };
-
-  const updateCartQuantity = (id: string, qty: number) => {
-    const next = cart.map(c => c.id === id ? { ...c, quantity: Math.max(0, qty) } : c).filter(c => c.quantity > 0);
-    persistCart(next);
-  };
-
-  const clearCart = () => { persistCart([]); };
-
-  const checkoutCart = async () => {
-    if (cart.length === 0) { alert('Le panier est vide.'); return; }
-    // create purchase in supabase (simple representation)
-    const total = cart.reduce((s, c) => s + ((c.price || 0) * (c.quantity || 1)), 0);
-    try {
-      const purchase = {
-        date: new Date().toISOString(),
-        total: total,
-        items: cart,
-        site: currentSite || 'Global'
-      };
-      const { data, error } = await supabase.from('purchases').insert([purchase]).select().single();
-      if (error) { alert('Erreur lors de la commande: ' + error.message); return; }
-      // add to local purchases state
-      setPurchases(prev => [data, ...prev]);
-      clearCart();
-      setIsCartOpen(false);
-      alert('Commande passée avec succès.');
-    } catch (e: any) {
-      alert('Erreur checkout: ' + (e.message || e));
-    }
   };
 
   useEffect(() => {
@@ -1435,7 +1285,6 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_stats' }, (payload) => {
            if (payload.eventType === 'INSERT') setStats(prev => [...prev, payload.new as StatData]);
            else if (payload.eventType === 'UPDATE') setStats(prev => prev.map(s => (s.date === payload.new.date && s.site === payload.new.site) ? payload.new as StatData : s));
-           else if (payload.eventType === 'DELETE') setStats(prev => prev.filter(s => !(s.date === payload.old.date && s.site === payload.old.site)));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticker_messages' }, (payload) => {
            if (payload.eventType === 'INSERT') setManualTickerMessages(prev => [...prev, { ...payload.new, isManual: true } as TickerMessage]);
@@ -1458,74 +1307,12 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
     return () => { supabase.removeChannel(channels); };
   }, []);
 
-  // --- REAL-TIME AGGREGATION LOGIC ---
-  // Calculates stats dynamically from Reports and Transactions
-  const realTimeStats = useMemo(() => {
-    const statsMap = new Map<string, StatData>();
-
-    // 1. Process Reports (Revenue/Expenses/Interventions)
-    reports.forEach(report => {
-        if (!report.date) return;
-        const key = `${report.date}_${report.site || 'Global'}`;
-        
-        if (!statsMap.has(key)) {
-            statsMap.set(key, {
-                id: key,
-                date: report.date,
-                site: report.site as Site,
-                revenue: 0,
-                expenses: 0,
-                profit: 0,
-                interventions: 0
-            });
-        }
-        
-        const stat = statsMap.get(key)!;
-        stat.revenue += Number(report.revenue || 0);
-        stat.expenses += Number(report.expenses || 0);
-        stat.interventions += 1;
-    });
-
-    // 2. Process Transactions (Revenue/Expenses from Accounting)
-    transactions.forEach(trans => {
-        if (!trans.date) return;
-        const key = `${trans.date}_${trans.site || 'Global'}`;
-
-        if (!statsMap.has(key)) {
-            statsMap.set(key, {
-                id: key,
-                date: trans.date,
-                site: trans.site as Site,
-                revenue: 0,
-                expenses: 0,
-                profit: 0,
-                interventions: 0
-            });
-        }
-
-        const stat = statsMap.get(key)!;
-        if (trans.type === 'Recette') {
-            stat.revenue += Number(trans.amount || 0);
-        } else if (trans.type === 'Dépense') {
-            stat.expenses += Number(trans.amount || 0);
-        }
-    });
-
-    // 3. Finalize Profit Calculation & Sort
-    return Array.from(statsMap.values()).map(stat => ({
-        ...stat,
-        profit: stat.revenue - stat.expenses
-    })).sort((a, b) => b.date.localeCompare(a.date));
-
-  }, [reports, transactions]);
-
-  // Use realTimeStats for Flash Info generation instead of static stats
   useEffect(() => {
-    if (realTimeStats.length > 0) generateAutoTickerMessages(realTimeStats);
+    if (stats.length > 0) generateAutoTickerMessages(stats);
     else setAutoTickerMessages([{ id: 'welcome-default', text: 'Bienvenue sur EBF Manager. Le système est prêt et connecté.', type: 'info', display_order: 0, isManual: false }]);
-    const interval = setInterval(() => { if (realTimeStats.length > 0) generateAutoTickerMessages(realTimeStats); }, 600000);
+    const interval = setInterval(() => { if (stats.length > 0) generateAutoTickerMessages(stats); }, 600000);
     return () => clearInterval(interval);
-  }, [realTimeStats]);
+  }, [stats]);
 
   const combinedTickerMessages = useMemo(() => {
      if (manualTickerMessages.length === 0 && autoTickerMessages.length === 0) return [];
@@ -1534,8 +1321,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
 
   const handleNavigate = (path: string) => { setCurrentPath(path); setIsMenuOpen(false); };
   const toggleTheme = () => { setDarkMode(!darkMode); document.documentElement.classList.toggle('dark'); };
-  const handleOpenAdd = (table: string) => { setCrudTarget(table); setItemToEdit(null); setIsAddOpen(true); };
-  const handleOpenEdit = (item: any, table: string) => { setCrudTarget(table); setItemToEdit(item); setIsAddOpen(true); };
+  const handleOpenAdd = (table: string) => { setCrudTarget(table); setIsAddOpen(true); };
   const handleOpenDelete = (item: any, table: string) => { setItemToDelete(item); setCrudTarget(table); setIsDeleteOpen(true); };
   
   const handleResetBiometrics = () => {
@@ -1558,21 +1344,10 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
       const config = FORM_CONFIGS[crudTarget];
       const processedData = { ...formData };
       if (config) config.fields.forEach(f => { if (f.type === 'number' && processedData[f.name]) processedData[f.name] = Number(processedData[f.name]); });
-      if (itemToEdit) {
-        // update
-        const { error } = await supabase.from(crudTarget).update(processedData).eq('id', itemToEdit.id);
-        setCrudLoading(false);
-        if (error) alert("Erreur mise à jour: " + error.message);
-        else {
-        setIsAddOpen(false);
-        setItemToEdit(null);
-        }
-        } else {
-          const { data, error } = await supabase.from(crudTarget).insert([processedData]).select().single();
-          setCrudLoading(false);
-          if (error) alert("Erreur: " + error.message);
-          else { setIsAddOpen(false); setItemToEdit(null); }
-        }
+      const { error } = await supabase.from(crudTarget).insert([processedData]);
+      setCrudLoading(false);
+      if (error) alert("Erreur: " + error.message);
+      else setIsAddOpen(false);
   };
   const handleDeleteDirectly = async (id: string, table: string) => {
       const { error } = await supabase.from(table).delete().eq('id', id);
@@ -1588,10 +1363,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
   };
 
   const renderContent = () => {
-     // MODIFICATION CRITIQUE: On passe 'realTimeStats' au lieu de 'stats' (qui venait de la table daily_stats)
-     if (currentPath === '/') return <Dashboard data={realTimeStats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
-     if (currentPath === '/synthesis') return <DetailedSynthesis data={realTimeStats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
-     
+     if (currentPath === '/') return <Dashboard data={stats} reports={reports} tickerMessages={combinedTickerMessages} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={(id) => handleDeleteDirectly(id, 'reports')} />;
+     if (currentPath === '/synthesis') return <DetailedSynthesis data={stats} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={(r) => alert(`Détail: ${r.content}`)} />;
      const section = currentPath.substring(1);
      if (MODULE_ACTIONS[section]) return (
              <div className="space-y-6 animate-fade-in">
@@ -1610,25 +1383,22 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      );
 
      // Existing Routes
-    if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} onEdit={(item: any) => handleOpenEdit(item, 'interventions')} readOnly={!canWrite} />;
-     if (currentPath === '/techniciens/rapports') return <>
-       <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else setIsVoiceOpen(true); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />
-       <VoiceRecorderModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} userProfile={userProfile} onSaveReport={(r: any) => setReports(prev => [r, ...prev])} />
-     </>;
-    if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} onEdit={(item: any) => handleOpenEdit(item, 'stocks')} readOnly={!canWrite} />;
-    if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} onAddToCart={addToCart} onEdit={(item: any) => handleOpenEdit(item, 'stocks')} readOnly={!canWrite} />;
-    if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} onEdit={(item: any) => handleOpenEdit(item, 'technicians')} readOnly={!canWrite} />;
+     if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} readOnly={!canWrite} />;
+     if (currentPath === '/techniciens/rapports') return <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else alert("Rapport vocal pas encore disponible."); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />;
+     if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
+     if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
+     if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} readOnly={!canWrite} />;
 
      // NEWLY CONFIGURED ROUTES (ACTIVE)
-    if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} onEdit={(item: any) => handleOpenEdit(item, 'chantiers')} readOnly={!canWrite} />;
-    if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} onEdit={(item: any) => handleOpenEdit(item, 'transactions')} readOnly={!canWrite} />;
-    if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} onEdit={(item: any) => handleOpenEdit(item, 'employees')} readOnly={!canWrite} />;
-    if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} onEdit={(item: any) => handleOpenEdit(item, 'payrolls')} readOnly={!canWrite} />;
+     if (currentPath === '/techniciens/chantiers') return <ModulePlaceholder title="Chantiers" subtitle="Suivi & Exécution" items={chantiers} onBack={() => handleNavigate('/techniciens')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('chantiers')} onDelete={(item: any) => handleOpenDelete(item, 'chantiers')} readOnly={!canWrite} />;
+     if (currentPath === '/comptabilite/bilan') return <ModulePlaceholder title="Bilan Financier" subtitle="Journal des Transactions" items={transactions} onBack={() => handleNavigate('/comptabilite')} color="bg-green-600" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('transactions')} onDelete={(item: any) => handleOpenDelete(item, 'transactions')} readOnly={!canWrite} />;
+     if (currentPath === '/comptabilite/rh') return <ModulePlaceholder title="Ressources Humaines" subtitle="Employés & Dossiers" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} onAdd={() => handleOpenAdd('employees')} onDelete={(item: any) => handleOpenDelete(item, 'employees')} readOnly={!canWrite} />;
+     if (currentPath === '/comptabilite/paie') return <ModulePlaceholder title="Paie & Salaires" subtitle="Virements" items={payrolls} onBack={() => handleNavigate('/comptabilite')} color="bg-orange-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('payrolls')} onDelete={(item: any) => handleOpenDelete(item, 'payrolls')} readOnly={!canWrite} />;
      if (currentPath === '/secretariat/planning') return <ModulePlaceholder title="Planning Équipe" subtitle="Vue d'ensemble Interventions" items={interventions} onBack={() => handleNavigate('/secretariat')} color="bg-indigo-500" currentSite={currentSite} currentPeriod={currentPeriod} readOnly={true} />; 
-    if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} onEdit={(item: any) => handleOpenEdit(item, 'clients')} readOnly={!canWrite} />;
-    if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} onEdit={(item: any) => handleOpenEdit(item, 'caisse')} readOnly={!canWrite} />;
-    if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} onEdit={(item: any) => handleOpenEdit(item, 'suppliers')} readOnly={!canWrite} />;
-    if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} onEdit={(item: any) => handleOpenEdit(item, 'purchases')} readOnly={!canWrite} />;
+     if (currentPath === '/secretariat/clients') return <ModulePlaceholder title="Gestion Clients" subtitle="Base de données" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} onAdd={() => handleOpenAdd('clients')} onDelete={(item: any) => handleOpenDelete(item, 'clients')} readOnly={!canWrite} />;
+     if (currentPath === '/secretariat/caisse') return <ModulePlaceholder title="Petite Caisse" subtitle="Entrées / Sorties" items={caisse} onBack={() => handleNavigate('/secretariat')} color="bg-gray-600" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('caisse')} onDelete={(item: any) => handleOpenDelete(item, 'caisse')} readOnly={!canWrite} />;
+     if (currentPath === '/quincaillerie/fournisseurs') return <ModulePlaceholder title="Fournisseurs" subtitle="Partenaires" items={suppliers} onBack={() => handleNavigate('/quincaillerie')} color="bg-green-600" currentSite={currentSite} onAdd={() => handleOpenAdd('suppliers')} onDelete={(item: any) => handleOpenDelete(item, 'suppliers')} readOnly={!canWrite} />;
+     if (currentPath === '/quincaillerie/achats') return <ModulePlaceholder title="Bons d'Achat" subtitle="Commandes Matériel" items={purchases} onBack={() => handleNavigate('/quincaillerie')} color="bg-red-500" currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('purchases')} onDelete={(item: any) => handleOpenDelete(item, 'purchases')} readOnly={!canWrite} />;
 
      return <div className="flex flex-col items-center justify-center h-full text-gray-400"><Wrench size={48} className="mb-4 opacity-50" /><p className="text-xl">Module "{currentPath}" en construction.</p><button onClick={() => handleNavigate('/')} className="mt-4 text-ebf-orange font-bold hover:underline">Retour Accueil</button></div>;
   };
@@ -1686,9 +1456,8 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
         <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} profile={userProfile} />
         <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
         <FlashInfoModal isOpen={isFlashInfoOpen} onClose={() => setIsFlashInfoOpen(false)} messages={combinedTickerMessages} onSaveMessage={saveManualTickerMessage} onDeleteMessage={deleteManualTickerMessage} />
-        <AddModal isOpen={isAddOpen} onClose={() => { setIsAddOpen(false); setItemToEdit(null); }} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} initialData={itemToEdit} />
+        <AddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} config={FORM_CONFIGS[crudTarget]} onSubmit={confirmAdd} loading={crudLoading} />
         <ConfirmationModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={confirmDelete} title="Suppression" message="Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible." />
-        <CartPanel isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cart={cart} updateQuantity={updateCartQuantity} onCheckout={checkoutCart} clearCart={clearCart} />
     </div>
   );
 };

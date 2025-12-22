@@ -12,15 +12,7 @@ export enum Period {
   YEAR = 'Année'
 }
 
-export type Role = 'Admin' | 'DG' | 'Technicien' | 'Secretaire' | 'Magasinier' | 'Visiteur';
-
-export interface UserPermissions {
-  technique?: boolean;
-  comptabilite?: boolean;
-  secretariat?: boolean;
-  quincaillerie?: boolean;
-  rh?: boolean;
-}
+export type Role = 'Admin' | 'Technicien' | 'Secretaire' | 'Magasinier' | 'Visiteur';
 
 export interface Profile {
   id: string;
@@ -29,9 +21,6 @@ export interface Profile {
   role: Role;
   site: Site;
   phone?: string;
-  photo_url?: string;
-  date_hired?: string;
-  permissions?: UserPermissions;
 }
 
 export interface Technician {
@@ -43,7 +32,6 @@ export interface Technician {
 }
 
 export interface StatData {
-  id: string;
   date: string;
   revenue: number;
   interventions: number;
@@ -61,10 +49,6 @@ export interface StockItem {
   site: Site;
 }
 
-export interface CartItem extends StockItem {
-  requestedQuantity: number;
-}
-
 export interface Intervention {
   id: string;
   site: Site;
@@ -76,26 +60,6 @@ export interface Intervention {
   technicianName?: string; // Nom affiché venant du profil
   date: string;
   status: 'Pending' | 'In Progress' | 'Completed'; // Mapped to Planifié, En cours, Exécuté
-}
-
-export interface Chantier {
-  id: string;
-  name: string;
-  client: string;
-  location: string;
-  status: 'En Cours' | 'Terminé' | 'En Attente';
-  budget: number;
-  site: Site;
-  startDate: string;
-}
-
-export interface Material {
-  id: string;
-  name: string;
-  serialNumber?: string;
-  condition: 'Neuf' | 'Bon' | 'Usé' | 'Panne';
-  assignedTo?: string; // Nom technicien
-  site: Site;
 }
 
 export interface DailyReport {
@@ -125,23 +89,6 @@ export interface Transaction {
   label: string;
   category: string;
   date: string;
-  site: Site;
-}
-
-export interface Client {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  address?: string;
-  site: Site;
-}
-
-export interface Supplier {
-  id: string;
-  name: string;
-  contact: string;
-  category: string;
   site: Site;
 }
 
