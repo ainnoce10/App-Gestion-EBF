@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { DetailedSynthesis } from './components/DetailedSynthesis';
+import QuincaillerieCatalog from './components/QuincaillerieCatalog';
 import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
 import { supabase } from './services/supabaseClient';
 
@@ -1438,7 +1439,7 @@ const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
      if (currentPath === '/techniciens/interventions') return <ModulePlaceholder title="Interventions" subtitle="Planning" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} onAdd={() => handleOpenAdd('interventions')} onDelete={(item: any) => handleOpenDelete(item, 'interventions')} readOnly={!canWrite} />;
      if (currentPath === '/techniciens/rapports') return <ReportModeSelector reports={reports} onSelectMode={(mode: string) => { if (mode === 'form') handleOpenAdd('reports'); else alert("Rapport vocal pas encore disponible."); }} onBack={() => handleNavigate('/techniciens')} onViewReport={(r: any) => alert(r.content)} readOnly={!canWrite} />;
      if (currentPath === '/techniciens/materiel') return <ModulePlaceholder title="Matériel" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/techniciens')} color="bg-blue-600" onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
-     if (currentPath === '/quincaillerie/stocks') return <ModulePlaceholder title="Stocks Quincaillerie" subtitle="Inventaire" items={stock} onBack={() => handleNavigate('/quincaillerie')} color="bg-orange-600" currentSite={currentSite} onAdd={() => handleOpenAdd('stocks')} onDelete={(item: any) => handleOpenDelete(item, 'stocks')} readOnly={!canWrite} />;
+    if (currentPath === '/quincaillerie/stocks') return <QuincaillerieCatalog items={stock} onBack={() => handleNavigate('/quincaillerie')} currentSite={currentSite} readOnly={!canWrite} />;
      if (currentPath === '/equipe') return <ModulePlaceholder title="Notre Équipe" subtitle="Staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} onAdd={() => handleOpenAdd('technicians')} onDelete={(item: any) => handleOpenDelete(item, 'technicians')} readOnly={!canWrite} />;
 
      // NEWLY CONFIGURED ROUTES (ACTIVE)
