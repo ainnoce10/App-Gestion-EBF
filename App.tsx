@@ -1,588 +1,378 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import { Filter, TrendingUp, Maximize2, DollarSign, Activity, Users, Star, ArrowUpRight, ArrowDownRight, Clock, Trash2, FileText, AlertTriangle, X, Download, Calendar } from 'lucide-react';
-import { StatData, Site, Period, TickerMessage, DailyReport, StockItem } from '../types';
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+  LayoutDashboard, Wrench, Briefcase, ShoppingCart, Search, Settings,
+  HardHat, DollarSign, LogOut, Calculator, Users, Calendar, FolderOpen, Truck, 
+  FileText, UserCheck, CreditCard, Archive, ShieldCheck, ClipboardList, ArrowLeft, 
+  Plus, Trash2, Moon, Play, StopCircle, RefreshCw, MapPin, Volume2, Megaphone, 
+  AlertCircle, Filter, TrendingUp, Edit, ArrowUp, ArrowDown, AlertTriangle, Loader2, 
+  Mail, Lock, UserPlus, Phone, CheckSquare, Key, Eye, EyeOff, Sparkles, Target, 
+  Shield, ExternalLink, Image as ImageIcon, Tag
+} from 'lucide-react';
+import { Dashboard } from './components/Dashboard';
+import { DetailedSynthesis } from './components/DetailedSynthesis';
+import { Site, Period, TickerMessage, StatData, DailyReport, Intervention, StockItem, Transaction, Profile, Role, Notification, Technician } from './types';
+import { supabase } from './services/supabaseClient';
+import { MOCK_STOCK, MOCK_INTERVENTIONS, MOCK_REPORTS, MOCK_TECHNICIANS, DEFAULT_TICKER_MESSAGES } from './constants';
 
-interface DashboardProps {
-  data: StatData[];
-  reports: DailyReport[];
-  tickerMessages: TickerMessage[];
-  stock: StockItem[];
-  currentSite: Site;
-  currentPeriod: Period;
-  onSiteChange: (site: Site) => void;
-  onPeriodChange: (period: Period) => void;
-  onNavigate: (path: string) => void;
-  onDeleteReport: (id: string) => void;
+// --- Menu Configuration ---
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  path: string;
+  colorClass: string;
 }
 
-const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass, bgClass, borderClass }: any) => (
-  <div className={`bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 ${borderClass} border-y border-r border-orange-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 group`}>
-    <div className="flex justify-between items-start mb-4">
-      <div className={`p-3 rounded-lg ${bgClass} group-hover:scale-110 transition-transform duration-300`}>
-        <Icon size={24} className={colorClass} />
-      </div>
-      {trend && (
-        <span className={`flex items-center text-xs font-bold px-2 py-1 rounded-full ${trend > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-          {trend > 0 ? <ArrowUpRight size={14} className="mr-1" /> : <ArrowDownRight size={14} className="mr-1" />}
-          {Math.abs(trend)}%
-        </span>
-      )}
-    </div>
-    <h3 className="text-green-700 dark:text-gray-400 text-sm font-medium uppercase tracking-wide">{title}</h3>
-    <div className="mt-1 flex items-baseline">
-      <p className="text-2xl font-bold text-green-900 dark:text-white">{value}</p>
-    </div>
-    <p className="text-xs text-gray-400 mt-2">{subtext}</p>
-  </div>
-);
+const MAIN_MENU: MenuItem[] = [
+  { id: 'accueil', label: 'Accueil', icon: LayoutDashboard, path: '/', colorClass: 'text-orange-500' },
+  { id: 'techniciens', label: 'Techniciens', icon: HardHat, path: '/techniciens', colorClass: 'text-gray-600' },
+  { id: 'comptabilite', label: 'Comptabilité', icon: Calculator, path: '/comptabilite', colorClass: 'text-gray-600' },
+  { id: 'secretariat', label: 'Secrétariat', icon: FolderOpen, path: '/secretariat', colorClass: 'text-gray-600' },
+  { id: 'quincaillerie', label: 'Quincaillerie', icon: ShoppingCart, path: '/quincaillerie', colorClass: 'text-gray-600' },
+  { id: 'equipe', label: 'Notre Équipe', icon: Users, path: '/equipe', colorClass: 'text-gray-600' },
+];
 
-export const Dashboard: React.FC<DashboardProps> = ({ 
-  data, reports, tickerMessages, stock, currentSite, currentPeriod, onSiteChange, onPeriodChange, onNavigate, onDeleteReport 
-}) => {
-  const [reportToDelete, setReportToDelete] = useState<DailyReport | null>(null);
+const MODULE_ACTIONS: Record<string, any[]> = {
+  techniciens: [
+    { id: 'interventions', label: 'Interventions', icon: Wrench, path: '/techniciens/interventions', color: 'bg-orange-500', description: 'Planning terrain' },
+    { id: 'rapports', label: 'Rapports Journaliers', icon: FileText, path: '/techniciens/rapports', color: 'bg-gray-700', description: 'Vocal ou Formulaire' },
+    { id: 'materiel', label: 'Matériel Affecté', icon: Truck, path: '/techniciens/materiel', color: 'bg-blue-600', description: 'Inventaire agents' },
+    { id: 'chantiers', label: 'Chantiers', icon: ShieldCheck, path: '/techniciens/chantiers', color: 'bg-green-600', description: 'Suivi exécution' },
+  ],
+  comptabilite: [
+    { id: 'bilan', label: 'Bilan Financier', icon: DollarSign, path: '/comptabilite/bilan', color: 'bg-green-600', description: 'Journal de caisse' },
+    { id: 'rh', label: 'RH', icon: Users, path: '/comptabilite/rh', color: 'bg-purple-600', description: 'Dossiers personnel' },
+    { id: 'paie', label: 'Paie', icon: CreditCard, path: '/comptabilite/paie', color: 'bg-orange-500', description: 'Salaires mensuels' },
+  ],
+  secretariat: [
+    { id: 'planning', label: 'Planning', icon: Calendar, path: '/secretariat/planning', color: 'bg-indigo-500', description: 'Agenda central' },
+    { id: 'clients', label: 'Clients', icon: UserCheck, path: '/secretariat/clients', color: 'bg-blue-500', description: 'Base CRM' },
+    { id: 'caisse', label: 'Caisse', icon: Archive, path: '/secretariat/caisse', color: 'bg-gray-600', description: 'Petites dépenses' },
+  ],
+  quincaillerie: [
+    { id: 'stocks', label: 'Catalogue Stocks', icon: ClipboardList, path: '/quincaillerie/stocks', color: 'bg-orange-600', description: 'Matériels & Prix' },
+    { id: 'fournisseurs', label: 'Fournisseurs', icon: Truck, path: '/quincaillerie/fournisseurs', color: 'bg-green-600', description: 'Gestion achats' },
+    { id: 'achats', label: 'Bons Achat', icon: FileText, path: '/quincaillerie/achats', color: 'bg-red-500', description: 'Historique' },
+  ]
+};
+
+// --- EBF Logo Component ---
+const EbfLogo = ({ size = 'normal' }: { size?: 'small' | 'normal' | 'large' }) => {
+    const scale = size === 'small' ? 0.6 : size === 'large' ? 1.5 : 1;
+    return (
+        <svg width={200 * scale} height={100 * scale} viewBox="0 0 200 100">
+            <circle cx="40" cy="40" r="30" fill="#FF8C00" />
+            <text x="110" y="55" fontFamily="Arial" fontWeight="900" fontSize="40" fill="#008000">E</text>
+            <text x="145" y="55" fontFamily="Arial" fontWeight="900" fontSize="40" fill="#FF0000">B</text>
+            <text x="180" y="55" fontFamily="Arial" fontWeight="900" fontSize="40" fill="#008000">F</text>
+        </svg>
+    );
+};
+
+// --- Helper Functions ---
+const isInPeriod = (dateStr: string, period: Period): boolean => {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  if (period === Period.DAY) return dateStr === todayStr;
+  if (period === Period.MONTH) return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  return true;
+};
+
+// --- MODERN HARDWARE CATALOG COMPONENT ---
+const HardwareCatalog = ({ items, onBack, onAddToCart, currentSite }: any) => {
+    const [search, setSearch] = useState('');
+    const [category, setCategory] = useState('Tous');
+    const [maxPrice, setMaxPrice] = useState(1000000);
+    const [onlyInStock, setOnlyInStock] = useState(false);
+
+    const categories = ['Tous', ...Array.from(new Set(items.map((i: any) => i.category)))];
+
+    const filteredItems = items.filter((item: any) => {
+        const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || 
+                             (item.description && item.description.toLowerCase().includes(search.toLowerCase()));
+        const matchesCategory = category === 'Tous' || item.category === category;
+        const matchesPrice = item.price <= maxPrice;
+        const matchesStock = onlyInStock ? item.quantity > 0 : true;
+        const matchesSite = currentSite === Site.GLOBAL || item.site === currentSite;
+        return matchesSearch && matchesCategory && matchesPrice && matchesStock && matchesSite;
+    });
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm border border-gray-100">
+                        <ArrowLeft size={20} className="text-gray-600 hover:text-ebf-orange"/>
+                    </button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Catalogue Quincaillerie</h2>
+                        <p className="text-gray-500 text-sm">Gestion des matériels techniques</p>
+                    </div>
+                </div>
+                <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
+                    <input 
+                        type="text" 
+                        placeholder="Rechercher un article..." 
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-ebf-orange outline-none shadow-sm"
+                    />
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-6">
+                <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-gray-400">CATÉGORIE</label>
+                    <select value={category} onChange={(e) => setCategory(e.target.value)} className="text-sm font-medium border-none bg-gray-50 rounded-lg p-1.5 outline-none">
+                        {categories.map(c => <option key={c as string} value={c as string}>{c as string}</option>)}
+                    </select>
+                </div>
+                <div className="flex flex-col gap-1 min-w-[150px]">
+                    <label className="text-[10px] font-bold text-gray-400">PRIX MAX: {maxPrice.toLocaleString()} F</label>
+                    <input type="range" min="0" max="500000" step="5000" value={maxPrice} onChange={(e) => setMaxPrice(parseInt(e.target.value))} className="accent-ebf-orange h-1.5" />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={onlyInStock} onChange={() => setOnlyInStock(!onlyInStock)} className="w-4 h-4 accent-ebf-orange" />
+                    <span className="text-sm font-bold text-gray-600">En stock</span>
+                </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredItems.map((item: any) => (
+                    <div key={item.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col">
+                        <div className="relative h-48 bg-gray-100 overflow-hidden">
+                            <img src={item.imageUrl || 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=400&auto=format&fit=crop'} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                            <span className="absolute top-2 left-2 bg-white/90 text-[10px] font-bold px-2 py-1 rounded-full shadow-sm">
+                                {item.category}
+                            </span>
+                        </div>
+                        <div className="p-4 flex-1 flex flex-col">
+                            <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-bold text-gray-800 dark:text-white text-sm">{item.name}</h3>
+                                <span className="text-xs font-black text-green-700 bg-green-50 px-2 py-1 rounded">{item.price.toLocaleString()} F</span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 mb-4 flex-1 line-clamp-2">{item.description}</p>
+                            <div className="flex gap-2">
+                                <button onClick={() => onAddToCart(item)} className="flex-1 bg-ebf-orange text-white py-2 rounded-lg font-bold text-[10px] uppercase flex items-center justify-center gap-2 hover:bg-orange-600 transition">
+                                    <ShoppingCart size={14}/> Panier
+                                </button>
+                                <a href={item.specsUrl || '#'} target="_blank" className="p-2 bg-gray-50 text-gray-400 hover:bg-green-600 hover:text-white rounded-lg transition border">
+                                    <FileText size={14}/>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// --- GENERIC MODULE VIEW ---
+const GenericModuleView = ({ title, subtitle, items = [], onBack, color, currentSite, currentPeriod, onAdd, onDelete }: any) => {
+    const filteredItems = items.filter((item: any) => {
+        if (currentSite && item.site && currentSite !== Site.GLOBAL && item.site !== currentSite) return false;
+        if (currentPeriod && item.date && !isInPeriod(item.date, currentPeriod)) return false;
+        return true;
+    });
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="p-2 bg-white rounded-full hover:bg-orange-50 shadow-sm border border-gray-100"><ArrowLeft size={20} className="text-gray-600"/></button>
+                    <div><h2 className="text-2xl font-bold text-gray-800 dark:text-white">{title}</h2><p className="text-gray-500 text-sm">{subtitle}</p></div>
+                </div>
+                {onAdd && <button onClick={onAdd} className={`${color} text-white px-4 py-2 rounded-lg font-bold shadow-md hover:opacity-90 transition flex items-center gap-2`}><Plus size={18}/> Ajouter</button>}
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-600 text-left">
+                        <tr>
+                            <th className="p-4 text-xs font-bold uppercase text-gray-400">ID</th>
+                            <th className="p-4 text-xs font-bold uppercase text-gray-400">Désignation</th>
+                            <th className="p-4 text-xs font-bold uppercase text-gray-400">Infos</th>
+                            <th className="p-4 text-xs font-bold uppercase text-gray-400">Site</th>
+                            <th className="p-4 text-right text-xs font-bold uppercase text-gray-400">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                        {filteredItems.map((item: any) => (
+                            <tr key={item.id} className="hover:bg-orange-50/20">
+                                <td className="p-4 text-xs font-mono text-gray-400">#{item.id.substring(0, 4)}</td>
+                                <td className="p-4 font-bold text-gray-800 dark:text-white">{item.name || item.client || item.label || item.full_name}</td>
+                                <td className="p-4 text-gray-600 dark:text-gray-300">{item.description || item.specialty || item.role || '-'}</td>
+                                <td className="p-4"><span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">{item.site}</span></td>
+                                <td className="p-4 text-right"><button onClick={() => onDelete(item)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition"><Trash2 size={16}/></button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+// --- MAIN APPLICATION CONTENT ---
+const AppContent = ({ session, onLogout, userRole, userProfile }: any) => {
+  const [currentPath, setCurrentPath] = useState('/');
+  const [currentSite, setCurrentSite] = useState<Site>(Site.GLOBAL);
+  const [currentPeriod, setCurrentPeriod] = useState<Period>(Period.MONTH);
+  const [darkMode, setDarkMode] = useState(false);
+  const [cart, setCart] = useState<any[]>([]);
+
+  // Local Data Stores
+  const [stock, setStock] = useState<StockItem[]>(MOCK_STOCK);
+  const [reports, setReports] = useState<DailyReport[]>(MOCK_REPORTS);
+  const [interventions, setInterventions] = useState<Intervention[]>(MOCK_INTERVENTIONS);
+  const [technicians, setTechnicians] = useState<Technician[]>(MOCK_TECHNICIANS);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
   
-  // États pour le filtre de date personnalisé
-  const [useCustomDate, setUseCustomDate] = useState(false);
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const handleNavigate = (path: string) => setCurrentPath(path);
+  const toggleTheme = () => { setDarkMode(!darkMode); document.documentElement.classList.toggle('dark'); };
+  const handleAddToCart = (item: any) => { setCart(prev => [...prev, item]); alert(`${item.name} ajouté au panier !`); };
 
-  // --- LOGIC: SCAN STOCK FOR ALERTS ---
-  const combinedTickerMessages = useMemo(() => {
-    const stockAlerts: TickerMessage[] = stock
-      .filter(item => {
-        const isSiteRelevant = currentSite === Site.GLOBAL || item.site === currentSite;
-        return isSiteRelevant && item.quantity <= item.threshold;
-      })
-      .map(item => ({
-        id: `stock-alert-${item.id}`,
-        text: `⚠️ STOCK CRITIQUE : ${item.name} (${item.quantity} ${item.unit} restants) à ${item.site}`,
-        type: 'alert',
-        display_order: 0,
-        isManual: false
-      }));
+  const renderContent = () => {
+     if (currentPath === '/') return <Dashboard data={[]} reports={reports} tickerMessages={DEFAULT_TICKER_MESSAGES} stock={stock} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onDeleteReport={() => {}} />;
+     if (currentPath === '/synthesis') return <DetailedSynthesis data={[]} reports={reports} currentSite={currentSite} currentPeriod={currentPeriod} onSiteChange={setCurrentSite} onPeriodChange={setCurrentPeriod} onNavigate={handleNavigate} onViewReport={() => {}} />;
+     
+     const section = currentPath.split('/')[1];
+     if (MODULE_ACTIONS[section] && currentPath.split('/').length === 2) {
+         return (
+             <div className="space-y-6 animate-fade-in">
+                 <div className="flex items-center gap-2 mb-4">
+                     <button onClick={() => handleNavigate('/')} className="p-2 hover:bg-gray-200 rounded-full transition"><ArrowLeft size={24}/></button>
+                     <h2 className="text-3xl font-black text-green-950 dark:text-white uppercase">Module {section}</h2>
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {MODULE_ACTIONS[section].map((action) => (
+                        <button key={action.id} onClick={() => handleNavigate(action.path)} className="bg-white dark:bg-gray-800 hover:bg-orange-50 p-6 rounded-2xl shadow-md border border-gray-100 hover:border-orange-200 transition text-left group">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${action.color} text-white shadow-xl`}><action.icon size={28} /></div>
+                            <h3 className="text-xl font-black text-gray-800 dark:text-white group-hover:text-ebf-orange">{action.label}</h3>
+                            <p className="text-gray-500 text-sm mt-1">{action.description}</p>
+                        </button>
+                    ))}
+                 </div>
+             </div>
+         );
+     }
 
-    return [...stockAlerts, ...tickerMessages];
-  }, [stock, tickerMessages, currentSite]);
+     // --- Specific Route Rendering ---
+     if (currentPath === '/quincaillerie/stocks') return <HardwareCatalog items={stock} onBack={() => handleNavigate('/quincaillerie')} onAddToCart={handleAddToCart} currentSite={currentSite} />;
+     if (currentPath === '/techniciens/interventions') return <GenericModuleView title="Interventions" subtitle="Suivi des dépannages" items={interventions} onBack={() => handleNavigate('/techniciens')} color="bg-orange-500" currentSite={currentSite} currentPeriod={currentPeriod} />;
+     if (currentPath === '/techniciens/rapports') return <div className="p-10 text-center"><button onClick={() => handleNavigate('/techniciens')} className="text-ebf-orange font-bold flex items-center gap-2 mx-auto"><ArrowLeft size={20}/> Retour</button><p className="mt-4">Gestion des rapports en cours...</p></div>;
+     if (currentPath === '/comptabilite/rh') return <GenericModuleView title="Ressources Humaines" subtitle="Gestion du personnel" items={employees} onBack={() => handleNavigate('/comptabilite')} color="bg-purple-600" currentSite={currentSite} />;
+     if (currentPath === '/secretariat/clients') return <GenericModuleView title="Gestion Clients" subtitle="Base CRM" items={clients} onBack={() => handleNavigate('/secretariat')} color="bg-blue-500" currentSite={currentSite} />;
+     if (currentPath === '/equipe') return <GenericModuleView title="Notre Équipe" subtitle="Liste des techniciens et staff" items={technicians} onBack={() => handleNavigate('/')} color="bg-indigo-500" currentSite={currentSite} />;
 
-  // Filter Data Logic (Robust Date Handling)
-  const filteredData = useMemo(() => {
-    return data.filter(d => {
-      // 1. Site Filter
-      const matchSite = currentSite === Site.GLOBAL || d.site === currentSite;
-      
-      // 2. Date Filter
-      let matchPeriod = true;
-
-      if (useCustomDate) {
-        if (dateRange.start && d.date < dateRange.start) matchPeriod = false;
-        if (dateRange.end && d.date > dateRange.end) matchPeriod = false;
-      } else {
-        // Use String comparison to avoid Timezone issues (YYYY-MM-DD)
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0]; 
-        const currentMonthPrefix = todayStr.substring(0, 7); 
-        const currentYearPrefix = todayStr.substring(0, 4);
-
-        if (currentPeriod === Period.DAY) {
-           matchPeriod = d.date === todayStr;
-        } else if (currentPeriod === Period.WEEK) {
-           const dDate = new Date(d.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay(); // 0 (Sun) to 6 (Sat)
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           
-           // Normalize comparison
-           matchPeriod = dDate >= monday && dDate <= sunday;
-        } else if (currentPeriod === Period.MONTH) {
-           matchPeriod = d.date.startsWith(currentMonthPrefix);
-        } else if (currentPeriod === Period.YEAR) {
-           matchPeriod = d.date.startsWith(currentYearPrefix);
-        }
-      }
-
-      return matchSite && matchPeriod;
-    });
-  }, [data, currentSite, currentPeriod, useCustomDate, dateRange]);
-
-  // --- CHART AGGREGATION LOGIC ---
-  // Transforme les données filtrées en une seule entrée globale pour la période sélectionnée
-  const aggregatedChartData = useMemo(() => {
-    if (filteredData.length === 0) return [];
-
-    const totals = filteredData.reduce((acc, curr) => ({
-      revenue: acc.revenue + curr.revenue,
-      expenses: acc.expenses + curr.expenses,
-      profit: acc.profit + curr.profit,
-      interventions: acc.interventions + curr.interventions
-    }), { revenue: 0, expenses: 0, profit: 0, interventions: 0 });
-
-    let label = "";
-    
-    if (useCustomDate) {
-       const startStr = dateRange.start ? new Date(dateRange.start).toLocaleDateString('fr-FR') : '?';
-       const endStr = dateRange.end ? new Date(dateRange.end).toLocaleDateString('fr-FR') : '?';
-       label = `Période (${startStr} - ${endStr})`;
-    } else {
-        const today = new Date();
-        if (currentPeriod === Period.DAY) {
-            // Pour le jour, on affiche la date exacte
-            label = today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-        } else if (currentPeriod === Period.WEEK) {
-            label = "Cette Semaine";
-        } else if (currentPeriod === Period.MONTH) {
-            label = today.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-            // Capitalize Month
-            label = label.charAt(0).toUpperCase() + label.slice(1);
-        } else if (currentPeriod === Period.YEAR) {
-            label = `Année ${today.getFullYear()}`;
-        }
-    }
-
-    return [{
-        date: label, // Clé utilisée par le XAxis
-        ...totals
-    }];
-  }, [filteredData, currentPeriod, useCustomDate, dateRange]);
-
-
-  // Filter Reports Logic (Robust Date Handling)
-  const filteredReports = useMemo(() => {
-    return reports.filter(r => {
-      const matchSite = currentSite === Site.GLOBAL || r.site === currentSite;
-      
-      let matchPeriod = true;
-
-      if (useCustomDate) {
-        if (dateRange.start && r.date < dateRange.start) matchPeriod = false;
-        if (dateRange.end && r.date > dateRange.end) matchPeriod = false;
-      } else {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const currentMonthPrefix = todayStr.substring(0, 7);
-        const currentYearPrefix = todayStr.substring(0, 4);
-
-        if (currentPeriod === Period.DAY) {
-           matchPeriod = r.date === todayStr;
-        } else if (currentPeriod === Period.WEEK) {
-           const rDate = new Date(r.date);
-           const tDate = new Date(todayStr);
-           const dayOfWeek = tDate.getDay();
-           const diffToMon = tDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-           const monday = new Date(tDate);
-           monday.setDate(diffToMon);
-           const sunday = new Date(monday);
-           sunday.setDate(monday.getDate() + 6);
-           matchPeriod = rDate >= monday && rDate <= sunday;
-        } else if (currentPeriod === Period.MONTH) {
-           matchPeriod = r.date.startsWith(currentMonthPrefix);
-        } else if (currentPeriod === Period.YEAR) {
-           matchPeriod = r.date.startsWith(currentYearPrefix);
-        }
-      }
-
-      return matchSite && matchPeriod;
-    });
-  }, [reports, currentSite, currentPeriod, useCustomDate, dateRange]);
-
-  // Aggregated totals for the cards
-  const totals = useMemo(() => {
-    return filteredData.reduce((acc, curr) => ({
-      revenue: acc.revenue + curr.revenue,
-      interventions: acc.interventions + curr.interventions,
-      profit: acc.profit + curr.profit,
-      expenses: acc.expenses + curr.expenses
-    }), { revenue: 0, interventions: 0, profit: 0, expenses: 0 });
-  }, [filteredData]);
-
-  // Calculate profit margin percentage
-  const marginPercent = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(1) : "0";
-
-  // Handle Delete Confirmation
-  const confirmDelete = () => {
-    if (reportToDelete) {
-      onDeleteReport(reportToDelete.id);
-      setReportToDelete(null);
-    }
-  };
-
-  // --- EXPORT PDF FUNCTION ---
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const todayStr = new Date().toLocaleDateString('fr-FR');
-    const periodStr = useCustomDate 
-        ? `Du ${dateRange.start || '...'} au ${dateRange.end || '...'}` 
-        : currentPeriod;
-
-    // -- Header --
-    doc.setFillColor(255, 140, 0); // EBF Orange
-    doc.rect(0, 0, 210, 20, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text("EBF MANAGER - RAPPORT DE SYNTHÈSE", 14, 13);
-    
-    // -- Sub-Header --
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Généré le : ${todayStr}`, 14, 30);
-    doc.text(`Site concerné : ${currentSite}`, 14, 35);
-    doc.text(`Période : ${periodStr}`, 14, 40);
-
-    // -- Financial Summary Box --
-    doc.setDrawColor(34, 139, 34); // EBF Green
-    doc.setLineWidth(0.5);
-    doc.roundedRect(14, 45, 180, 25, 3, 3);
-    
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(34, 139, 34); // Green Text
-    doc.text("RÉSUMÉ FINANCIER", 20, 53);
-
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Chiffre d'Affaires : ${totals.revenue.toLocaleString()} FCFA`, 20, 62);
-    doc.text(`Bénéfice Net : ${totals.profit.toLocaleString()} FCFA (${marginPercent}%)`, 100, 62);
-    doc.text(`Volume Interventions : ${totals.interventions}`, 20, 67);
-
-    // -- Table Data --
-    const tableBody = filteredReports.map(r => [
-      r.date,
-      r.technicianName,
-      r.domain || '-',
-      r.content || '',
-      r.revenue ? `${r.revenue.toLocaleString()} F` : '-'
-    ]);
-
-    // -- Generate Table --
-    autoTable(doc, {
-      startY: 75,
-      head: [['Date', 'Technicien', 'Domaine', 'Détails', 'Recette']],
-      body: tableBody,
-      theme: 'grid',
-      headStyles: { fillColor: [255, 140, 0], textColor: 255 }, // Orange header
-      alternateRowStyles: { fillColor: [240, 240, 240] },
-      styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 35 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 'auto' },
-        4: { cellWidth: 25, halign: 'right' },
-      }
-    });
-
-    // -- Footer --
-    const pageCount = doc.getNumberOfPages();
-    for(let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text('EBF Manager - Document confidentiel interne', 14, 285);
-        doc.text(`Page ${i} / ${pageCount}`, 190, 285, { align: 'right' });
-    }
-
-    doc.save(`Rapport_EBF_${currentSite}_${new Date().toISOString().split('T')[0]}.pdf`);
+     return (
+        <div className="p-10 text-center text-gray-400">
+            <Wrench size={48} className="mx-auto mb-4 opacity-30" />
+            <p className="font-black text-xl">Module en cours de développement.</p>
+            <button onClick={() => handleNavigate('/')} className="mt-4 bg-green-950 text-white px-6 py-2 rounded-xl font-black shadow-lg">Retour Accueil</button>
+        </div>
+     );
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
-      
-      {/* Ticker Tape - BOUCLE INFINIE */}
-      {combinedTickerMessages.length > 0 && (
-        <div className="bg-green-950 text-ebf-white p-2 overflow-hidden shadow-md rounded-lg border-b-4 border-ebf-orange relative h-12 flex items-center group">
-          <div className="absolute left-0 top-0 bottom-0 z-20 bg-green-950 px-2 flex items-center shadow-lg border-r border-green-800">
-            <Clock size={16} className="text-ebf-orange animate-pulse" />
-            <span className="font-bold text-xs ml-1 tracking-wider text-white">FLASH</span>
-          </div>
-          
-          {/* Container dupliqué pour animation infinie */}
-          <div className="animate-ticker flex items-center pl-4 group-hover:pause">
-            {/* Séquence 1 */}
-            <div className="flex space-x-12 items-center pr-96 min-w-max">
-              {combinedTickerMessages.map((msg) => (
-                <div key={msg.id} className="flex items-center space-x-2 whitespace-nowrap">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    msg.type === 'alert' ? 'bg-red-500' : 
-                    msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'
-                  }`}></span>
-                  <span className={`${
-                    msg.type === 'alert' ? 'text-red-400 font-bold' : 
-                    msg.type === 'success' ? 'text-green-400 font-bold' : 'text-gray-100'
-                  } text-sm font-medium tracking-wide`}>
-                    {msg.text}
-                  </span>
-                </div>
-              ))}
+    <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors ${darkMode ? 'dark' : ''}`}>
+        <aside className="fixed inset-y-0 left-0 z-40 w-64 bg-green-950 text-white transform lg:translate-x-0 transition-transform shadow-2xl flex flex-col">
+            <div className="h-24 flex items-center justify-center px-6"><EbfLogo size="normal" /></div>
+            <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
+                {MAIN_MENU.map(item => (
+                    <button key={item.id} onClick={() => handleNavigate(item.path)} className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all ${currentPath === item.path || (item.path !== '/' && currentPath.startsWith(item.path)) ? 'bg-ebf-orange text-white shadow-xl scale-105 font-black' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}>
+                        <item.icon size={22} />
+                        <span className="text-sm">{item.label}</span>
+                    </button>
+                ))}
+            </nav>
+            <div className="p-4 border-t border-white/10">
+                <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition font-black uppercase text-xs tracking-widest"><LogOut size={20}/> Déconnexion</button>
             </div>
+        </aside>
 
-            {/* Séquence 2 (Copie pour boucle) */}
-            <div className="flex space-x-12 items-center pr-96 min-w-max">
-              {combinedTickerMessages.map((msg) => (
-                <div key={`dup-${msg.id}`} className="flex items-center space-x-2 whitespace-nowrap">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    msg.type === 'alert' ? 'bg-red-500' : 
-                    msg.type === 'success' ? 'bg-green-500' : 'bg-blue-400'
-                  }`}></span>
-                  <span className={`${
-                    msg.type === 'alert' ? 'text-red-400 font-bold' : 
-                    msg.type === 'success' ? 'text-green-400 font-bold' : 'text-gray-100'
-                  } text-sm font-medium tracking-wide`}>
-                    {msg.text}
-                  </span>
+        <div className="flex-1 flex flex-col lg:ml-64 relative overflow-hidden">
+             <header className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-b h-20 flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm">
+                <div className="flex flex-col">
+                    <h1 className="font-black text-2xl text-green-950 dark:text-white tracking-tighter uppercase leading-none">EBF CENTRAL HUB</h1>
+                    <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-[4px] mt-1">Management Système</p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filters & Actions */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center bg-white dark:bg-gray-800 p-3 md:p-4 rounded-xl shadow-sm border-l-4 border-ebf-orange border-y border-r border-orange-100 dark:border-gray-700 gap-3 md:gap-4">
-        <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
-          <div className="flex items-center space-x-2 bg-orange-50 dark:bg-gray-700 px-2 py-1.5 rounded-lg border border-orange-200 dark:border-gray-600">
-            <Filter size={16} className="text-ebf-orange" />
-            <span className="font-bold text-ebf-orange text-xs md:text-sm">Filtres</span>
-          </div>
-          
-          <select 
-            className="bg-white border-orange-200 border rounded-lg px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-green-900 font-medium focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none shadow-sm cursor-pointer"
-            value={currentSite}
-            onChange={(e) => onSiteChange(e.target.value as Site)}
-          >
-            <option value={Site.GLOBAL}>🌍 Tous les Sites</option>
-            <option value={Site.ABIDJAN}>🇨🇮 Abidjan</option>
-            <option value={Site.BOUAKE}>🇨🇮 Bouaké</option>
-          </select>
-
-          {/* Toggle pour Dates Précises */}
-           <div className="flex items-center gap-2 border-l border-gray-200 pl-2 md:pl-4">
-              <label className="flex items-center cursor-pointer relative select-none">
-                <input type="checkbox" checked={useCustomDate} onChange={() => setUseCustomDate(!useCustomDate)} className="sr-only peer" />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-ebf-orange"></div>
-                <span className="ml-2 text-xs md:text-sm font-medium text-green-900 dark:text-gray-300 hidden sm:inline">Dates précises</span>
-              </label>
-           </div>
-
-          {!useCustomDate ? (
-            <select 
-                className="bg-white border-orange-200 border rounded-lg px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-green-900 font-medium focus:ring-2 focus:ring-ebf-orange focus:border-ebf-orange outline-none shadow-sm cursor-pointer min-w-[140px]"
-                value={currentPeriod}
-                onChange={(e) => onPeriodChange(e.target.value as Period)}
-            >
-                <option value={Period.DAY}>Aujourd'hui</option>
-                <option value={Period.WEEK}>Cette Semaine</option>
-                <option value={Period.MONTH}>Ce Mois</option>
-                <option value={Period.YEAR}>Cette Année</option>
-            </select>
-          ) : (
-             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <div className="relative">
-                    <Calendar className="absolute left-2 top-1.5 text-ebf-orange" size={14} />
-                    <input 
-                    type="date" 
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-                    className="pl-7 pr-2 border-orange-200 border rounded-lg py-1.5 text-xs md:text-sm text-green-900 bg-white focus:ring-2 focus:ring-ebf-orange outline-none w-32"
-                    />
-                </div>
-                <span className="text-gray-400 font-bold hidden sm:inline">-</span>
-                <div className="relative">
-                    <Calendar className="absolute left-2 top-1.5 text-ebf-orange" size={14} />
-                    <input 
-                    type="date" 
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-                    className="pl-7 pr-2 border-orange-200 border rounded-lg py-1.5 text-xs md:text-sm text-green-900 bg-white focus:ring-2 focus:ring-ebf-orange outline-none w-32"
-                    />
-                </div>
-             </div>
-          )}
-        </div>
-        
-        <div className="flex gap-2 w-full md:w-auto justify-end">
-            <button 
-                onClick={handleExportPDF}
-                className="flex items-center justify-center space-x-2 bg-white border border-ebf-orange text-ebf-orange px-3 py-2 md:px-4 md:py-2.5 rounded-lg hover:bg-orange-50 transition transform hover:-translate-y-0.5 text-sm md:text-base font-medium shadow-sm flex-1 md:flex-initial"
-            >
-                <Download size={16} className="md:w-5 md:h-5" />
-                <span className="hidden sm:inline">Export PDF</span>
-            </button>
-            <button 
-            onClick={() => onNavigate('/synthesis')}
-            className="flex items-center justify-center space-x-2 bg-gradient-to-r from-ebf-green to-emerald-600 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg hover:shadow-lg hover:shadow-green-200 transition transform hover:-translate-y-0.5 text-sm md:text-base flex-1 md:flex-initial"
-            >
-            <Maximize2 size={16} className="md:w-5 md:h-5" />
-            <span className="font-medium">Synthèse Détaillée</span>
-            </button>
-        </div>
-      </div>
-
-      {/* KPIs Grid - RÉORGANISÉ: Interventions, CA, Dépenses, Bénéfice */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <KPICard 
-          title="Interventions" 
-          value={totals.interventions}
-          subtext="Réalisées avec succès"
-          icon={Activity}
-          colorClass="text-blue-500"
-          bgClass="bg-blue-50 dark:bg-gray-700"
-          borderClass="border-blue-500"
-        />
-        <KPICard 
-          title="Chiffre d'Affaires" 
-          value={`${totals.revenue.toLocaleString()} FCFA`}
-          subtext="Total sur la période"
-          icon={DollarSign}
-          trend={12.5}
-          colorClass="text-blue-600"
-          bgClass="bg-blue-50 dark:bg-gray-700"
-          borderClass="border-blue-500"
-        />
-        <KPICard 
-          title="Dépenses" 
-          value={`${totals.expenses.toLocaleString()} FCFA`}
-          subtext="Coûts opérationnels"
-          icon={ArrowDownRight}
-          trend={-5.0}
-          colorClass="text-red-500"
-          bgClass="bg-red-50 dark:bg-gray-700"
-          borderClass="border-red-500"
-        />
-        <KPICard 
-          title="Bénéfice Net" 
-          value={`${totals.profit.toLocaleString()} FCFA`}
-          subtext={`${marginPercent}% de marge`}
-          icon={TrendingUp}
-          trend={8.2}
-          colorClass="text-ebf-green"
-          bgClass="bg-green-50 dark:bg-gray-700"
-          borderClass="border-ebf-green"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        {/* Main Single Histogram - AGGREGATED VIEW */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-orange-100 dark:border-gray-700 border-t-4 border-gray-500">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-green-900 dark:text-white flex items-center">
-              <TrendingUp className="mr-2 text-ebf-orange" size={20} />
-              Performance Globale (CA vs Dépenses vs Bénéfice)
-            </h3>
-            <span className="text-xs text-orange-600 font-bold bg-orange-50 border border-orange-100 px-2 py-1 rounded">Vue globale</span>
-          </div>
-          <div className="h-96 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              {aggregatedChartData.length > 0 ? (
-                <BarChart data={aggregatedChartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="date" tick={{fontSize: 12, fill: '#14532d'}} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" orientation="left" stroke="#14532d" tickFormatter={(value) => `${(value / 1000).toFixed(0)}k F`} axisLine={false} tickLine={false} />
-                  <Tooltip 
-                    cursor={{fill: '#fff7ed'}}
-                    contentStyle={{ borderRadius: '12px', border: '1px solid #fed7aa', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', color: '#14532d' }}
-                    formatter={(value: number) => [`${value.toLocaleString()} FCFA`]}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                  <Bar yAxisId="left" dataKey="revenue" name="Chiffre d'Affaires" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={50} />
-                  <Bar yAxisId="left" dataKey="expenses" name="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={50} />
-                  <Bar yAxisId="left" dataKey="profit" name="Bénéfices" fill="#228B22" radius={[4, 4, 0, 0]} barSize={50}>
-                     {aggregatedChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#228B22' : '#ef4444'} />
-                     ))}
-                  </Bar>
-                </BarChart>
-              ) : (
-                <div className="flex h-full items-center justify-center text-gray-400 flex-col">
-                  <Filter size={48} className="mb-2 opacity-30" />
-                  <p>Aucune donnée pour cette période.</p>
-                </div>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* --- SECTION DERNIERS RAPPORTS AVEC SUPPRESSION --- */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-orange-100 dark:border-gray-700">
-          <h3 className="text-lg font-bold text-green-900 dark:text-white flex items-center mb-4">
-            <FileText className="mr-2 text-ebf-green" size={20} />
-            Derniers Rapports Journaliers
-          </h3>
-          <div className="overflow-x-auto">
-             <table className="w-full">
-               <thead className="bg-gray-50 border-b border-gray-100">
-                 <tr>
-                   <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Date</th>
-                   <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Technicien</th>
-                   <th className="p-3 text-left text-xs font-bold uppercase text-gray-500">Contenu</th>
-                   <th className="p-3 text-right text-xs font-bold uppercase text-gray-500">Actions</th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-gray-50">
-                  {filteredReports.slice(0, 5).map((r: any) => (
-                    <tr key={r.id} className="hover:bg-orange-50/50">
-                      <td className="p-3 text-sm font-bold text-gray-700">{r.date}</td>
-                      <td className="p-3 text-sm text-gray-700">{r.technicianName}</td>
-                      <td className="p-3 text-sm text-gray-600 truncate max-w-xs">{r.content || '...'}</td>
-                      <td className="p-3 text-right">
-                         <button 
-                           onClick={() => setReportToDelete(r)}
-                           className="p-1.5 text-red-500 bg-red-50 rounded hover:bg-red-100 transition"
-                           title="Supprimer ce rapport"
-                         >
-                            <Trash2 size={16}/>
-                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredReports.length === 0 && (
-                     <tr><td colSpan={4} className="p-4 text-center text-gray-400">Aucun rapport récent.</td></tr>
-                  )}
-               </tbody>
-             </table>
-          </div>
-        </div>
-      </div>
-
-      {/* --- CONFIRMATION MODAL (LOCAL TO DASHBOARD) --- */}
-      {reportToDelete && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-green-900/60 backdrop-blur-sm" onClick={() => setReportToDelete(null)} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in border border-red-100">
-                <button onClick={() => setReportToDelete(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20}/></button>
-                <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
-                        <AlertTriangle size={28} />
-                    </div>
-                    <h3 className="text-xl font-bold text-green-900 dark:text-white mb-2">Supprimer le rapport ?</h3>
-                    <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm">
-                        Êtes-vous sûr de vouloir supprimer le rapport de <span className="font-bold">{reportToDelete.technicianName}</span> du <span className="font-bold">{reportToDelete.date}</span> ?
-                        <br/><br/>
-                        <span className="text-red-500 font-bold">Cette action est irréversible.</span>
-                    </p>
-                    <div className="flex gap-4 w-full">
-                        <button onClick={() => setReportToDelete(null)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-bold">
-                            Annuler
-                        </button>
-                        <button onClick={confirmDelete} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-bold shadow-md">
-                            Confirmer
-                        </button>
+                <div className="flex items-center gap-5">
+                    <button onClick={toggleTheme} className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-full">{darkMode ? <Moon size={22}/> : <Settings size={22}/>}</button>
+                    <div className="w-px h-10 bg-gray-100 dark:bg-gray-700"></div>
+                    <div className="flex items-center gap-3">
+                        <div className="text-right hidden sm:block">
+                            <p className="text-xs font-black text-gray-900 dark:text-white leading-none">{userProfile?.full_name}</p>
+                            <p className="text-[10px] text-ebf-orange font-bold uppercase tracking-widest mt-1">{userRole}</p>
+                        </div>
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center font-black text-xl border-4 border-white shadow-lg">
+                            {userProfile?.full_name?.charAt(0)}
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-      )}
+             </header>
 
+             <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-ebf-pattern relative">
+                <div className="max-w-7xl mx-auto">
+                    {renderContent()}
+                </div>
+                
+                {cart.length > 0 && currentPath.includes('quincaillerie') && (
+                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-green-950/95 backdrop-blur-md text-white px-8 py-5 rounded-3xl shadow-2xl flex items-center gap-8 z-50 animate-slide-in border-2 border-ebf-orange max-w-xl w-full lg:ml-32">
+                        <div className="relative">
+                           <div className="w-14 h-14 bg-ebf-orange rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6"><ShoppingCart size={32} className="text-white" /></div>
+                           <span className="absolute -top-3 -right-3 bg-red-600 text-white text-xs w-7 h-7 rounded-full flex items-center justify-center font-black border-2 border-white">{cart.length}</span>
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-black text-lg tracking-tight leading-none">AFFECTATION ACTIVE</p>
+                            <p className="text-xs text-gray-400 mt-1 italic">Matériel prêt pour validation</p>
+                        </div>
+                        <button onClick={() => alert('Validation validée !')} className="bg-white text-green-950 px-6 py-2.5 rounded-xl font-black text-sm hover:bg-orange-50 transition">VALIDER</button>
+                        <button onClick={() => setCart([])} className="text-gray-400 hover:text-red-500 transition"><Trash2 size={24}/></button>
+                    </div>
+                )}
+             </main>
+        </div>
     </div>
   );
 };
+
+export default function App() {
+  const [appState, setAppState] = useState<'LOADING' | 'LOGIN' | 'APP'>('LOADING');
+  const [session, setSession] = useState<any>(null);
+  const [userRole, setUserRole] = useState<Role>('Visiteur');
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+         supabase.from('profiles').select('*').eq('id', session.user.id).single().then(({ data }) => {
+            if (data) { setUserRole(data.role); setUserProfile(data); }
+            setSession(session);
+            setAppState('APP');
+         });
+      } else { setAppState('LOGIN'); }
+    });
+  }, []);
+
+  const LoginScreen = () => (
+    <div className="h-screen flex items-center justify-center bg-ebf-pattern p-6">
+        <div className="bg-white/95 backdrop-blur-md p-12 rounded-[40px] shadow-2xl w-full max-w-md text-center border-t-[12px] border-ebf-orange">
+            <EbfLogo size="large" />
+            <h2 className="text-3xl font-black text-green-950 mt-8 mb-2 tracking-tighter uppercase">CONNEXION EBF</h2>
+            <p className="text-gray-500 text-xs mb-10 font-bold uppercase tracking-[4px]">Management Centralisé</p>
+            <button onClick={() => setAppState('APP')} className="w-full bg-green-950 text-white py-5 rounded-3xl font-black text-xl shadow-2xl hover:bg-emerald-900 transition transform hover:-translate-y-1">ENTRER DANS LE HUB</button>
+            <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-widest">Abidjan | Bouaké | International</p>
+        </div>
+    </div>
+  );
+
+  if (appState === 'LOADING') return <div className="h-screen flex items-center justify-center bg-green-50"><Loader2 className="animate-spin text-ebf-orange" size={64}/></div>;
+  if (appState === 'LOGIN') return <LoginScreen />;
+
+  return <AppContent session={session} onLogout={() => setAppState('LOGIN')} userRole={userRole} userProfile={userProfile} />;
+}
